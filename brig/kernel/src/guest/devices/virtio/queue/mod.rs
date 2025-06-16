@@ -114,28 +114,28 @@ impl VirtQueue {
     }
 
     pub fn set_descriptor_low(&mut self, value: u32) {
-        self.descriptor_gpa &= 0x0000_0000_ffff_ffff;
+        self.descriptor_gpa &= 0xffff_ffff_0000_0000;
         self.descriptor_gpa |= u64::from(value);
     }
     pub fn set_descriptor_high(&mut self, value: u32) {
-        self.descriptor_gpa &= 0xffff_ffff_0000_0000;
+        self.descriptor_gpa &= 0x0000_0000_ffff_ffff;
         self.descriptor_gpa |= u64::from(value) << 32;
     }
 
     pub fn set_available_low(&mut self, value: u32) {
-        self.available_gpa &= 0x0000_0000_ffff_ffff;
+        self.available_gpa &= 0xffff_ffff_0000_0000;
         self.available_gpa |= u64::from(value);
     }
     pub fn set_available_high(&mut self, value: u32) {
-        self.available_gpa &= 0xffff_ffff_0000_0000;
+        self.available_gpa &= 0x0000_0000_ffff_ffff;
         self.available_gpa |= u64::from(value) << 32;
     }
     pub fn set_used_low(&mut self, value: u32) {
-        self.used_gpa &= 0x0000_0000_ffff_ffff;
+        self.used_gpa &= 0xffff_ffff_0000_0000;
         self.used_gpa |= u64::from(value);
     }
     pub fn set_used_high(&mut self, value: u32) {
-        self.used_gpa &= 0xffff_ffff_0000_0000;
+        self.used_gpa &= 0x0000_0000_ffff_ffff;
         self.used_gpa |= u64::from(value) << 32;
     }
 }
