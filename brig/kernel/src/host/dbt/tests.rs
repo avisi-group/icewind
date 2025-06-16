@@ -4783,3 +4783,50 @@ fn sbfm() {
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
+
+#[ktest]
+fn umulh() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 9bc17c02     umulh   x2, x0, x1
+    // decode_umulh_aarch64_instrs_integer_arithmetic_mul_widening_64_128hi
+    // execute_aarch64_instrs_integer_arithmetic_mul_widening_64_128hi
+    let opcode = emitter.constant(0x9bc17c02, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("SEE", -1i64);
+    register_file.write("R2", 0x0);
+    register_file.write("R1", 8u64);
+    register_file.write("R0", 4u64);
+
+    log::error!("{translation:?}");
+
+    translation.execute(&register_file);
+
+    let nzcv = register_file.read::<u8>("PSTATE_N") << 3
+        | register_file.read::<u8>("PSTATE_Z") << 2
+        | register_file.read::<u8>("PSTATE_C") << 1
+        | register_file.read::<u8>("PSTATE_V");
+
+    panic!("{:x} {:04b}", register_file.read::<u64>("R2"), nzcv);
+
+    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
