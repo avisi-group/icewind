@@ -67,7 +67,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     let cv = match kind {
                         BinaryOperationKind::Add => lhs + rhs,
                         BinaryOperationKind::Sub => lhs - rhs,
-                        BinaryOperationKind::Multiply | BinaryOperationKind::IMultiply => lhs * rhs,
+                        BinaryOperationKind::Multiply => lhs * rhs,
                         BinaryOperationKind::Divide => lhs / rhs,
                         BinaryOperationKind::Modulo => todo!(),
                         BinaryOperationKind::And => todo!(),

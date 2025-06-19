@@ -809,16 +809,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 bit_extract(*value, *start, *length),
                 Type::Unsigned(u16::try_from(*length).unwrap()),
             ),
-            // // getting top 64 bits of multiplication? replace with a tuple access of an imultiply
-            // (
-            //     NodeKind::BinaryOperation(BinaryOperationKind::Multiply(a, b)),
-            //     NodeKind::Constant { value: 64, .. },
-            //     NodeKind::Constant { value: 64, .. },
-            // ) => {
-            //     let imul =
-            //         self.binary_operation(BinaryOperationKind::IMultiply(a.clone(), b.clone()));
-            //     self.access_tuple(imul, 1) // top 64 bits
-            // }
+
             // known start and length
             (
                 _,
@@ -1750,7 +1741,7 @@ pub enum BinaryOperationKind<A: Alloc> {
     Add(X86NodeRef<A>, X86NodeRef<A>),
     Sub(X86NodeRef<A>, X86NodeRef<A>),
     Multiply(X86NodeRef<A>, X86NodeRef<A>),
-    IMultiply(X86NodeRef<A>, X86NodeRef<A>),
+
     Divide(X86NodeRef<A>, X86NodeRef<A>),
     Modulo(X86NodeRef<A>, X86NodeRef<A>),
     And(X86NodeRef<A>, X86NodeRef<A>),

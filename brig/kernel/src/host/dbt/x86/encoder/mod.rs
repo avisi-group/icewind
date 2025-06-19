@@ -67,6 +67,8 @@ pub enum Opcode<A: Alloc> {
     XOR(Operand<A>, Operand<A>),
     /// and {0}, {1},
     AND(Operand<A>, Operand<A>),
+    /// mul {0}, {1}, {2},
+    MUL(Operand<A>, Operand<A>, Operand<A>),
     /// imul {0}, {1},
     IMUL(Operand<A>, Operand<A>),
     /// imul1 {0}, {1}, {2} (one-operand form has 128 bit output)
@@ -793,6 +795,10 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::AND(src, dst))
     }
 
+    pub fn mul(src: Operand<A>, dst_lo: Operand<A>, dst_hi: Operand<A>) -> Self {
+        Self(Opcode::MUL(src, dst_lo, dst_hi))
+    }
+
     pub fn imul(src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::IMUL(src, dst))
     }
@@ -1336,6 +1342,25 @@ impl<A: Alloc> Instruction<A> {
             ) => assembler
                 .imul_2::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                 .unwrap(),
+
+            MUL(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst_lo)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst_hi)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assert_eq!(*dst_hi, PhysicalRegister::RDX);
+                assert_eq!(*dst_lo, PhysicalRegister::RAX);
+                assembler.mul::<AsmRegister64>(src.into()).unwrap()
+            }
             IMUL1(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1426,6 +1451,12 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
+            ]
+            .into_iter(),
+            Opcode::MUL(src, dst_lo, dst_hi) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst_lo)),
+                Some((OperandDirection::Out, dst_hi)),
             ]
             .into_iter(),
             Opcode::IMUL1(src, dst_lo, dst_hi) => [
@@ -1520,6 +1551,13 @@ impl<A: Alloc> Instruction<A> {
                     .into_iter()
                     .collect()
             }
+            Opcode::MUL(src, dst_lo, dst_hi) => [
+                (OperandDirection::In, src),
+                (OperandDirection::InOut, dst_lo),
+                (OperandDirection::Out, dst_hi),
+            ]
+            .into_iter()
+            .collect(),
             Opcode::IMUL1(src, dst_lo, dst_hi) => [
                 (OperandDirection::In, src),
                 (OperandDirection::InOut, dst_lo),

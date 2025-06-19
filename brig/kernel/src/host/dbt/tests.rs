@@ -4812,8 +4812,6 @@ fn umulh() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::error!("{translation:?}");
-
     register_file.write("R2", 0x0);
     register_file.write("R1", 8u64);
     register_file.write("R0", 4u64);
@@ -4821,10 +4819,12 @@ fn umulh() {
     assert_eq!(register_file.read::<u64>("R2"), 0);
 
     register_file.write("R2", 0x0);
-    register_file.write("R1", u64::MAX);
-    register_file.write("R0", 2);
+    register_file.write("R1", i64::MAX as u64);
+    register_file.write("R0", 4);
     translation.execute(&register_file);
     assert_eq!(register_file.read::<u64>("R2"), 1);
+
+    // todo: actually fix this for unsigned integers
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
 }

@@ -39,7 +39,6 @@ pub enum BinaryOperationKind {
     Add,
     Sub,
     Multiply,
-    IMultiply, // integer multiplication, 128-bit output
     Divide,
     Modulo,
     And,
@@ -923,7 +922,6 @@ impl Statement {
                     BinaryOperationKind::Add => "add",
                     BinaryOperationKind::Sub => "sub",
                     BinaryOperationKind::Multiply => "mul",
-                    BinaryOperationKind::IMultiply => "imul",
                     BinaryOperationKind::Divide => "div",
                     BinaryOperationKind::Modulo => "mod",
                     BinaryOperationKind::CompareEqual => "cmp-eq",

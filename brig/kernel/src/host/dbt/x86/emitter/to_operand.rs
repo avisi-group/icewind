@@ -354,6 +354,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 amount,
                 kind,
             } => {
+                // SPECIAL CASE FOR UMULH BUG
                 // getting top 64 bits of multiplication, emit imul and read out RAX
                 if let NodeKind::BinaryOperation(BinaryOperationKind::Multiply(a, b)) = value.kind()
                     && let NodeKind::Constant { value: 64, .. } = amount.kind()
@@ -367,7 +368,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     let b = self.to_operand(b);
                     self.push_instruction(Instruction::mov(a, src).unwrap());
                     self.push_instruction(Instruction::mov(b, dst_lo).unwrap());
-                    self.push_instruction(Instruction::imul1(src, dst_lo, dst_hi));
+                    self.push_instruction(Instruction::mul(src, dst_lo, dst_hi));
 
                     return dst_hi;
                 }
@@ -633,7 +634,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         | Modulo(left, right)
         | Divide(left, right)
         | Multiply(left, right)
-        | IMultiply(left, right)
         | And(left, right)
         | Xor(left, right)
         | PowI(left, right)
