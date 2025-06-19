@@ -14,6 +14,7 @@ use {
             types::{PrimitiveType, Type},
         },
     },
+    rayon::prelude::*,
 };
 
 pub fn run(_ctx: &OptimizationContext, model: &mut Model) -> bool {
@@ -21,7 +22,7 @@ pub fn run(_ctx: &OptimizationContext, model: &mut Model) -> bool {
 
     let single_block_functions = model
         .functions()
-        .iter()
+        .par_iter()
         .filter(|(name, _)| !INTRINSICS.contains(&name.as_ref()))
         .filter(|(_, f)| f.block_iter().count() == 1)
         .map(|(name, f)| {

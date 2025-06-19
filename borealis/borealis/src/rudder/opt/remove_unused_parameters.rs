@@ -1,28 +1,33 @@
 use {
     crate::rudder::{analysis, opt::OptimizationContext},
     common::rudder::{Model, block::Block},
+    parking_lot::Mutex,
+    rayon::prelude::*,
+    std::sync::atomic::{AtomicBool, Ordering},
 };
 
-pub fn run(ctx: &OptimizationContext, model: &mut Model) -> bool {
-    let mut changed = false;
+pub fn run(_ctx: &OptimizationContext, model: &mut Model) -> bool {
+    let changed = AtomicBool::new(false);
 
-    let mut dead_parameters = vec![];
+    let dead_parameters = Mutex::new(vec![]);
 
-    for (_, f) in model.functions_mut() {
-        let dfa = analysis::dfa::SymbolUseAnalysis::new(f);
+    model.functions_mut().par_values_mut().for_each(|function| {
+        let dfa = analysis::dfa::SymbolUseAnalysis::new(function);
 
-        for (i, sym) in f.parameters().iter().enumerate().rev() {
+        for (i, sym) in function.parameters().iter().enumerate().rev() {
             // rev because we want to remove parameters in reverse order to not mess up the
             // indices
             if dfa.is_symbol_dead(&sym) {
-                dead_parameters.push((f.name(), i));
-                f.remove_parameter(&sym);
+                dead_parameters.lock().push((function.name(), i));
+                function.remove_parameter(&sym);
             }
         }
-    }
+    });
+
+    let dead_parameters = dead_parameters.into_inner();
 
     //     fix call sites
-    for (_, function) in model.functions_mut() {
+    model.functions_mut().par_values_mut().for_each(|function| {
         function
             .block_iter()
             .collect::<Vec<_>>()
@@ -42,12 +47,12 @@ pub fn run(ctx: &OptimizationContext, model: &mut Model) -> bool {
                             .filter(|(name, _)| *name == *target)
                             .for_each(|(_, index)| {
                                 args.remove(*index);
-                                changed = true;
+                                changed.store(true, Ordering::Relaxed);
                             });
                     }
                 }
             });
-    }
+    });
 
-    changed
+    changed.load(Ordering::Relaxed)
 }
