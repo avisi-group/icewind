@@ -67,7 +67,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     let cv = match kind {
                         BinaryOperationKind::Add => lhs + rhs,
                         BinaryOperationKind::Sub => lhs - rhs,
-                        BinaryOperationKind::Multiply => lhs * rhs,
+                        BinaryOperationKind::Multiply | BinaryOperationKind::IMultiply => lhs * rhs,
                         BinaryOperationKind::Divide => lhs / rhs,
                         BinaryOperationKind::Modulo => todo!(),
                         BinaryOperationKind::And => todo!(),
@@ -115,7 +115,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                                 false
                             }
                         }
-                        Constant::SignedInteger { value: rhs_value, .. } => {
+                        Constant::SignedInteger {
+                            value: rhs_value, ..
+                        } => {
                             if rhs_value == 1 {
                                 false
                             } else {

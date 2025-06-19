@@ -4812,21 +4812,19 @@ fn umulh() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    register_file.write("SEE", -1i64);
+    log::error!("{translation:?}");
+
     register_file.write("R2", 0x0);
     register_file.write("R1", 8u64);
     register_file.write("R0", 4u64);
-
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0);
 
-    let nzcv = register_file.read::<u8>("PSTATE_N") << 3
-        | register_file.read::<u8>("PSTATE_Z") << 2
-        | register_file.read::<u8>("PSTATE_C") << 1
-        | register_file.read::<u8>("PSTATE_V");
-
-    panic!("{:x} {:04b}", register_file.read::<u64>("R2"), nzcv);
+    register_file.write("R2", 0x0);
+    register_file.write("R1", u64::MAX);
+    register_file.write("R0", 2);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 1);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
