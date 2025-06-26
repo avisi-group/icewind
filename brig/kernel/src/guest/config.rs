@@ -44,7 +44,7 @@ pub fn load_from_fs<FS: Filesystem>(fs: &mut FS) -> Result<Config, ConfigLoadErr
 pub struct Config {
     pub memory: BTreeMap<InternedString, AddressSpace>,
     pub load: Vec<Load>,
-    pub devices: BTreeMap<InternedString, Device>,
+    pub devices: Vec<Device>,
 }
 
 pub type AddressSpace = BTreeMap<InternedString, Memory>;
@@ -66,6 +66,7 @@ pub struct Load {
 
 #[derive(Debug, Deserialize)]
 pub struct Device {
+    pub name: InternedString,
     pub kind: InternedString,
     pub attach: Option<DeviceAttachment>,
     #[serde(flatten)]

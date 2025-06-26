@@ -20,12 +20,16 @@ use {
 
 #[guest_device_factory(virtio_block)]
 fn create_virtio_block(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    let dev = Arc::new(VirtioBlock::new(64));
+    let dev = Arc::new(VirtioBlock::new(
+        64,
+        *config
+            .get(&InternedString::from_static("irq_controller"))
+            .unwrap(),
+    ));
 
     dev
 }
 
-#[derive(Debug)]
 struct VirtioBlock {
     id: ObjectId,
     virtio: Mutex<Virtio>,
@@ -33,14 +37,21 @@ struct VirtioBlock {
 }
 
 impl VirtioBlock {
-    fn new(irq_line: usize) -> Self {
+    fn new(irq_line: usize, controller_name: InternedString) -> Self {
+        // Lookup GIC
+        let gic_id = ObjectStore::global()
+            .lookup_by_alias(controller_name)
+            .unwrap();
+        let controller = ObjectStore::global().get_irq_controller(gic_id).unwrap();
+
         let mut celf = Self {
             id: ObjectId::new(),
-            virtio: Mutex::new(Virtio::new(1, VIRTIO_DEV_BLK)),
+            virtio: Mutex::new(Virtio::new(1, VIRTIO_DEV_BLK, irq_line, controller)),
             config: virtio_blk_config::default(),
         };
 
-        celf.config.capacity = 1 * 1024 * 1024;
+        // in 512 byte sectors
+        celf.config.capacity = 1 * 1024 * 1024 * 1024 / 512; // 1GiB
         celf.config.blk_size = 4096;
 
         celf.virtio.lock().set_host_feature(6);
@@ -78,7 +89,7 @@ impl MemoryMappedDevice for VirtioBlock {
         } else {
             let config_offset = usize::try_from(offset - 0x100).unwrap();
 
-            log::warn!("reading config @ {config_offset:x}");
+            log::error!("reading config @ {config_offset:x}");
 
             let config = unsafe { any_as_u8_slice(&self.config) };
             let start = config_offset;

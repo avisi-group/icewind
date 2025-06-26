@@ -1,5 +1,8 @@
 use {
-    crate::guest::devices::virtio::queue::VirtQueue, alloc::vec::Vec, bitfields::bitfield,
+    crate::{guest::devices::virtio::queue::VirtQueue, host::objects::irq::IrqController},
+    alloc::{sync::Arc, vec::Vec},
+    bitfields::bitfield,
+    core::sync::atomic::AtomicU32,
     virtio_drivers::transport::pci::VIRTIO_VENDOR_ID,
 };
 
@@ -117,27 +120,32 @@ impl WriteRegister {
     }
 }
 
-#[derive(Debug)]
-struct Virtio {
+pub struct Virtio {
     device_id: u16,
     device_feature_select: bool,
     device_features: [u32; 2],
     driver_features_select: u32,
     driver_features: u32,
-    isr: u32,
+    isr: AtomicU32,
     status: Status,
     queues: Vec<VirtQueue>,
     queue_select: usize,
+    irq: Irq,
 }
 
 impl Virtio {
-    fn new(num_queues: usize, device_id: u16) -> Self {
+    fn new(
+        num_queues: usize,
+        device_id: u16,
+        irq_line: usize,
+        irq_controller: Arc<dyn IrqController>,
+    ) -> Self {
         assert!(num_queues > 0);
         Self {
             device_id,
             device_feature_select: false,
             device_features: [0, 0],
-            isr: 0,
+            isr: AtomicU32::new(0),
             status: Status::new(),
             queues: (0..num_queues)
                 .into_iter()
@@ -146,6 +154,10 @@ impl Virtio {
             queue_select: 0,
             driver_features_select: 0,
             driver_features: 0,
+            irq: Irq {
+                line: irq_line,
+                controller: irq_controller,
+            },
         }
     }
 
@@ -191,7 +203,7 @@ impl Virtio {
             DeviceFeatures => self.selected_device_feature(),
             QueueReady => u32::from(self.selected_queue().ready()),
             QueueNumMax => u32::try_from(self.selected_queue().num_max()).unwrap(),
-            InterruptStatus => self.isr,
+            InterruptStatus => self.isr.load(core::sync::atomic::Ordering::Relaxed),
             Status => self.status.0,
             ConfigGeneration => 0,
         };
@@ -255,8 +267,23 @@ impl Virtio {
                 };
                 self.selected_queue_mut().set_ready(ready);
             }
-            R::QueueNotify => todo!(),
-            R::InterruptAcknowledge => todo!(),
+            R::QueueNotify => {
+                let queue_idx = usize::try_from(value).unwrap();
+                self.queues[queue_idx].process(&self.irq, &self.isr)
+            }
+            R::InterruptAcknowledge => {
+                let isr = self
+                    .isr
+                    .fetch_and(!value, core::sync::atomic::Ordering::Relaxed);
+
+                if isr != 0 {
+                    log::error!("ack int raise");
+                    self.irq.controller.raise(self.irq.line);
+                } else {
+                    log::error!("ack int rescind");
+                    self.irq.controller.rescind(self.irq.line);
+                }
+            }
             R::QueueDescriptorLow => self.selected_queue_mut().set_descriptor_low(value),
             R::QueueDescriptorHigh => self.selected_queue_mut().set_descriptor_high(value),
             R::QueueAvailableLow => self.selected_queue_mut().set_available_low(value),
@@ -265,4 +292,9 @@ impl Virtio {
             R::QueueUsedHigh => self.selected_queue_mut().set_used_high(value),
         }
     }
+}
+
+pub struct Irq {
+    pub line: usize,
+    pub controller: Arc<dyn IrqController>,
 }

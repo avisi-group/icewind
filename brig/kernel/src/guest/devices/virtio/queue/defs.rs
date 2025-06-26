@@ -38,3 +38,24 @@ pub const DEFAULT_AVAIL_RING_ADDR: u64 = 0x0;
 
 /// Default guest physical address for used ring.
 pub const DEFAULT_USED_RING_ADDR: u64 = 0x0;
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C, packed)]
+pub struct BlkReq {
+    pub typ: BlkReqType,
+    pub ioprio: u32,
+    pub sector: u64,
+}
+
+#[repr(u32)]
+#[derive(Debug, Clone, Copy)]
+pub enum BlkReqType {
+    In = 0,
+    Out = 1,
+    Flush = 4,
+    GetId = 8,
+    GetLifetime = 10,
+    Discard = 11,
+    WriteZeroes = 13,
+    SecureErase = 14,
+}
