@@ -209,9 +209,9 @@ impl Virtio {
         };
 
         if register == Status {
-            log::error!("read status {:#?}", self.status);
+            log::debug!("read status {:#?}", self.status);
         } else {
-            log::error!("read reg {register:?}: {resp:?}");
+            log::debug!("read reg {register:?}: {resp:?}");
         }
 
         resp
@@ -221,9 +221,9 @@ impl Virtio {
         use WriteRegister as R;
 
         if register == R::Status {
-            log::error!("writing status {:#?}", Status::from(value));
+            log::debug!("writing status {:#?}", Status::from(value));
         } else {
-            log::error!("write reg {register:?}: {value:?}");
+            log::debug!("write reg {register:?}: {value:?}");
         }
 
         match register {
@@ -277,10 +277,10 @@ impl Virtio {
                     .fetch_and(!value, core::sync::atomic::Ordering::Relaxed);
 
                 if isr != 0 {
-                    log::error!("ack int raise");
+                    log::debug!("ack int raise");
                     self.irq.controller.raise(self.irq.line);
                 } else {
-                    log::error!("ack int rescind");
+                    log::debug!("ack int rescind");
                     self.irq.controller.rescind(self.irq.line);
                 }
             }

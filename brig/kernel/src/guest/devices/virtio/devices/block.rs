@@ -51,7 +51,7 @@ impl VirtioBlock {
         };
 
         // in 512 byte sectors
-        celf.config.capacity = 1 * 1024 * 1024 * 1024 / 512; // 1GiB
+        celf.config.capacity = 62918656 / 512;
         celf.config.blk_size = 4096;
 
         celf.virtio.lock().set_host_feature(6);
@@ -89,7 +89,7 @@ impl MemoryMappedDevice for VirtioBlock {
         } else {
             let config_offset = usize::try_from(offset - 0x100).unwrap();
 
-            log::error!("reading config @ {config_offset:x}");
+            log::debug!("reading config @ {config_offset:x}");
 
             let config = unsafe { any_as_u8_slice(&self.config) };
             let start = config_offset;

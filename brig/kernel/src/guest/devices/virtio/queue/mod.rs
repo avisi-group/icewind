@@ -4,13 +4,26 @@ use {
             devices::{Irq, Virtio},
             queue::defs::{BlkReq, BlkReqType},
         },
-        host::{arch::x86::memory::guest_physical_to_host_virt, objects::irq::IrqController},
+        host::{
+            arch::x86::memory::{VirtAddrExt as _, VirtualMemoryArea, guest_physical_to_host_virt},
+            devices::manager::SharedDeviceManager,
+            objects::irq::IrqController,
+        },
     },
-    alloc::vec::Vec,
-    core::sync::atomic::{AtomicBool, AtomicU32},
+    alloc::{alloc::alloc_zeroed, vec::Vec},
+    core::{
+        alloc::Layout,
+        ptr::slice_from_raw_parts_mut,
+        slice,
+        sync::atomic::{AtomicBool, AtomicU32},
+    },
     spin::Mutex,
     virtio_bindings::virtio_scsi::__u32,
     x86::fence,
+    x86_64::{
+        VirtAddr,
+        structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate as _},
+    },
 };
 
 const DESTINATION_DEVICE_BLOCK_SIZE: usize = 4096;
@@ -238,7 +251,7 @@ impl VirtQueue {
     }
 
     pub fn process(&mut self, irq: &Irq, isr: &AtomicU32) {
-        log::error!("processing queue");
+        log::debug!("processing queue");
         //  assert(queue);
 
         // 	DEBUG << CONTEXT(VirtIO) << "Processing queue " << queue;
@@ -249,12 +262,12 @@ impl VirtQueue {
         // 		DEBUG << CONTEXT(VirtIO) << "Popped a descriptor chain head, idx="
         // << std::dec << idx;
         while let Some((idx, mut descr)) = self.pop() {
-            log::error!("popped: {idx}: {descr:?}");
+            log::debug!("popped: {idx}: {descr:?}");
             // 		VirtIOQueueEvent *evt = new VirtIOQueueEvent(queue, idx);
             let mut evt = VirtQueueEvent::new(idx);
 
             loop {
-                log::error!("start of loop: {descr:?}");
+                log::debug!("start of loop: {descr:?}");
                 // 			void *descr_host_addr;
                 // 			if (!guest().resolve_gpa((gpa_t)descr->addr, descr_host_addr))
                 // { 				ERROR << "Unable to resolve VirtIO descriptor
@@ -269,7 +282,7 @@ impl VirtQueue {
                     size: descr.length,
                 };
 
-                log::error!("buffer: {buffer:?}");
+                log::debug!("buffer: {buffer:?}");
 
                 if descr.is_write() {
                     evt.write_buffers.push(buffer);
@@ -318,10 +331,10 @@ impl VirtQueueEvent {
     }
 
     fn process(&mut self, queue: &mut VirtQueue, irq: &Irq, isr: &AtomicU32) {
-        log::error!("processing event");
+        log::debug!("processing event");
 
         let Some(first) = self.read_buffers.first() else {
-            log::error!("EMPTY EVENT?");
+            log::debug!("EMPTY EVENT?");
             return;
         };
 
@@ -352,28 +365,32 @@ impl VirtQueueEvent {
         irq: &Irq,
         isr: &AtomicU32,
     ) {
-        log::error!("read event: {sector:x}");
+        log::debug!("read event: {sector:x}");
         assert_eq!(self.write_buffers.len(), 2);
 
-        let req = BlockDeviceRequest {
-            block_count: self.write_buffers[0].size / DESTINATION_DEVICE_BLOCK_SIZE as __u32,
-            block_offset: sector,
-            buffer: self.write_buffers[0].data,
-            is_read: true,
-            opaque: core::ptr::null_mut(),
+        allocate_physical(self.write_buffers[0].data);
+
+        let dev = SharedDeviceManager::get()
+            .get_device_by_alias("disk00:04.0")
+            .unwrap();
+        let mut dev = dev.lock();
+        let blk = dev.as_block();
+
+        let destination = unsafe {
+            core::slice::from_raw_parts_mut(
+                self.write_buffers[0].data,
+                usize::try_from(self.write_buffers[0].size).unwrap(),
+            )
         };
 
-        log::error!("{req:?}");
+        log::debug!("destination.len {}", destination.len());
 
-        // todo: actually do read here
-        // unsafe {
-        //     self.write_buffers[0]
-        //         .data
-        //         .write_bytes(0xAA,
-        // usize::try_from(self.write_buffers[0].size).unwrap()) };
+        let offset = (usize::try_from(sector).unwrap() * 512) / blk.block_size();
+        blk.read(destination, offset).unwrap();
 
         // callback logic just inlined here
         unsafe { self.write_buffers[1].data.write(0x00) }; // success
+
         self.response_size = 1 + self.write_buffers[0].size;
         self.submit(queue, irq, isr);
     }
@@ -384,7 +401,7 @@ impl VirtQueueEvent {
         let idx = 0;
         isr.fetch_or(1 << idx, core::sync::atomic::Ordering::Relaxed);
         // _irq.raise();
-        log::error!("pushed, raising irq");
+        log::debug!("pushed, raising irq");
 
         irq.controller.raise(irq.line);
     }
@@ -404,4 +421,41 @@ struct BlockDeviceRequest {
     buffer: *mut u8,
     is_read: bool,
     opaque: *mut (),
+}
+
+/// If the supplied pointer does not have a physical mapping, allocate a new
+/// backing page and map it
+fn allocate_physical(ptr: *mut u8) {
+    let address = VirtAddr::from_ptr(ptr);
+
+    let physical = VirtualMemoryArea::current().opt.translate_addr(address);
+
+    if physical.is_some() {
+        return;
+    }
+
+    // Physical address lies within a RAM-backed region, so allocate a
+    // backing page.
+    let backing_page = VirtAddr::from_ptr(unsafe {
+        alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+    })
+    .to_phys();
+
+    // Map the allocated backing page into the 1-1 guest phyical memory area
+    VirtualMemoryArea::current().map_page(
+        Page::<Size4KiB>::from_start_address(address.align_down(0x1000u64)).unwrap(),
+        PhysFrame::from_start_address(backing_page).unwrap(),
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
+
+    log::debug!(
+        "allocated backing page {backing_page:x?} -> {:x?}",
+        address.align_down(0x1000u64)
+    );
+
+    VirtualMemoryArea::current().map_page_propagate_invalidation(
+        Page::<Size4KiB>::from_start_address(address.align_down(0x1000u64)).unwrap(),
+        PhysFrame::from_start_address(backing_page).unwrap(),
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
 }

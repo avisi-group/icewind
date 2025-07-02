@@ -3874,8 +3874,6 @@ fn el_from_spsr() {
     register_file.write("SCTLR_EL2_bits", 0x30c50830);
     register_file.write("CPTR_EL2_bits", 0x33ff);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
     // valid = true
@@ -4733,8 +4731,6 @@ fn stp_mem_init() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    log::error!("{translation:?}")
-
     //translation.execute(&register_file);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
@@ -4777,8 +4773,6 @@ fn sbfm() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    log::error!("{translation:?}")
-
     //translation.execute(&register_file);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
@@ -4819,12 +4813,95 @@ fn umulh() {
     assert_eq!(register_file.read::<u64>("R2"), 0);
 
     register_file.write("R2", 0x0);
-    register_file.write("R1", i64::MAX as u64);
+    register_file.write("R1", u64::MAX);
     register_file.write("R0", 4);
     translation.execute(&register_file);
-    assert_eq!(register_file.read::<u64>("R2"), 1);
+    assert_eq!(register_file.read::<u64>("R2"), 0b11);
 
     // todo: actually fix this for unsigned integers
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
+
+#[ktest]
+fn eor() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //ca010042        eor     x2, x2, x1
+    let opcode = emitter.constant(0xca010042, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R2", 0x0000_FFFF_0000_FFFFu64);
+    register_file.write("R1", 0x0F0F_0F0F_0F0F_0F0Fu64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0x0F0F_F0F0_0F0F_F0F0);
+}
+
+/// Validated with
+///
+/// ```rust
+/// use std::arch::asm;
+/// fn main() {
+///     let mut a = 0xAAAA_AAAA_AAAA_AAAAu64;
+///     let b = 0xBBBB_BBBB_BBBB_BBBBu64;
+
+///     unsafe {
+///         asm!(
+///             "extr    x2, x3, x2, #32",
+///             in("x3") b,
+///             inout("x2") a,
+///         );
+///     }
+
+///     println!("{a:x}");
+/// }
+/// ```
+#[ktest]
+fn extr() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 93c28062        extr    x2, x3, x2, #32
+    let opcode = emitter.constant(0x93c28062, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R2", 0xAAAA_AAAA_AAAA_AAAAu64);
+    register_file.write("R3", 0xBBBB_BBBB_BBBB_BBBBu64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0xBBBB_BBBB_AAAA_AAAA);
 }

@@ -429,47 +429,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         );
     } else {
-        if faulting_address > GUEST_PHYSICAL_START {
-            // if faulting_address is within GUEST_PHYSICAL_START + SIZE_OF_GUEST_PHYSICAL
-            // then it is in guest physical region
-            // is it really a RAM page?
-            // then do allocation
-
-            let physical = VirtualMemoryArea::current()
-                .opt
-                .translate_addr(faulting_address);
-
-            assert!(physical.is_none());
-
-            // Physical address lies within a RAM-backed region, so allocate a
-            // backing page.
-            let backing_page = VirtAddr::from_ptr(unsafe {
-                alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
-            })
-            .to_phys();
-
-            // Map the allocated backing page into the 1-1 guest phyical memory area
-            VirtualMemoryArea::current().map_page(
-                Page::<Size4KiB>::from_start_address(faulting_address.align_down(0x1000u64))
-                    .unwrap(),
-                PhysFrame::from_start_address(backing_page).unwrap(),
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            );
-
-            log::debug!(
-                "allocated backing page {backing_page:x?} -> {:x?}",
-                faulting_address.align_down(0x1000u64)
-            );
-
-            VirtualMemoryArea::current().map_page_propagate_invalidation(
-                Page::<Size4KiB>::from_start_address(faulting_address.align_down(0x1000u64))
-                    .unwrap(),
-                PhysFrame::from_start_address(backing_page).unwrap(),
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            );
-        } else {
-            exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
-        }
+        exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
     }
 }
 
