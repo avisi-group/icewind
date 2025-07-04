@@ -347,7 +347,6 @@ impl VirtQueueEvent {
             BlkReqType::In => self.handle_read_event(req.sector, queue, irq, isr),
             BlkReqType::Out => {
                 // handle write event
-                todo!()
             }
             BlkReqType::Flush => todo!(),
             BlkReqType::GetId => todo!(),
