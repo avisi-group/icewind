@@ -231,7 +231,7 @@ impl ModelDevice {
 
     fn block_exec(&self, single_step_mode: bool) {
         let shared = SharedDeviceManager::get()
-            .get_device_by_alias("transport00:04.0")
+            .get_device_by_alias("transport00:05.0")
             .unwrap();
         let crate::host::devices::Device::Transport(transport) = &mut *shared.lock() else {
             panic!();

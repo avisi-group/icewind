@@ -61,7 +61,7 @@ fn _translate_l0(
     let entry_idx = ((guest_virtual_address >> 39) & 0x1ff) as usize;
 
     log::trace!("entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("entry: {entry:x?}");
 
     if entry.is_table_or_page() {
@@ -78,7 +78,7 @@ fn translate_l1(
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 30) & 0x1ff) as usize;
     log::trace!("l1 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l1 entry: {entry:x?}");
 
     if !entry.is_valid() {
@@ -102,7 +102,7 @@ fn translate_l2(
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
     log::trace!("l2 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
@@ -124,7 +124,7 @@ fn translate_l3(
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 12) & 0x1ff) as usize;
     log::trace!("l3 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
     if entry.is_table_or_page() {
@@ -271,12 +271,4 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
             exit_with_message!("trap")
         }
     }
-}
-
-#[ktest]
-fn l1_entry_suspicious() {
-    let raw: u64 = 0x1000000088fff003;
-    let desc: Descriptor = unsafe { core::mem::transmute(raw) };
-
-    //    log::error!("{desc:?}: {:?}", desc.flags());
 }

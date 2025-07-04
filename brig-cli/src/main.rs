@@ -384,6 +384,15 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         ),
     ]);
 
+    cmd.args([
+        "-device",
+        "virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4",
+    ]);
+    cmd.args([
+        "-drive",
+        &format!("file=guest_data/rootfs.ext2,if=none,format=raw,id=drive1",),
+    ]);
+
     cmd.args(["-debugcon", "file:/tmp/debugcon"]);
 
     // cmd.arg("-device");
@@ -466,7 +475,7 @@ fn gdb_cli(artifacts: &[Artifact]) {
 
                     target remote :1234
 
-                    hbreak kernel::dbt::trampoline::trampoline
+                    hbreak kernel::host::dbt::trampoline::trampoline
                 "#,
                 kernel_path.to_string_lossy(),
                 offset,

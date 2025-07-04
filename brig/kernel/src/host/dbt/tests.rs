@@ -3874,8 +3874,6 @@ fn el_from_spsr() {
     register_file.write("SCTLR_EL2_bits", 0x30c50830);
     register_file.write("CPTR_EL2_bits", 0x33ff);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
     // valid = true
@@ -4733,8 +4731,6 @@ fn stp_mem_init() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    log::error!("{translation:?}")
-
     //translation.execute(&register_file);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
@@ -4777,9 +4773,169 @@ fn sbfm() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    log::error!("{translation:?}")
-
     //translation.execute(&register_file);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
+
+#[ktest]
+fn umulh() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 9bc17c02     umulh   x2, x0, x1
+    // decode_umulh_aarch64_instrs_integer_arithmetic_mul_widening_64_128hi
+    // execute_aarch64_instrs_integer_arithmetic_mul_widening_64_128hi
+    let opcode = emitter.constant(0x9bc17c02, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R2", 0x0);
+    register_file.write("R1", 8u64);
+    register_file.write("R0", 4u64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0);
+
+    register_file.write("R2", 0x0);
+    register_file.write("R1", u64::MAX);
+    register_file.write("R0", 4);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0b11);
+
+    // todo: actually fix this for unsigned integers
+
+    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
+
+#[ktest]
+fn eor() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //ca010042        eor     x2, x2, x1
+    let opcode = emitter.constant(0xca010042, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R2", 0x0000_FFFF_0000_FFFFu64);
+    register_file.write("R1", 0x0F0F_0F0F_0F0F_0F0Fu64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<u64>("R2"), 0x0F0F_F0F0_0F0F_F0F0);
+}
+
+/// Validated with
+///
+/// ```rust
+/// use std::arch::asm;
+/// fn main() {
+///     let a = 0x1122_3344_5566_7788u64;
+///     let b = 0x9900_AABB_CCDD_EEFFu64;
+///
+///     println!("0: {:16x}", wrapper::<0>(a, b));
+///     println!("1: {:16x}", wrapper::<1>(a, b));
+///     println!("16: {:16x}", wrapper::<16>(a, b));
+///     println!("32: {:16x}", wrapper::<32>(a, b));
+///     println!("48: {:16x}", wrapper::<48>(a, b));
+///     println!("63: {:16x}", wrapper::<63>(a, b));
+/// }
+///
+/// fn wrapper<const SHIFT: usize>(mut a: u64, b: u64) -> u64 {
+///     unsafe {
+///         asm!(
+///             "extr x2, x3, x2, #{shift}",
+///             shift = const SHIFT,
+///             in("x3") b,
+///             inout("x2") a,
+///         );
+///
+///         a
+///     }
+/// }
+/// ```
+#[ktest]
+fn extr() {
+    fn wrapper(opcode: u32) -> u64 {
+        let model = models::get("aarch64").unwrap();
+
+        let register_file = RegisterFile::init(&*model);
+
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        // 93c28062        extr    x2, x3, x2, #32
+        // execute_aarch64_instrs_integer_ins_ext_extract_immediate
+        let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
+        translate(
+            Global,
+            &*model,
+            "__DecodeA64",
+            &[opcode],
+            &mut emitter,
+            &register_file,
+        )
+        .unwrap();
+
+        emitter.leave();
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        register_file.write("R2", 0x1122_3344_5566_7788u64);
+        register_file.write("R3", 0x9900_AABB_CCDD_EEFFu64);
+        translation.execute(&register_file);
+        register_file.read::<u64>("R2")
+    }
+
+    // 1000009c4: 93c2fc62     extr    x2, x3, x2, #0x3f
+    // 1000009f8: 93c28062     extr    x2, x3, x2, #0x20
+    // 100000a2c: 93c24062     extr    x2, x3, x2, #0x10
+    // 100000a60: 93c20062     extr    x2, x3, x2, #0x0
+    // 100000a94: 93c2c062     extr    x2, x3, x2, #0x30
+    // 100000ac8: 93c20462     extr    x2, x3, x2, #0x1
+
+    for (opcode, expected) in [
+        // shift = 0, todo: no zero width constants allowed! Unsigned(0) @ ref 0x36 (arena
+        // 4294967295) fix by specializing lsb = 0
+        //    (0x93c20062, 0x1122334455667788),
+        (0x93c20462, 0x889119a22ab33bc4), // shift = 1
+        (0x93c24062, 0xeeff112233445566), // shift = 16
+        (0x93c28062, 0xccddeeff11223344), // shift = 32
+        (0x93c2c062, 0xaabbccddeeff1122), // shift = 48
+        (0x93c2fc62, 0x3201557799bbddfe), // shift = 63
+    ] {
+        assert_eq!(wrapper(opcode), expected);
+    }
 }

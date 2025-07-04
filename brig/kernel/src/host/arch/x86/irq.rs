@@ -459,8 +459,6 @@ fn gpf_exception(machine_context: *mut MachineContext) {
         "EXCEPTION: GENERAL PROTECTION FAULT\nrip = {:x}",
         unsafe { &*machine_context }.rip
     );
-
-    crate::qemu_exit();
 }
 
 #[irq_handler(with_code = true)]

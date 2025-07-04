@@ -64,3 +64,4 @@ aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
 paste = "1.0.15"
 embedded-time = "0.12.1"
 bitfields = "0.13.2"
+virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }

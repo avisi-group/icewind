@@ -455,14 +455,18 @@ impl MemoryMappedDevice for GlobalInterruptController {
 
     /// Write `value` bytes into the device starting at `offset`
     fn write(&self, offset: u64, value: &[u8]) {
-        let data = u32::from_ne_bytes(value.try_into().unwrap());
+        let value = match *value {
+            [x] => u32::from(x),
+            [a, b, c, d] => u32::from_ne_bytes([a, b, c, d]),
+            _ => todo!("{offset:x} <= {value:?}"),
+        };
 
-        log::debug!("write GIC @ {offset:x} = {data:x}");
+        log::debug!("write GIC @ {offset:x} = {value:x}");
 
         match offset {
             0x1000 => {
                 self.distributor_enabled
-                    .store((data & 1) == 1, Ordering::Relaxed);
+                    .store((value & 1) == 1, Ordering::Relaxed);
             }
             0x1100..=0x117f => {
                 // GICD_ISENABLE
@@ -470,7 +474,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
-                        let enable = ((data >> index) & 1) == 1;
+                        let enable = ((value >> index) & 1) == 1;
                         line.enabled.fetch_or(enable, Ordering::Relaxed);
                     })
             }
@@ -480,7 +484,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
-                        let clear_enable = ((data >> index) & 1) == 1;
+                        let clear_enable = ((value >> index) & 1) == 1;
                         line.enabled.fetch_nand(clear_enable, Ordering::Relaxed);
                     })
             }
@@ -490,7 +494,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
-                        let clear_active = ((data >> index) & 1) == 1;
+                        let clear_active = ((value >> index) & 1) == 1;
                         line.active.fetch_nand(clear_active, Ordering::Relaxed);
                     })
             }
@@ -501,7 +505,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .enumerate()
                     .for_each(|(index, line)| {
                         line.priority
-                            .store(((data >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
+                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
                     })
             }
             0x1800..=0x1bfb => {
@@ -511,7 +515,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .enumerate()
                     .for_each(|(index, line)| {
                         line.cpu_mask
-                            .store(((data >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
+                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
                     })
             }
             0x1c00..=0x1dff => {
@@ -520,7 +524,7 @@ impl MemoryMappedDevice for GlobalInterruptController {
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
-                        let cfg_val = ((data >> (index * 2)) & 0x3) as u8;
+                        let cfg_val = ((value >> (index * 2)) & 0x3) as u8;
 
                         log::debug!("updating config for line offset={} to {:x}", index, cfg_val);
 
@@ -541,18 +545,18 @@ impl MemoryMappedDevice for GlobalInterruptController {
             // GICC
             0x2000 => {
                 // GICC_CTLR
-                self.cpu_enabled.store((data & 1) == 1, Ordering::Relaxed);
+                self.cpu_enabled.store((value & 1) == 1, Ordering::Relaxed);
             }
             0x2004 => {
                 // GICC_PMR
-                self.cpu_pmr.store((data & 0xff) as u8, Ordering::Relaxed);
+                self.cpu_pmr.store((value & 0xff) as u8, Ordering::Relaxed);
             }
             0x2010 => {
                 // GICC_EOIR
-                self.eoi(usize::try_from(data).unwrap());
+                self.eoi(usize::try_from(value).unwrap());
             }
             _ => {
-                panic!("[GIC] Write offset: {offset:x} <= {data:x}");
+                panic!("[GIC] Write offset: {offset:x} <= {value:x}");
             }
         }
     }

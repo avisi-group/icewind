@@ -15,7 +15,7 @@
 	#size-cells = <2>;
 
 	chosen {
-	       bootargs = "earlycon=pl011,0x3c000000 loglevel=7 debug acpi=off sched_debug keep_bootcon nohlt";
+	       bootargs = "earlycon=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug keep_bootcon nohlt root=/dev/vda";
 	};
 
 	cpus {
@@ -58,4 +58,9 @@
 		      <0x0 0x2c002000 0 0x2000>;
 	};
 
+	virtio_block@3d000000 {
+		compatible = "virtio,mmio";
+		reg = <0x00 0x3d000000 0x00 0x1000>;
+		interrupts = <0x00 0x20 0x04>;
+	};
 };

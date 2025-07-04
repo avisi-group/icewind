@@ -1015,6 +1015,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     RudderOp::Add => EmitterOp::Add(lhs, rhs),
                     RudderOp::Sub => EmitterOp::Sub(lhs, rhs),
                     RudderOp::Multiply => EmitterOp::Multiply(lhs, rhs),
+
                     RudderOp::Divide => EmitterOp::Divide(lhs, rhs),
                     RudderOp::Modulo => EmitterOp::Modulo(lhs, rhs),
                     RudderOp::And => EmitterOp::And(lhs, rhs),

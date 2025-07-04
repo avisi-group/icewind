@@ -33,14 +33,16 @@
             "address": "0x8208_0000"
         }
     ],
-    "devices": {
-        "core0": {
+    "devices": [
+        {
+            "name": "core0",
             "kind": "core",
             "model": "aarch64",
             "address_space": "as0",
             "initial_pc": "0x8000_0000"
         },
-        "serial": {
+        {
+            "name": "serial",
             "kind": "pl011",
             "attach": {
                 "memory": {
@@ -49,7 +51,8 @@
                 }
             }
         },
-        "gic": {
+        {
+            "name": "gic",
             "kind": "a9gic",
             "attach": {
                 "memory": {
@@ -58,7 +61,19 @@
                 }
             }
         },
-        "timer": {
+        {
+            "name": "block",
+            "kind": "virtio_block",
+            "irq_controller": "gic",
+            "attach": {
+                "memory": {
+                    "address_space": "as0",
+                    "base": "0x3d00_0000"
+                }
+            }
+        },
+        {
+            "name": "timer",
             "kind": "generic_timer",
             "irq_controller": "gic",
             "attach": {
@@ -164,5 +179,5 @@
                 }
             }
         }
-    }
+    ]
 }

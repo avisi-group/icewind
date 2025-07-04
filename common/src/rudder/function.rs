@@ -136,7 +136,7 @@ impl Function {
         self.entry_block = b;
     }
 
-    pub fn block_iter(&self) -> BlockIterator {
+    pub fn block_iter(&self) -> BlockIterator<'_> {
         BlockIterator::new(self.arena(), self.entry_block)
     }
 }

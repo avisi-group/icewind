@@ -115,7 +115,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                                 false
                             }
                         }
-                        Constant::SignedInteger { value: rhs_value, .. } => {
+                        Constant::SignedInteger {
+                            value: rhs_value, ..
+                        } => {
                             if rhs_value == 1 {
                                 false
                             } else {

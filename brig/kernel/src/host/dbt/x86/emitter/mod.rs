@@ -415,6 +415,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
+
             Divide(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
                 (
                     NodeKind::Constant {
@@ -1740,6 +1741,7 @@ pub enum BinaryOperationKind<A: Alloc> {
     Add(X86NodeRef<A>, X86NodeRef<A>),
     Sub(X86NodeRef<A>, X86NodeRef<A>),
     Multiply(X86NodeRef<A>, X86NodeRef<A>),
+
     Divide(X86NodeRef<A>, X86NodeRef<A>),
     Modulo(X86NodeRef<A>, X86NodeRef<A>),
     And(X86NodeRef<A>, X86NodeRef<A>),
@@ -1773,7 +1775,7 @@ pub enum TernaryOperationKind<A: Alloc> {
     AddWithCarry(X86NodeRef<A>, X86NodeRef<A>, X86NodeRef<A>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -1783,7 +1785,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,

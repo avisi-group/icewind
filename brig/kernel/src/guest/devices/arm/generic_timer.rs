@@ -52,9 +52,8 @@ const CNTV_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 2);
 struct GenericTimer {
     id: ObjectId,
 
-    controller_name: InternedString,
-    controller: Once<Arc<dyn IrqController>>,
-    irq: usize,
+    irq_controller: Arc<dyn IrqController>,
+    irq_line: usize,
 
     tick_interval: Nanoseconds<u64>,
 
@@ -73,12 +72,21 @@ struct GenericTimer {
 }
 
 impl GenericTimer {
-    fn new(controller_name: InternedString, irq: usize, tick_interval: Nanoseconds<u64>) -> Self {
+    fn new(
+        controller_name: InternedString,
+        irq_line: usize,
+        tick_interval: Nanoseconds<u64>,
+    ) -> Self {
+        // Lookup GIC
+        let gic_id = ObjectStore::global()
+            .lookup_by_alias(controller_name)
+            .unwrap();
+        let controller = ObjectStore::global().get_irq_controller(gic_id).unwrap();
+
         Self {
             id: ObjectId::new(),
-            irq,
-            controller_name,
-            controller: Once::new(),
+            irq_line,
+            irq_controller: controller,
             tick_interval,
             counter: AtomicU64::new(0),
             frequency: AtomicU64::new(10_000_000), //
@@ -120,9 +128,9 @@ impl Tickable for GenericTimer {
             .store(interrupt_status, Ordering::Relaxed);
 
         if interrupt_status && !self.timer_interrupt_masked.load(Ordering::Relaxed) {
-            self.controller.get().unwrap().raise(self.irq);
+            self.irq_controller.raise(self.irq_line);
         } else {
-            self.controller.get().unwrap().rescind(self.irq);
+            self.irq_controller.rescind(self.irq_line);
         }
     }
 }
@@ -135,13 +143,6 @@ impl Object for GenericTimer {
 
 impl Device for GenericTimer {
     fn start(&self) {
-        // Lookup GIC
-        let gic_id = ObjectStore::global()
-            .lookup_by_alias(self.controller_name)
-            .unwrap();
-        let gic = ObjectStore::global().get_irq_controller(gic_id).unwrap();
-        self.controller.call_once(|| gic);
-
         host::timer::register_tickable(
             // Nanoseconds(1_000_000_000),
             self.tick_interval,

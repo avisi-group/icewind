@@ -80,7 +80,7 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     }
 
     // create devices, including cores
-    for (name, device_config) in config.devices {
+    for device_config in config.devices {
         let device = devices::create_device(device_config.kind, &device_config.extra)
             .unwrap_or_else(|| {
                 panic!(
@@ -89,9 +89,9 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
                 )
             });
 
-        guest.devices.insert(name.clone(), device.clone());
+        guest.devices.insert(device_config.name, device.clone());
         ObjectStore::global().insert(device.clone());
-        ObjectStore::global().insert_alias(device.id(), name.clone());
+        ObjectStore::global().insert_alias(device.id(), device_config.name);
 
         // locate address space for attachment, if any
         match device_config.attach {
@@ -105,7 +105,7 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
 
                 if let Some(addrspace) = guest.address_spaces.get_mut(&address_space) {
                     addrspace.add_region(AddressSpaceRegion::new(
-                        name,
+                        device_config.name,
                         base,
                         mem_map_device.address_space_size(),
                         memory::AddressSpaceRegionKind::IO(mem_map_device.clone()),
@@ -113,7 +113,7 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
                 } else {
                     panic!(
                         "address space {} not configured for attaching device {}",
-                        address_space, name
+                        address_space, device_config.name
                     );
                 }
             }
