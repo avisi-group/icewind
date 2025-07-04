@@ -96,7 +96,7 @@ pub struct ListVec<T>(Vec<T>);
 
 impl<T> ListVec<T> {
     /// Returns an iterator over the inner `Vec`.
-    pub fn iter(&self) -> slice::Iter<T> {
+    pub fn iter(&self) -> slice::Iter<'_, T> {
         self.0.iter()
     }
 
