@@ -28,9 +28,10 @@ use {
             rand, scheduler, tasks, timer,
         },
         logger::WRITER,
+        models::ModelDevice,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    core::panic::PanicInfo,
+    core::{any::Any, panic::PanicInfo},
     x86::io::outw,
 };
 
@@ -138,7 +139,22 @@ fn panic(info: &PanicInfo) -> ! {
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
+    let device = ((&**unsafe {
+        crate::guest::GUEST
+            .get()
+            .unwrap()
+            .devices
+            .get(&("core0".into()))
+            .unwrap()
+    }) as &dyn Any)
+        .downcast_ref::<ModelDevice>()
+        .unwrap();
+
+    let pc = device.register_file.read::<u64>("_PC");
+    log::error!("Guest PC = {pc:016x}");
+
     backtrace();
+
     qemu_exit();
 }
 

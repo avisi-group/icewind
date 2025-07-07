@@ -324,7 +324,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             let dst_width = dst.width();
                             if src_width < dst_width {
                                 panic!(
-                                    "src ({src_width} bits) must be larger than dst ({dst_width} bits)"
+                                    "src ({src_width} bits) must be larger than dst ({dst_width} bits) in node:\n{node:#?}"
                                 );
                             }
 

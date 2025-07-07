@@ -4939,3 +4939,107 @@ fn extr() {
         assert_eq!(wrapper(opcode), expected);
     }
 }
+
+#[ktest]
+fn branch_maybe_2048() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let opcode = emitter.constant(0x17ffffe1, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("_PC", 1000u64);
+    register_file.write("SEE", -1i64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(876, register_file.read::<u64>("_PC"));
+}
+
+#[ktest]
+fn cbz_maybe_2048() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //ffffffc008093d60:       b40005b4        cbz     x20, ffffffc008093e14
+    // <__flush_smp_call_function_queue+0x130>
+    let opcode = emitter.constant(0xb40005b4, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("_PC", 1000u64);
+    register_file.write("SEE", -1i64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(1180, register_file.read::<u64>("_PC"));
+}
+
+#[ktest]
+fn ldp_128() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // ad410c02        ldp     q2, q3, [x0, #32]
+    let opcode = emitter.constant(0xad410c02, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mem = alloc::boxed::Box::new([0xABu8; 32]);
+
+    register_file.write("R0", &*mem as *const _ as u64);
+    register_file.write("SEE", -1i64);
+
+    translation.execute(&register_file);
+
+    todo!("q2, q3 == 0xABAB...")
+}

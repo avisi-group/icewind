@@ -734,7 +734,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     (v, 0) => *v,
                     (v, a) => v
                         .checked_shl(u32::try_from(*a).unwrap())
-                        .unwrap_or_else(|| panic!("failed to shift left {value:?} by {amount:?}")),
+                        .unwrap_or_else(|| {
+                            log::warn!("failed to shift left {value:?} by {amount:?}");
+                            0
+                        }),
                 };
 
                 // shift and mask to width of value

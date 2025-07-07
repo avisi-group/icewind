@@ -382,7 +382,7 @@ impl VirtQueueEvent {
             )
         };
 
-        log::debug!("destination.len {}", destination.len());
+        log::error!("reading {} bytes @ {sector:x}", destination.len());
 
         let offset = (usize::try_from(sector).unwrap() * 512) / blk.block_size();
         blk.read(destination, offset).unwrap();

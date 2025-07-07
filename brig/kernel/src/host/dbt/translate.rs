@@ -23,7 +23,7 @@ use {
     core::{
         hash::{Hash, Hasher},
         panic,
-        sync::atomic::{AtomicUsize, Ordering},
+        sync::atomic::{AtomicU32, AtomicUsize, Ordering},
     },
     derive_where::derive_where,
     itertools::Itertools,
@@ -82,6 +82,8 @@ enum ControlFlow<A: Alloc> {
 
 const NUM_TRANSLATE_ATTEMPTS: usize = 3;
 
+pub static CURRENT_OPCODE: AtomicU32 = AtomicU32::new(0);
+
 /// Top-level translation of a given guest instruction opcode
 ///
 /// Includes logic for retrying decoding if a SEE exception is thrown.
@@ -94,6 +96,8 @@ pub fn translate_instruction<A: Alloc>(
     opcode: u32,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     register_file.write("SEE", -1i64);
+
+    CURRENT_OPCODE.store(opcode, Ordering::Relaxed);
 
     let initial_block = emitter.get_current_block();
 
@@ -895,7 +899,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
-                assert_eq!(offset, self.model.registers().get(&name).unwrap().offset);
+                if offset != self.model.registers().get(&name).unwrap().offset {
+                    panic!(
+                        "offset: {offset:x} != register start: {:x}, opcode = {:x}",
+                        self.model.registers().get(&name).unwrap().offset,
+                        CURRENT_OPCODE.load(Ordering::Relaxed)
+                    );
+                }
 
                 let value = value_store.get(*value);
 

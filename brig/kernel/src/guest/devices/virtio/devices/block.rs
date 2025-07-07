@@ -51,7 +51,7 @@ impl VirtioBlock {
         };
 
         // in 512 byte sectors
-        celf.config.capacity = 62918656 / 512;
+        celf.config.capacity = 33554432 / 512;
         celf.config.blk_size = 512;
 
         celf.virtio.lock().set_host_feature(6);

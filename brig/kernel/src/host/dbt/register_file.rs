@@ -269,6 +269,8 @@ fn configure_features(register_file: &RegisterFile) {
         "FEAT_BTI_IMPLEMENTED",
         "FEAT_PAuth_IMPLEMENTED",
         "FEAT_PAuth2_IMPLEMENTED",
+        "FEAT_AES_IMPLEMENTED",
+        "FEAT_SVE_IMPLEMENTED",
     ];
 
     disabled.into_iter().for_each(|name| {
