@@ -4,6 +4,7 @@
 *.dot
 *.svg
 *.log
+*.ir
 /aarch64
 /ir
 /borealis/_sbuild
