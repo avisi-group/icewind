@@ -5018,6 +5018,7 @@ fn ldp_128() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // ad410c02        ldp     q2, q3, [x0, #32]
+    // execute_aarch64_instrs_memory_pair_simdfp_post_idx
     let opcode = emitter.constant(0xad410c02, Type::Unsigned(32));
     translate(
         Global,

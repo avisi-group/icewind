@@ -9,6 +9,7 @@ pub enum Width {
     _16,
     _32,
     _64,
+    _128,
 }
 
 impl PartialOrd for Width {
@@ -30,9 +31,10 @@ impl Width {
             9..=16 => Ok(Self::_16),
             17..=32 => Ok(Self::_32),
             33..=64 => Ok(Self::_64),
+            65..=128 => Ok(Self::_128),
             0 => Err(WidthError::Zero),
-            _ => Ok(Self::_64), /* todo: fix PhysicalCount and other oversized registers
-                                 *n => Err(WidthError::Oversize(n)), */
+            // n => Err(WidthError::Oversize(n)),
+            _ => Ok(Self::_128), // todo: fix PhysicalCount and other oversized registers
         }
     }
 
@@ -42,6 +44,7 @@ impl Width {
             Width::_16 => 16,
             Width::_32 => 32,
             Width::_64 => 64,
+            Width::_128 => 128,
         }
     }
 }
@@ -52,8 +55,8 @@ impl Display for Width {
     }
 }
 
-#[derive(Debug, displaydoc::Display)]
 /// Width canonicalization error
+#[derive(Debug, displaydoc::Display)]
 pub enum WidthError {
     /// Cannot encode 0 sized width
     Zero,
