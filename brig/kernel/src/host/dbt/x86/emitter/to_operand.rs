@@ -9,8 +9,8 @@ use {
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
             },
             encoder::{
-                Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
-                Register::{self},
+                Instruction, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register},
                 width::Width,
             },
         },
@@ -75,7 +75,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     Instruction::mov(
                         Operand::mem_base_displ(
                             width,
-                            Register::PhysicalRegister(PhysicalRegister::RBP),
+                            Register::Physical(PhysicalRegister::RBP),
                             (*offset).try_into().unwrap(),
                         ),
                         dst,

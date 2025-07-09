@@ -4,8 +4,8 @@ use {
         x86::encoder::{
             Operand,
             OperandKind::{Immediate as I, Register as R},
-            Register::PhysicalRegister as PHYS,
             Width,
+            registers::Register::Physical as PHYS,
         },
     },
     iced_x86::code_asm::{

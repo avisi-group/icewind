@@ -9,8 +9,10 @@ use {
             x86::{
                 Emitter, X86TranslationContext,
                 encoder::{
-                    Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
-                    Register::{self},
+                    Instruction, Opcode, Operand, OperandKind,
+                    registers::{
+                        PhysicalRegister, PhysicalRegisterGeneral, Register, SegmentRegister,
+                    },
                     width::Width,
                 },
                 register_allocator::RegisterAllocator,
@@ -1042,7 +1044,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 let dest = Operand::mem_base_displ(
                     Width::_8,
-                    Register::PhysicalRegister(PhysicalRegister::RBP),
+                    Register::Physical(PhysicalRegister::RBP),
                     offset.try_into().unwrap(),
                 );
 
@@ -1143,7 +1145,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     value,
                     Operand::mem_base_displ(
                         width,
-                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                        Register::Physical(PhysicalRegister::RBP),
                         offset.try_into().unwrap(),
                     ),
                 )
@@ -1275,7 +1277,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Instruction::mov(
                 Operand::mem_seg_displ(
                     32,
-                    super::encoder::SegmentRegister::FS,
+                    SegmentRegister::FS,
                     i32::try_from(offset_of!(GuestExecutionContext, interrupt_pending)).unwrap(),
                 ),
                 Operand::preg(Width::_32, PhysicalRegister::RAX),
@@ -1308,7 +1310,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Instruction::mov(
                 Operand::mem_seg_displ(
                     32,
-                    super::encoder::SegmentRegister::FS,
+                    SegmentRegister::FS,
                     i32::try_from(offset_of!(GuestExecutionContext, interrupt_pending)).unwrap(),
                 ),
                 Operand::preg(Width::_32, PhysicalRegister::RAX),
@@ -1340,7 +1342,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Instruction::mov(
                 Operand::mem_base_displ(
                     Width::_64,
-                    Register::PhysicalRegister(PhysicalRegister::RBP),
+                    Register::Physical(PhysicalRegister::RBP),
                     self.ctx().pc_offset() as i32,
                 ),
                 pc_vreg,

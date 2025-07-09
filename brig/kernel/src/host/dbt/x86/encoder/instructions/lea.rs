@@ -4,8 +4,8 @@ use {
         x86::encoder::{
             Operand,
             OperandKind::{Memory as M, Register as R},
-            Register::PhysicalRegister as PHYS,
             Width, memory_operand_to_iced,
+            registers::Register::Physical as PHYS,
         },
     },
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},

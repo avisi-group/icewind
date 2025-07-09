@@ -2,11 +2,11 @@ use {
     crate::host::dbt::{
         Alloc,
         x86::encoder::{
-            Operand,
+            self, Operand,
             OperandKind::{Immediate as I, Register as R},
-            PhysicalRegister,
-            Register::PhysicalRegister as PHYS,
+            Register::Physical as PHYS,
             Width,
+            registers::{PhysicalRegister, PhysicalRegisterGeneral},
         },
     },
     iced_x86::code_asm::{
@@ -26,7 +26,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (
@@ -39,7 +39,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (
@@ -52,7 +52,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (
@@ -65,7 +65,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (
@@ -74,12 +74,18 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_8,
             },
             Operand {
-                kind: R(PHYS(value)),
+                kind: R(PHYS(value_reg)),
                 width_in_bits: Width::_64,
             },
         ) => {
+            if *value_reg == PhysicalRegister::RCX {
+                panic!("can't shr %rcx %rcx");
+            }
             assembler
-                .shl::<AsmRegister64, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
+                .shr::<AsmRegister64, AsmRegister8>(
+                    value_reg.into(),
+                    PhysicalRegisterGeneral::RCX.into(),
+                )
                 .unwrap();
         }
         (
@@ -88,15 +94,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_8,
             },
             Operand {
-                kind: R(PHYS(value)),
+                kind: R(PHYS(value_reg)),
                 width_in_bits: Width::_32,
             },
         ) => {
+            if *value_reg == PhysicalRegister::RCX {
+                panic!("can't shr %rcx %rcx");
+            }
             assembler
-                .shl::<AsmRegister32, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
+                .shr::<AsmRegister32, AsmRegister8>(
+                    value_reg.into(),
+                    PhysicalRegisterGeneral::RCX.into(),
+                )
                 .unwrap();
         }
-
-        _ => todo!("shl {amount} {value}"),
+        _ => todo!("shr {amount} {value}"),
     }
 }

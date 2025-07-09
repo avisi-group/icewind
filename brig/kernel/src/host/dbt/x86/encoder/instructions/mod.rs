@@ -1,0 +1,15 @@
+pub mod adc;
+pub mod add;
+pub mod and;
+pub mod cmp;
+pub mod lea;
+pub mod mov;
+pub mod movsx;
+pub mod movzx;
+pub mod or;
+pub mod setne;
+pub mod shl;
+pub mod shr;
+pub mod sub;
+pub mod test;
+pub mod xor;

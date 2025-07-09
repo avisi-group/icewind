@@ -2,7 +2,7 @@ use {
     crate::host::dbt::{
         Alloc,
         x86::encoder::{
-            Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS, Width,
+            Operand, OperandKind::Register as R, Width, registers::Register::Physical as PHYS,
         },
     },
     iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},

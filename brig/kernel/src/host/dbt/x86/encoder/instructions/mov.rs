@@ -4,8 +4,9 @@ use {
         x86::encoder::{
             Operand,
             OperandKind::{Immediate as I, Memory as M, Register as R},
-            Register::PhysicalRegister as PHYS,
-            Width, memory_operand_to_iced, segment_memory_operand_to_iced,
+            Width, memory_operand_to_iced,
+            registers::Register::Physical as PHYS,
+            segment_memory_operand_to_iced,
         },
     },
     iced_x86::code_asm::{

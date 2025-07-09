@@ -3,7 +3,8 @@ use {
         Alloc as MemAlloc,
         x86::{
             encoder::{
-                Instruction, MemoryScale, Opcode, Operand, PhysicalRegister, Register, width::Width,
+                Instruction, MemoryScale, Opcode, Operand, registers::PhysicalRegister,
+                registers::Register, width::Width,
             },
             register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
         },
@@ -35,11 +36,11 @@ fn conflicted_physical_allocation() {
         )),
         Instruction(Opcode::MOV(
             Operand::preg(Width::_64, PhysicalRegister::RAX),
-            Operand::mem_base(Width::_64, Register::VirtualRegister(0)),
+            Operand::mem_base(Width::_64, Register::Virtual(0)),
         )),
         Instruction(Opcode::MOV(
             Operand::vreg(Width::_64, 0),
-            Operand::mem_base(Width::_64, Register::VirtualRegister(0)),
+            Operand::mem_base(Width::_64, Register::Virtual(0)),
         )),
     ];
 
@@ -52,16 +53,16 @@ fn shr_full() {
     use {
         crate::host::dbt::x86::{
             OperandKind::*,
-            register_allocator::{PhysicalRegister::*, Register::*},
+            encoder::registers::{PhysicalRegister, Register::*},
         },
         Opcode::*,
     };
 
     let mut instructions = alloc::vec![
         Instruction(MOV(
-            Operand::<Global> {
+            Operand {
                 kind: Memory {
-                    base: Some(PhysicalRegister(RBP)),
+                    base: Some(Physical(PhysicalRegister::RBP)),
                     index: None,
                     scale: MemoryScale::S1,
                     displacement: 12560,
@@ -70,17 +71,17 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(4)),
+                kind: Register(Virtual(4)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(4)),
+                kind: Register(Virtual(4)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(5)),
+                kind: Register(Virtual(5)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -90,17 +91,17 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(5)),
+                kind: Register(Virtual(5)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(5)),
+                kind: Register(Virtual(5)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(3)),
+                kind: Register(Virtual(3)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -110,37 +111,37 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(6)),
+                kind: Register(Virtual(6)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(3)),
+                kind: Register(Virtual(3)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(2)),
+                kind: Register(Virtual(2)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(AND(
             Operand {
-                kind: Register(VirtualRegister(6)),
+                kind: Register(Virtual(6)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(2)),
+                kind: Register(Virtual(2)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(2)),
+                kind: Register(Virtual(2)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(1)),
+                kind: Register(Virtual(1)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -150,7 +151,7 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(7)),
+                kind: Register(Virtual(7)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -160,38 +161,38 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(PhysicalRegister(RDX)),
+                kind: Register(Physical(PhysicalRegister::RDX)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(1)),
+                kind: Register(Virtual(1)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(PhysicalRegister(RAX)),
+                kind: Register(Physical(PhysicalRegister::RAX)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(IDIV(
             Operand {
-                kind: Register(PhysicalRegister(RDX)),
+                kind: Register(Physical(PhysicalRegister::RDX)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(PhysicalRegister(RAX)),
+                kind: Register(Physical(PhysicalRegister::RAX)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(7)),
+                kind: Register(Virtual(7)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
                 kind: Memory {
-                    base: Some(PhysicalRegister(RBP)),
+                    base: Some(Physical(PhysicalRegister::RBP)),
                     index: None,
                     scale: MemoryScale::S1,
                     displacement: 4984,
@@ -200,17 +201,17 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(10)),
+                kind: Register(Virtual(10)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(10)),
+                kind: Register(Virtual(10)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(11)),
+                kind: Register(Virtual(11)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -220,17 +221,17 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(11)),
+                kind: Register(Virtual(11)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(11)),
+                kind: Register(Virtual(11)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(9)),
+                kind: Register(Virtual(9)),
                 width_in_bits: Width::_64,
             },
         )),
@@ -240,78 +241,78 @@ fn shr_full() {
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(12)),
+                kind: Register(Virtual(12)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(9)),
+                kind: Register(Virtual(9)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(8)),
+                kind: Register(Virtual(8)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(AND(
             Operand {
-                kind: Register(VirtualRegister(12)),
+                kind: Register(Virtual(12)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(8)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(VirtualRegister(8)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(VirtualRegister(13)),
+                kind: Register(Virtual(8)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(PhysicalRegister(RDX)),
+                kind: Register(Virtual(8)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(PhysicalRegister(RCX)),
+                kind: Register(Virtual(13)),
+                width_in_bits: Width::_64,
+            },
+        )),
+        Instruction(MOV(
+            Operand {
+                kind: Register(Physical(PhysicalRegister::RDX)),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: Register(Physical(PhysicalRegister::RCX)),
                 width_in_bits: Width::_8,
             },
         )),
         Instruction(SHR(
             Operand {
-                kind: Register(PhysicalRegister(RCX)),
+                kind: Register(Physical(PhysicalRegister::RCX)),
                 width_in_bits: Width::_8,
             },
             Operand {
-                kind: Register(VirtualRegister(13)),
+                kind: Register(Virtual(13)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(13)),
+                kind: Register(Virtual(13)),
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: Register(VirtualRegister(0)),
+                kind: Register(Virtual(0)),
                 width_in_bits: Width::_64,
             },
         )),
         Instruction(MOV(
             Operand {
-                kind: Register(VirtualRegister(0)),
+                kind: Register(Virtual(0)),
                 width_in_bits: Width::_64,
             },
             Operand {
                 kind: Memory {
-                    base: Some(PhysicalRegister(RBP)),
+                    base: Some(Physical(PhysicalRegister::RBP)),
                     index: None,
                     scale: MemoryScale::S1,
                     displacement: 12560,

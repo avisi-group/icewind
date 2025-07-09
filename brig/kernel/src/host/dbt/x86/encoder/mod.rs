@@ -3,7 +3,13 @@ use {
         Alloc,
         x86::{
             emitter::{ARG_REGS, X86Block},
-            encoder::width::Width,
+            encoder::{
+                instructions::{
+                    adc, add, and, cmp, lea, mov, movsx, movzx, or, setne, shl, shr, sub, test, xor,
+                },
+                registers::{PhysicalRegister, Register, SegmentRegister},
+                width::Width,
+            },
         },
     },
     alloc::vec::Vec,
@@ -18,22 +24,9 @@ use {
     strum::EnumIter,
 };
 
-mod adc;
-mod add;
-mod and;
-mod cmp;
-mod lea;
-mod mov;
-mod movsx;
-mod movzx;
-mod or;
-mod setne;
-mod shl;
-mod shr;
-mod sub;
-mod test;
+pub mod registers;
+mod instructions;
 pub mod width;
-mod xor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Opcode<A: Alloc> {
@@ -147,207 +140,6 @@ pub enum Opcode<A: Alloc> {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
-pub enum PhysicalRegister {
-    /// rax
-    RAX,
-    /// rcx
-    RCX,
-    /// rdx
-    RDX,
-    /// rbx
-    RBX,
-    /// rsi
-    RSI,
-    /// rdi
-    RDI,
-    /// rsp
-    RSP,
-    /// rbp
-    RBP,
-    /// r8
-    R8,
-    /// r9
-    R9,
-    /// r10
-    R10,
-    /// r11
-    R11,
-    /// r12
-    R12,
-    /// r13
-    R13,
-    /// r14
-    R14,
-    /// r15
-    R15,
-}
-
-impl From<&PhysicalRegister> for AsmRegister64 {
-    fn from(phys: &PhysicalRegister) -> Self {
-        use iced_x86::code_asm::{
-            r8, r9, r10, r11, r12, r13, r14, r15, rax, rbp, rbx, rcx, rdi, rdx, rsi, rsp,
-        };
-
-        match phys {
-            PhysicalRegister::RAX => rax,
-            PhysicalRegister::RCX => rcx,
-            PhysicalRegister::RDX => rdx,
-            PhysicalRegister::RBX => rbx,
-            PhysicalRegister::RSI => rsi,
-            PhysicalRegister::RDI => rdi,
-            PhysicalRegister::RSP => rsp,
-            PhysicalRegister::RBP => rbp,
-            PhysicalRegister::R8 => r8,
-            PhysicalRegister::R9 => r9,
-            PhysicalRegister::R10 => r10,
-            PhysicalRegister::R11 => r11,
-            PhysicalRegister::R12 => r12,
-            PhysicalRegister::R13 => r13,
-            PhysicalRegister::R14 => r14,
-            PhysicalRegister::R15 => r15,
-        }
-    }
-}
-
-impl From<PhysicalRegister> for AsmRegister64 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
-    }
-}
-
-impl From<&PhysicalRegister> for AsmRegister8 {
-    fn from(phys: &PhysicalRegister) -> Self {
-        use iced_x86::code_asm::{
-            al, bl, bpl, cl, dil, dl, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b, sil, spl,
-        };
-
-        match phys {
-            PhysicalRegister::RAX => al,
-            PhysicalRegister::RCX => cl,
-            PhysicalRegister::RDX => dl,
-            PhysicalRegister::RBX => bl,
-            PhysicalRegister::RSI => sil,
-            PhysicalRegister::RDI => dil,
-            PhysicalRegister::RSP => spl,
-            PhysicalRegister::RBP => bpl,
-            PhysicalRegister::R8 => r8b,
-            PhysicalRegister::R9 => r9b,
-            PhysicalRegister::R10 => r10b,
-            PhysicalRegister::R11 => r11b,
-            PhysicalRegister::R12 => r12b,
-            PhysicalRegister::R13 => r13b,
-            PhysicalRegister::R14 => r14b,
-            PhysicalRegister::R15 => r15b,
-        }
-    }
-}
-
-impl From<PhysicalRegister> for AsmRegister8 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
-    }
-}
-
-impl From<&PhysicalRegister> for AsmRegister16 {
-    fn from(phys: &PhysicalRegister) -> Self {
-        use iced_x86::code_asm::{
-            ax, bp, bx, cx, di, dx, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w, si, sp,
-        };
-
-        match phys {
-            PhysicalRegister::RAX => ax,
-            PhysicalRegister::RCX => cx,
-            PhysicalRegister::RDX => dx,
-            PhysicalRegister::RBX => bx,
-            PhysicalRegister::RSI => si,
-            PhysicalRegister::RDI => di,
-            PhysicalRegister::RSP => sp,
-            PhysicalRegister::RBP => bp,
-            PhysicalRegister::R8 => r8w,
-            PhysicalRegister::R9 => r9w,
-            PhysicalRegister::R10 => r10w,
-            PhysicalRegister::R11 => r11w,
-            PhysicalRegister::R12 => r12w,
-            PhysicalRegister::R13 => r13w,
-            PhysicalRegister::R14 => r14w,
-            PhysicalRegister::R15 => r15w,
-        }
-    }
-}
-
-impl From<&PhysicalRegister> for AsmRegister32 {
-    fn from(phys: &PhysicalRegister) -> Self {
-        use iced_x86::code_asm::{
-            eax, ebp, ebx, ecx, edi, edx, esi, esp, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d,
-        };
-
-        match phys {
-            PhysicalRegister::RAX => eax,
-            PhysicalRegister::RCX => ecx,
-            PhysicalRegister::RDX => edx,
-            PhysicalRegister::RBX => ebx,
-            PhysicalRegister::RSI => esi,
-            PhysicalRegister::RDI => edi,
-            PhysicalRegister::RSP => esp,
-            PhysicalRegister::RBP => ebp,
-            PhysicalRegister::R8 => r8d,
-            PhysicalRegister::R9 => r9d,
-            PhysicalRegister::R10 => r10d,
-            PhysicalRegister::R11 => r11d,
-            PhysicalRegister::R12 => r12d,
-            PhysicalRegister::R13 => r13d,
-            PhysicalRegister::R14 => r14d,
-            PhysicalRegister::R15 => r15d,
-        }
-    }
-}
-
-impl From<PhysicalRegister> for AsmRegister16 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
-    }
-}
-
-impl From<PhysicalRegister> for AsmRegister32 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
-pub enum SegmentRegister {
-    /// fs
-    FS,
-    /// gs
-    GS,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Register {
-    PhysicalRegister(PhysicalRegister),
-    VirtualRegister(usize),
-    GlobalRegister(usize),
-}
-
-impl Display for Register {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Register::PhysicalRegister(pr) => write!(f, "%{pr}"),
-            Register::VirtualRegister(vr) => write!(f, "v{vr}"),
-            Register::GlobalRegister(gr) => write!(f, "g{gr}"),
-        }
-    }
-}
-
-impl Into<iced_x86::Register> for PhysicalRegister {
-    fn into(self) -> iced_x86::Register {
-        match self {
-            PhysicalRegister::RAX => iced_x86::Register::RAX,
-            _ => todo!(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum MemoryScale {
@@ -477,21 +269,21 @@ impl<A: Alloc> Operand<A> {
 
     pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand<A> {
         Operand {
-            kind: OperandKind::Register(Register::PhysicalRegister(reg)),
+            kind: OperandKind::Register(Register::Physical(reg)),
             width_in_bits: (width_in_bits),
         }
     }
 
     pub fn vreg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
-            kind: OperandKind::Register(Register::VirtualRegister(reg)),
+            kind: OperandKind::Register(Register::Virtual(reg)),
             width_in_bits: (width_in_bits),
         }
     }
 
     pub fn greg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
-            kind: OperandKind::Register(Register::GlobalRegister(reg)),
+            kind: OperandKind::Register(Register::Global(reg)),
             width_in_bits: (width_in_bits),
         }
     }
@@ -680,7 +472,7 @@ fn memory_operand_to_iced(
 ) -> AsmMemoryOperand {
     let mut mem = AsmRegister64::from(base) + displacement;
 
-    if let Some(Register::PhysicalRegister(index)) = index {
+    if let Some(Register::Physical(index)) = index {
         let scale: i32 = match scale {
             MemoryScale::S1 => 1,
             MemoryScale::S2 => 2,
@@ -703,7 +495,7 @@ fn segment_memory_operand_to_iced(
 ) -> AsmMemoryOperand {
     let mut mem = AsmMemoryOperand::from(displacement);
 
-    if let Some(Register::PhysicalRegister(index)) = index {
+    if let Some(Register::Physical(index)) = index {
         let scale: i32 = match scale {
             MemoryScale::S1 => 1,
             MemoryScale::S2 => 2,
@@ -911,7 +703,7 @@ impl<A: Alloc> Instruction<A> {
         use {
             Opcode::*,
             OperandKind::{Immediate as I, Memory as M, Register as R, Target as T},
-            Register::PhysicalRegister as PHYS,
+            Register::Physical as PHYS,
         };
 
         match &self.0 {
