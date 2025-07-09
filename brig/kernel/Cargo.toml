@@ -65,3 +65,4 @@ paste = "1.0.15"
 embedded-time = "0.12.1"
 bitfields = "0.13.2"
 virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
+strum = { version = "0.27.1", features = ["derive"], default-features = false }

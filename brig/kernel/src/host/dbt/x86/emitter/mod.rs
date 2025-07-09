@@ -812,6 +812,44 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 bit_extract(*value, *start, *length),
                 Type::Unsigned(u16::try_from(*length).unwrap()),
             ),
+            // register read direct
+            (
+                NodeKind::GuestRegister { offset },
+                NodeKind::Constant { value: 0, .. },
+                NodeKind::Constant {
+                    value: length_value @ (8 | 16 | 32 | 64 | 128),
+                    ..
+                },
+            ) => {
+                let length = u16::try_from(*length_value).unwrap();
+
+                let new_typ = match typ {
+                    Type::Unsigned(_) => Type::Unsigned(length),
+                    _ => todo!("{typ:?}"),
+                };
+
+                self.read_register(*offset, new_typ)
+            }
+            // // register read with bitextract
+            // (
+            //     NodeKind::GuestRegister { offset },
+            //     NodeKind::Constant {
+            //         value: start_value, ..
+            //     },
+            //     NodeKind::Constant {
+            //         value: length_value,
+            //         ..
+            //     },
+            // ) => {
+            //     let start_quotient = start_value / 8;
+            //     let start_remainder = start_value % 8;
+            //     let length = u16::try_from(*length_value).unwrap();
+            //     let new_typ = match typ {
+            //         Type::Unsigned(_) => Type::Unsigned(length),
+            //         _ => todo!("{typ:?}"),
+            //     };
+            //     todo!();
+            // }
 
             // known start and length
             (

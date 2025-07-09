@@ -10,17 +10,16 @@ use {
         },
     },
     alloc::vec::Vec,
-    bitset_core::BitSet,
     common::hashmap::{HashMap, HashSet},
     core::panic,
-    itertools::Itertools,
+    strum::IntoEnumIterator,
 };
 
 pub struct FreshAllocator {
     global_register_offset: usize,
     live_ranges: HashMap<Register, Vec<(usize, Option<usize>)>>,
-
-    allocation_plan: HashMap<usize, usize>,
+    // virtual register id to physical register
+    allocation_plan: HashMap<usize, PhysicalRegister>,
 }
 
 impl RegisterAllocator for FreshAllocator {
@@ -68,9 +67,7 @@ impl RegisterAllocator for FreshAllocator {
             instruction.get_use_defs_mut().for_each(|ud| {
                 let (UseDefMut::Def(reg) | UseDefMut::Use(reg) | UseDefMut::UseDef(reg)) = ud;
                 if let Register::VirtualRegister(vreg) = &*reg {
-                    *reg = Register::PhysicalRegister(PhysicalRegister::from_index(
-                        *self.allocation_plan.get(vreg).unwrap(),
-                    ));
+                    *reg = Register::PhysicalRegister(*self.allocation_plan.get(vreg).unwrap());
                 }
             });
         });
@@ -245,21 +242,21 @@ impl FreshAllocator {
     }
 
     fn build_allocation_plan<M: MemAlloc>(&mut self, instructions: &mut [Instruction<M>]) {
-        let mut physical_used = 0u16;
+        let mut physical_used = HashSet::default();
 
         instructions.iter().enumerate().for_each(|(instruction_index, _instruction)| {
             {
                 let ended_registers = self.live_ranges.iter().map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range))).flatten().filter(|(_, (_, end))| *end == Some(instruction_index)).map(|(reg, _)| reg).collect::<Vec<_>>();
 
                 ended_registers.iter().for_each(|reg| match reg {
-                    Register::PhysicalRegister(idx) => {
-                        assert!(physical_used.bit_test(idx.index()));
-                        physical_used.bit_reset(idx.index());
+                    Register::PhysicalRegister(phys_reg) => {
+                        assert!(physical_used.contains(phys_reg));
+                        physical_used.remove(phys_reg);
                     }
                     Register::VirtualRegister(idx) => {
-                        let phys_reg = *self.allocation_plan.get(&*idx).unwrap();
-                        assert!(physical_used.bit_test(phys_reg));
-                        physical_used.bit_reset(phys_reg);
+                        let phys_reg = self.allocation_plan.get(&*idx).unwrap();
+                      assert!(physical_used.contains(phys_reg));
+                        physical_used.remove(phys_reg);
                     }
                     Register::GlobalRegister(_) => {
                         // TODO
@@ -269,17 +266,17 @@ impl FreshAllocator {
 
             let started_registers = self.live_ranges.iter().map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range))).flatten().filter(|(_, (start, _))| *start == instruction_index).map(|(reg, _)| reg).collect::<Vec<_>>();
 
-            started_registers.iter().filter_map(|reg| if let Register::PhysicalRegister(idx) = reg { Some(idx.index()) } else { None }).for_each(|idx| {
-                if physical_used.bit_test(idx) {
+            started_registers.iter().filter_map(|reg| if let Register::PhysicalRegister(phys_reg) = reg { Some(phys_reg) } else { None }).for_each(|phys_reg| {
+                if physical_used.contains(phys_reg) {
                     let currently_live_registers = self.live_ranges.iter().filter(|(_, ranges)| ranges.iter().any(|(start, end)| (*start <= instruction_index) && (instruction_index < end.unwrap()))).filter_map(|(reg, _)| if let Register::VirtualRegister(idx) = reg { Some(*idx) } else { None }).collect::<Vec<usize>>();
 
                     // vregs that use our just-started physical register
-                    let mut vregs = self.allocation_plan.iter().filter(|(vreg, preg)| **preg == idx && currently_live_registers.contains(vreg)).map(|(vreg, _)| *vreg).collect::<Vec<_>>();
+                    let mut vregs = self.allocation_plan.iter().filter(|(vreg, preg)| *preg == phys_reg && currently_live_registers.contains(vreg)).map(|(vreg, _)| *vreg).collect::<Vec<_>>();
 
                     assert!(vregs.len() == 1);
 
                     let conflicting_vreg = vregs.pop().unwrap();
-                    log::trace!("detected conflict with preg {idx} and vreg {}", conflicting_vreg);
+                    log::trace!("detected conflict with preg {phys_reg} and vreg {}", conflicting_vreg);
 
                     // todo: maybe only need to check intersections with start of current range
 
@@ -294,48 +291,33 @@ impl FreshAllocator {
 
                let intersecting_physicals = intersecting_registers.iter().filter_map(|reg| match reg {
                     Register::VirtualRegister(idx) => self.allocation_plan.get(&*idx).copied(), // intersects in the future but not yet allocated
-                    Register::PhysicalRegister(idx) => Some(idx.index()),
+                    Register::PhysicalRegister(phys_reg) => Some(*phys_reg),
                     Register::GlobalRegister(_) => None
                 }).collect::<Vec<_>>();
 
                 // todo: maybe start at 0 and set bits, rather than copying currently used
-                    let mut temp_physical_used = physical_used;
-                    for idx in intersecting_physicals {
-                        temp_physical_used.bit_set(idx);
+                    let mut temp_physical_used = physical_used.clone();
+                    for phys_reg in intersecting_physicals {
+                        temp_physical_used.insert(phys_reg);
                     }
-                    let reallocated_phys_index = {
-                        let first_empty = temp_physical_used.trailing_ones();
+                    let reallocated_phys =
+                         PhysicalRegister::iter().find(|phys_reg| !temp_physical_used.contains(phys_reg)).unwrap();
+                    physical_used.insert(reallocated_phys);
 
-                        if first_empty > 16 {
-                            panic!("ran out of registers :(");
-                        }
-
-                        usize::try_from(first_empty).unwrap()
-                    };
-                    physical_used.bit_set(reallocated_phys_index);
-
-                    self.allocation_plan.insert(conflicting_vreg, reallocated_phys_index);
+                    self.allocation_plan.insert(conflicting_vreg, reallocated_phys);
                 } else {
-                    physical_used.bit_set(idx);
+                    physical_used.insert(*phys_reg);
                 }
             });
 
             started_registers.iter().filter_map(|reg| if let Register::VirtualRegister(idx) = reg { Some(idx) } else { None }).for_each(|vreg_idx| {
-                let phys_index = {
-                    let first_empty = physical_used.trailing_ones();
+                let phys_reg =  PhysicalRegister::iter().find(|phys_reg| !physical_used.contains(phys_reg)).unwrap();
 
-                    if first_empty > 16 {
-                        panic!("ran out of registers :(");
-                    }
-
-                    usize::try_from(first_empty).unwrap()
-                };
-
-                physical_used.bit_set(phys_index);
+                physical_used.insert(phys_reg);
 
                 // assert that virtual register never re-starts
-                if let Some(old_preg) = self.allocation_plan.insert(*vreg_idx, phys_index) {
-                    panic!("cannot re-start virtual register! vreg = {vreg_idx}, old_preg = {old_preg}, new allocation = {phys_index}");
+                if let Some(old_preg) = self.allocation_plan.insert(*vreg_idx, phys_reg) {
+                    panic!("cannot re-start virtual register! vreg = {vreg_idx}, old_preg = {old_preg}, new allocation = {phys_reg}");
                 }
             })
         });
@@ -370,9 +352,7 @@ impl FreshAllocator {
                     })
                     .map(|(reg, _)| match reg {
                         Register::PhysicalRegister(preg) => *preg,
-                        Register::VirtualRegister(virt) => {
-                            PhysicalRegister::from_index(*self.allocation_plan.get(virt).unwrap())
-                        }
+                        Register::VirtualRegister(virt) => *self.allocation_plan.get(virt).unwrap(),
                         Register::GlobalRegister(_) => todo!(),
                     })
                     .collect::<Vec<_>>();

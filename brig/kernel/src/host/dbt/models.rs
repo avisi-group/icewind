@@ -215,28 +215,7 @@ impl ModelDevice {
         }
     }
 
-    fn get_nzcv(&self) -> u8 {
-        let n = self.register_file.read::<u8>("PSTATE_N");
-        let z = self.register_file.read::<u8>("PSTATE_Z");
-        let c = self.register_file.read::<u8>("PSTATE_C");
-        let v = self.register_file.read::<u8>("PSTATE_V");
-
-        assert!(n <= 1);
-        assert!(z <= 1);
-        assert!(c <= 1);
-        assert!(v <= 1);
-
-        n << 3 | z << 2 | c << 1 | v
-    }
-
     fn block_exec(&self, single_step_mode: bool) {
-        let shared = SharedDeviceManager::get()
-            .get_device_by_alias("transport00:05.0")
-            .unwrap();
-        let crate::host::devices::Device::Transport(transport) = &mut *shared.lock() else {
-            panic!();
-        };
-
         let mut instructions_executed = 0usize;
 
         // guest PC to translated block cache
@@ -246,27 +225,15 @@ impl ModelDevice {
         // guest virtual address
         let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
 
-        let mut block_freq_hist = HashMap::<u64, (u64, usize)>::default();
-
         // virtual to physical PCs
         let mut translation_cache = DirectMappedCache::<1024, u64>::new(1);
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
-        //  log::set_max_level(log::LevelFilter::Error);
-
         let _status = record_safepoint();
 
         // block translation/execution loop
         loop {
-            // if instructions_executed == 389280 {
-            //     log::set_max_level(log::LevelFilter::Trace);
-            // }
-
-            // if instructions_executed == 52590 {
-            //     panic!();
-            // }
-
             let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
 
             let block_start_physical_pc =
@@ -321,85 +288,6 @@ impl ModelDevice {
             );
 
             let exec_result = translated_block.translation.execute(&self.register_file);
-
-            // log::trace!(
-            //     "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x3: {:x}, x18:
-            // {:x}",     self.get_nzcv(),
-            //     self.register_file.read::<u64>("SP_EL3"),
-            //     self.register_file.read::<u64>("R0"),
-            //     self.register_file.read::<u64>("R1"),
-            //     self.register_file.read::<u64>("R2"),
-            //     self.register_file.read::<u64>("R3"),
-            //     self.register_file.read::<u64>("R18"),
-            // );
-
-            if PRINT_REGISTERS {
-                write!(transport, "instr = {:08x}\n", translated_block.opcodes[0]).unwrap();
-                write!(
-                    transport,
-                    "PC = {:016x}\n",
-                    self.register_file.read::<u64>("_PC")
-                )
-                .unwrap();
-                write!(transport, "PSTATE:\n").unwrap();
-                for field in [
-                    "A", "ALLINT", //"BTYPE",
-                    "C", "D", "DIT", "E", "EL", "EXLOCK", "F", "GE", "I", "IL", "IT", "J", "M",
-                    "N", "PAN", "PM", "PPEND", "Q", "SM", "SP", "SS", "SSBS", "T", "TCO", "UAO",
-                    "V", "Z", "ZA", "nRW",
-                ] {
-                    write!(
-                        transport,
-                        "\t{field} = {}\n",
-                        self.register_file
-                            .read::<u8>(alloc::format!("PSTATE_{field}"))
-                    )
-                    .unwrap();
-                }
-                // write!(
-                //     transport,
-                //     "BTypeNext = {}\n",
-                //     self.register_file.read::<u8>("BTypeNext")
-                // )
-                // .unwrap();
-                for el in 0..=3 {
-                    write!(
-                        transport,
-                        "SP_EL{el} = {:016x}\n",
-                        self.register_file.read::<u64>(alloc::format!("SP_EL{el}"))
-                    )
-                    .unwrap();
-                }
-                for el in 1..=3 {
-                    write!(
-                        transport,
-                        "SPSR_EL{el} = {:016x}\n",
-                        self.register_file
-                            .read::<u64>(alloc::format!("SPSR_EL{el}_bits"))
-                    )
-                    .unwrap();
-                }
-                for el in 1..=3 {
-                    write!(
-                        transport,
-                        "ELR_EL{el} = {:016x}\n",
-                        self.register_file.read::<u64>(alloc::format!("ELR_EL{el}"))
-                    )
-                    .unwrap();
-                }
-                for reg in 0..=30 {
-                    write!(
-                        transport,
-                        "R{reg:02} = {:016x}\n",
-                        self.register_file.read::<u64>(alloc::format!("R{reg}"))
-                    )
-                    .unwrap();
-                }
-                write!(transport, "\n\n").unwrap();
-                if !single_step_mode {
-                    write!(transport, "skip {}\n", translated_block.opcodes.len()).unwrap();
-                }
-            }
 
             if exec_result.need_tlb_invalidate() {
                 chain_cache.fill_keys(1);

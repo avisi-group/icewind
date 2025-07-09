@@ -15,6 +15,7 @@ use {
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
         CodeLabel, qword_ptr,
     },
+    strum::EnumIter,
 };
 
 mod adc;
@@ -146,7 +147,7 @@ pub enum Opcode<A: Alloc> {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
 pub enum PhysicalRegister {
     /// rax
     RAX,
@@ -180,51 +181,6 @@ pub enum PhysicalRegister {
     R14,
     /// r15
     R15,
-}
-
-impl PhysicalRegister {
-    pub fn index(&self) -> usize {
-        match self {
-            PhysicalRegister::RAX => 0,
-            PhysicalRegister::RCX => 1,
-            PhysicalRegister::RDX => 2,
-            PhysicalRegister::RBX => 3,
-            PhysicalRegister::RSI => 4,
-            PhysicalRegister::RDI => 5,
-            PhysicalRegister::RSP => 6,
-            PhysicalRegister::RBP => 7,
-            PhysicalRegister::R8 => 8,
-            PhysicalRegister::R9 => 9,
-            PhysicalRegister::R10 => 10,
-            PhysicalRegister::R11 => 11,
-            PhysicalRegister::R12 => 12,
-            PhysicalRegister::R13 => 13,
-            PhysicalRegister::R14 => 14,
-            PhysicalRegister::R15 => 15,
-        }
-    }
-
-    pub fn from_index(index: usize) -> PhysicalRegister {
-        match index {
-            0 => PhysicalRegister::RAX,
-            1 => PhysicalRegister::RCX,
-            2 => PhysicalRegister::RDX,
-            3 => PhysicalRegister::RBX,
-            4 => PhysicalRegister::RSI,
-            5 => PhysicalRegister::RDI,
-            6 => PhysicalRegister::RSP,
-            7 => PhysicalRegister::RBP,
-            8 => PhysicalRegister::R8,
-            9 => PhysicalRegister::R9,
-            10 => PhysicalRegister::R10,
-            11 => PhysicalRegister::R11,
-            12 => PhysicalRegister::R12,
-            13 => PhysicalRegister::R13,
-            14 => PhysicalRegister::R14,
-            15 => PhysicalRegister::R15,
-            _ => unreachable!(),
-        }
-    }
 }
 
 impl From<&PhysicalRegister> for AsmRegister64 {

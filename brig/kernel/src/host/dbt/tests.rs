@@ -26,7 +26,7 @@ use {
     },
     alloc::{alloc::Global, boxed::Box, collections::BTreeMap},
     common::{hashmap::HashMap, mask::mask},
-    core::panic,
+    core::{panic, u128},
     proc_macro_lib::ktest,
 };
 
@@ -4704,7 +4704,6 @@ fn stp_mem_init() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // a901fc1f        stp     xzr, xzr, [x0, #24]
-
     let opcode = emitter.constant(0xa901fc1f, Type::Unsigned(32));
     translate(
         Global,
@@ -4724,16 +4723,14 @@ fn stp_mem_init() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    let dst = Box::<(u64, u64)>::new((0, 0));
+    let dst = Box::<(u64, u64)>::new((0xFEED, 0xDEAD));
 
     register_file.write("SEE", -1i64);
-    register_file.write("R29", 0xFEEDu64);
-    register_file.write("R30", 0xDEADu64);
-    register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
+    register_file.write("R0", (((&*dst) as *const (u64, u64)) as u64) - 24);
 
-    //translation.execute(&register_file);
+    translation.execute(&register_file);
 
-    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+    assert_eq!(*dst, (0, 0));
 }
 
 #[ktest]
@@ -5043,4 +5040,73 @@ fn ldp_128() {
     translation.execute(&register_file);
 
     todo!("q2, q3 == 0xABAB...")
+}
+
+#[ktest]
+fn simd_128_reg_minimal() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let n = emitter.constant(3, Type::Signed(64));
+    let width = emitter.constant(128, Type::Signed(64));
+    let result = translate(
+        Global,
+        &*model,
+        "V_read",
+        &[n, width],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert!(matches!(
+        result.kind(),
+        NodeKind::GuestRegister { offset: _ }
+    ));
+    assert_eq!(result.typ(), &Type::Unsigned(128));
+}
+
+#[ktest]
+fn simd_128_reg_to_mem() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let n = emitter.constant(3, Type::Signed(64));
+    let width = emitter.constant(128, Type::Signed(64));
+    let result = translate(
+        Global,
+        &*model,
+        "V_read",
+        &[n, width],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    let addr = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
+    emitter.write_memory(addr, result);
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mut mem = alloc::boxed::Box::new(u128::MAX);
+
+    register_file.write("R0", &mut *mem as *mut _ as u64);
+    register_file.write("SEE", -1i64);
+
+    log::error!("{translation:?}");
+
+    translation.execute(&register_file);
+
+    panic!("{mem:?}");
 }
