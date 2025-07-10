@@ -517,7 +517,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         width: target_width,
                     })
                 }
-                Statement::BitReplicate { pattern, count } => {
+                Statement::BitReplicate { .. } => {
                     todo!()
                 }
 

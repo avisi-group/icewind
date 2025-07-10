@@ -1,9 +1,6 @@
 use {
     super::Bus,
-    crate::host::{
-        arch::x86::memory::PhysAddrExt,
-        devices::{ivshmem::probe_ivshmem, virtio::probe_virtio_block},
-    },
+    crate::host::{arch::x86::memory::PhysAddrExt, devices::virtio::probe_virtio_block},
     acpi::{PciConfigRegions, mcfg::PciConfigEntry},
     common::hashmap::HashMap,
     core::fmt::{self, Display},

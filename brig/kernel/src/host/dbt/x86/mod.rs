@@ -16,9 +16,7 @@ use {
         rudder::Model,
     },
     core::fmt::Debug,
-    iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister64, CodeAssembler, IcedError, qword_ptr, rax,
-    },
+    iced_x86::code_asm::CodeAssembler,
 };
 
 pub mod dot;

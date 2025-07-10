@@ -9,10 +9,8 @@ use {
             x86::{
                 Emitter, X86TranslationContext,
                 encoder::{
-                    Instruction, Opcode, Operand, OperandKind,
-                    registers::{
-                        PhysicalRegister, PhysicalRegisterGeneral, Register, SegmentRegister,
-                    },
+                    Instruction, MemoryScale, Opcode, Operand, OperandKind,
+                    registers::{PhysicalRegister, Register, SegmentRegister},
                     width::Width,
                 },
                 register_allocator::RegisterAllocator,
@@ -1376,7 +1374,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     Width::_64,
                     chain_cache_reg.as_register().unwrap(),
                     masked_vreg.as_register().unwrap(),
-                    super::encoder::MemoryScale::S1,
+                    MemoryScale::S1,
                 ),
                 tag,
             )
@@ -1403,7 +1401,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Width::_64,
             chain_cache_reg.as_register().unwrap(),
             masked_vreg.as_register().unwrap(),
-            super::encoder::MemoryScale::S1,
+            MemoryScale::S1,
             8,
         ))));
 

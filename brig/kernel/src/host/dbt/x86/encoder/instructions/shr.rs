@@ -2,7 +2,7 @@ use {
     crate::host::dbt::{
         Alloc,
         x86::encoder::{
-            self, Operand,
+            Operand,
             OperandKind::{Immediate as I, Register as R},
             Register::Physical as PHYS,
             Width,

@@ -1,6 +1,6 @@
 use {
     crate::host::objects::device::MemoryMappedDevice,
-    alloc::{collections::BTreeMap, string::String, sync::Arc},
+    alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
     core::{
         fmt::Display,

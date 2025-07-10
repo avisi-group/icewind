@@ -1,6 +1,6 @@
 use {
     crate::{
-        guest::{GuestExecutionContext, devices::create_device},
+        guest::devices::create_device,
         host::{
             dbt::{
                 Translation, bit_insert,

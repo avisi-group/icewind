@@ -10,7 +10,6 @@ mod block;
 
 const VIRTIO_MAGIC: u32 = u32::from_le_bytes([b'v', b'i', b'r', b't']);
 const VIRTIO_VERSION: u32 = 0x2;
-const VIRTIO_DEV_NET: u16 = 0x1;
 const VIRTIO_DEV_BLK: u16 = 0x2;
 
 #[bitfield(u32)]

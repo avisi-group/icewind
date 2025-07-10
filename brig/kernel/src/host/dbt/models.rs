@@ -16,12 +16,8 @@ use {
                     emitter::{BinaryOperationKind, X86Emitter},
                 },
             },
-            devices::manager::SharedDeviceManager,
             fs::Filesystem,
-            memory::{
-                bump::{BumpAllocator, BumpAllocatorRef},
-                bytes,
-            },
+            memory::bump::{BumpAllocator, BumpAllocatorRef},
             objects::{
                 Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
                 ToRegisterMappedDevice, ToTickable, device::Device,
@@ -44,10 +40,8 @@ use {
     },
     core::{
         alloc::Layout,
-        fmt::{self, Debug, Write},
-        ptr::NonNull,
+        fmt::{self, Debug},
     },
-    itertools::Itertools,
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},

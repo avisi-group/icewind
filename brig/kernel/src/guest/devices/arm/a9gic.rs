@@ -7,15 +7,13 @@ use {
             irq::IrqController,
         },
     },
-    alloc::{collections::BTreeMap, sync::Arc, vec::Vec},
+    alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
     core::{
-        mem::MaybeUninit,
         sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
         u8,
     },
     proc_macro_lib::guest_device_factory,
-    spin::Mutex,
 };
 
 #[guest_device_factory(a9gic)]

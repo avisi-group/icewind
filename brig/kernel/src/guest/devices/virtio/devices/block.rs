@@ -1,8 +1,6 @@
 use {
     crate::{
-        guest::devices::virtio::devices::{
-            ReadRegister, VIRTIO_DEV_BLK, VIRTIO_MAGIC, VIRTIO_VERSION, Virtio, WriteRegister,
-        },
+        guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
         host::objects::{
             Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
             device::{Device, MemoryMappedDevice},
@@ -11,11 +9,9 @@ use {
     },
     alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
-    core::sync::atomic::Ordering,
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
-    virtio_drivers::transport::pci::VIRTIO_VENDOR_ID,
 };
 
 #[guest_device_factory(virtio_block)]

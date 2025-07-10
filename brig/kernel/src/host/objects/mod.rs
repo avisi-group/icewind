@@ -4,7 +4,7 @@ use {
         irq::IrqController,
         tickable::Tickable,
     },
-    alloc::{fmt, string::String, sync::Arc},
+    alloc::{fmt, sync::Arc},
     common::{
         hashmap::{HashMap, HashSet},
         intern::InternedString,

@@ -3,20 +3,18 @@ use {
         self,
         dbt::sysreg_helpers::encode_sysreg_id,
         objects::{
-            Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
-            ToRegisterMappedDevice, ToTickable,
+            Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
             device::{Device, RegisterMappedDevice},
             irq::IrqController,
             tickable::Tickable,
         },
     },
-    alloc::{borrow::ToOwned, collections::BTreeMap, string::String, sync::Arc},
+    alloc::{collections::BTreeMap, sync::Arc},
     bitfields::bitfield,
     common::intern::InternedString,
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
     embedded_time::duration::Nanoseconds,
     proc_macro_lib::guest_device_factory,
-    spin::Once,
 };
 
 #[guest_device_factory(generic_timer)]

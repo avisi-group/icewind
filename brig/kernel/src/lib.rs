@@ -106,7 +106,7 @@ fn continue_start() {
     guest::start(&mut fs, test_config);
 }
 
-fn serial_in() {
+fn _serial_in() {
     let mut buf = [0u8; 64];
 
     loop {

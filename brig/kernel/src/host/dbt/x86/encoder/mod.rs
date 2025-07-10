@@ -21,11 +21,10 @@ use {
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
         CodeLabel, qword_ptr,
     },
-    strum::EnumIter,
 };
 
-pub mod registers;
 mod instructions;
+pub mod registers;
 pub mod width;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
@@ -139,7 +138,6 @@ pub enum Opcode<A: Alloc> {
         nr_output_args: usize,
     },
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum MemoryScale {
