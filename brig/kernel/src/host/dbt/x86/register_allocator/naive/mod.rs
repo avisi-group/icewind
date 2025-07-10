@@ -7,7 +7,7 @@ use {
                 registers::{PhysicalRegister, PhysicalRegisterGeneral, Register},
                 width::Width,
             },
-            register_allocator::RegisterAllocator,
+            register_allocator::{RegisterAllocator, naive::physical_used::PhysicalUsed},
         },
     },
     alloc::vec::Vec,
@@ -15,6 +15,8 @@ use {
     core::panic,
     strum::IntoEnumIterator,
 };
+
+mod physical_used;
 
 pub struct FreshAllocator {
     global_register_offset: usize,
@@ -79,7 +81,8 @@ fn build_allocation_plan<M: MemAlloc>(
 ) -> HashMap<usize, PhysicalRegister> {
     let mut allocation_plan = HashMap::default();
 
-    let mut physical_used = HashSet::default();
+    let mut physical_used = PhysicalUsed::empty();
+
     instructions.iter().enumerate().for_each(|(instruction_index, _instruction)| {
         {
             let ended_registers = live_ranges
@@ -92,11 +95,11 @@ fn build_allocation_plan<M: MemAlloc>(
 
             ended_registers.iter().for_each(|reg| match reg {
                 Register::Physical(phys_reg) => {
-                    assert!(physical_used.remove(phys_reg));
+                  physical_used.remove(phys_reg);
                 }
                 Register::Virtual(idx) => {
                     let phys_reg = allocation_plan.get(&*idx).unwrap();
-                    assert!(physical_used.remove(phys_reg));
+                    physical_used.remove(phys_reg);
                 }
                 Register::Global(_) => {
                     // TODO
