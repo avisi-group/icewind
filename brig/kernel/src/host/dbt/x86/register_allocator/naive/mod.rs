@@ -7,7 +7,10 @@ use {
                 registers::{PhysicalRegister, PhysicalRegisterGeneral, Register},
                 width::Width,
             },
-            register_allocator::{RegisterAllocator, naive::physical_used::PhysicalUsed},
+            register_allocator::{
+                RegisterAllocator,
+                naive::{physical_used::PhysicalUsed, range::Range},
+            },
         },
     },
     alloc::vec::Vec,
@@ -17,6 +20,7 @@ use {
 };
 
 mod physical_used;
+mod range;
 
 pub struct FreshAllocator {
     global_register_offset: usize,
@@ -76,7 +80,7 @@ impl RegisterAllocator for FreshAllocator {
 }
 
 fn build_allocation_plan<M: MemAlloc>(
-    live_ranges: &HashMap<Register, Vec<(usize, Option<usize>)>>,
+    live_ranges: &HashMap<Register, Vec<Range>>,
     instructions: &mut [Instruction<M>],
 ) -> HashMap<usize, PhysicalRegister> {
     let mut allocation_plan = HashMap::default();
@@ -89,7 +93,7 @@ fn build_allocation_plan<M: MemAlloc>(
                 .iter()
                 .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
                 .flatten()
-                .filter(|(_, (_, end))| *end == Some(instruction_index))
+                .filter(|(_, range)| range.end() == Some(instruction_index))
                 .map(|(reg, _)| reg)
                 .collect::<Vec<_>>();
 
@@ -111,7 +115,7 @@ fn build_allocation_plan<M: MemAlloc>(
             .iter()
             .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
             .flatten()
-            .filter(|(_, (start, _))| *start == instruction_index)
+            .filter(|(_, range)| range.start() == instruction_index)
             .map(|(reg, _)| reg)
             .collect::<Vec<_>>();
 
@@ -123,10 +127,8 @@ fn build_allocation_plan<M: MemAlloc>(
                     let currently_live_registers = live_ranges
                         .iter()
                         .filter(|(_, ranges)|
-                            ranges.iter().any(|(start, end)|
-                            (*start <= instruction_index) &&
-                            (instruction_index < end.unwrap()
-                        )))
+                            ranges.iter().any(|range| range.contains(instruction_index)
+                        ))
                         .filter_map(|(reg, _)| if let Register::Virtual(idx) = reg { Some(*idx) } else { None })
                         .collect::<Vec<usize>>();
 
@@ -196,25 +198,25 @@ fn build_allocation_plan<M: MemAlloc>(
 
 fn build_live_ranges<M: MemAlloc>(
     instructions: &mut [Instruction<M>],
-) -> HashMap<Register, Vec<(usize, Option<usize>)>> {
+) -> HashMap<Register, Vec<Range>> {
     let mut live_ranges = HashMap::default();
 
     // stores stack pointer from brig, can't clobber
     live_ranges.insert(
         Register::Physical(PhysicalRegister::RSP),
-        alloc::vec![(0, Some(usize::MAX))],
+        alloc::vec![Range::new(0, usize::MAX)],
     );
 
     // register file pointer
     live_ranges.insert(
         Register::Physical(PhysicalRegister::RBP),
-        alloc::vec![(0, Some(usize::MAX))],
+        alloc::vec![Range::new(0, usize::MAX)],
     );
 
     // debug register for panics
     live_ranges.insert(
         Register::Physical(PhysicalRegister::R15),
-        alloc::vec![(0, Some(usize::MAX))],
+        alloc::vec![Range::new(0, usize::MAX)],
     );
 
     let instrs_clone = instructions.to_vec();
@@ -230,11 +232,11 @@ fn build_live_ranges<M: MemAlloc>(
             if matches!(instruction.0, Opcode::RET) {
                 if let Some(live_ranges) = live_ranges.get_mut(&Register::Physical(PhysicalRegister::RAX)) {
                     // update end
-                    let last_use = &mut live_ranges
+                    let last_use = live_ranges
                         .as_mut_slice()
                         .last_mut()
                         .expect("should have at least one live range")
-                        .1;
+                        .end_mut();
 
                     if last_use.unwrap_or_default() < instruction_index {
                         *last_use = Some(instruction_index);
@@ -272,17 +274,17 @@ fn build_live_ranges<M: MemAlloc>(
                                     // assert last live range had some end
                                     let last_range = live_ranges.as_mut_slice().last_mut().unwrap();
 
-                                    if last_range.1.is_none() {
+                                    if last_range.end().is_none() {
                                         // silenced due to CMOVNE, will give it an end in a second
                                         // log::warn!(
                                         //     "last live range had no end, but re-def'd: {reg} in {}",
                                         //     instr_clone
                                         // );
-                                        last_range.1 = Some(instruction_index);
+                                       * last_range.end_mut() = Some(instruction_index);
                                     }
 
                                     // start new live range if past the current end
-                                    if instruction_index >= last_range.1.unwrap_or_default() {
+                                    if instruction_index >= last_range.end().unwrap_or_default() {
                                         if let Register::Virtual(_) = reg {
                                             if let Opcode::CMOVNE(_, _) = instruction.0 {
                                                 // do nothing for CMOVNE
@@ -293,11 +295,11 @@ fn build_live_ranges<M: MemAlloc>(
                                                 )
                                             }
                                         } else {
-                                            live_ranges.push((instruction_index, None));
+                                            live_ranges.push(Range::new_partial(instruction_index));
                                         }
                                     }
                                 })
-                                .or_insert(alloc::vec![(instruction_index, None)]);
+                                .or_insert(alloc::vec![Range::new_partial(instruction_index)]);
                         }
                     });
                 instruction
@@ -318,11 +320,11 @@ fn build_live_ranges<M: MemAlloc>(
                                 .unwrap_or_else(|| panic!("use of undef'd register {reg} @ {instruction_index}"));
 
                             // update end
-                            let last_use = &mut live_ranges
+                            let last_use = live_ranges
                                 .as_mut_slice()
                                 .last_mut()
                                 .expect("should have at least one live range")
-                                .1;
+                                .end_mut();
 
                             if last_use.unwrap_or_default() < instruction_index {
                                 *last_use = Some(instruction_index);
@@ -336,7 +338,7 @@ fn build_live_ranges<M: MemAlloc>(
 }
 
 fn insert_register_saves<M: MemAlloc>(
-    live_ranges: &HashMap<Register, Vec<(usize, Option<usize>)>>,
+    live_ranges: &HashMap<Register, Vec<Range>>,
     allocation_plan: &HashMap<usize, PhysicalRegister>,
     instructions: &mut Vec<Instruction<M>, M>,
 ) {
@@ -362,7 +364,8 @@ fn insert_register_saves<M: MemAlloc>(
                     ranges
                         .iter()
                         .copied()
-                        .filter_map(|(start, end)| end.map(|end| (start, end)))
+                        .filter(|r| !r.is_partial())
+                        .filter_map(|r| r.end().map(|end| (r.start(), end)))
                         .any(|(start, end)| start < index && end > index)
                 })
                 .map(|(reg, _)| match reg {
@@ -395,15 +398,12 @@ fn insert_register_saves<M: MemAlloc>(
     instructions.extend_from_slice(&new_instructions);
 }
 
-fn query_intersections(
-    (x_start, x_end): (usize, Option<usize>),
-    live_ranges: &HashMap<Register, Vec<(usize, Option<usize>)>>,
-) -> HashSet<Register> {
+fn query_intersections(x: Range, live_ranges: &HashMap<Register, Vec<Range>>) -> HashSet<Register> {
     live_ranges
         .iter()
         .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
         .flatten()
-        .filter(|(_, (y_start, y_end))| x_start <= y_end.unwrap() && *y_start <= x_end.unwrap())
+        .filter(|(_, y)| x.intersects(y))
         .map(|(reg, _)| reg)
         .collect()
 }
