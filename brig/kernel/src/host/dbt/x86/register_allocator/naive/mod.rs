@@ -4,7 +4,9 @@ use {
         x86::{
             encoder::{
                 Instruction, Opcode, Operand, OperandKind, UseDef, UseDefMut,
-                registers::{PhysicalRegister, PhysicalRegisterGeneral, Register},
+                registers::{
+                    PhysicalRegister, PhysicalRegisterGeneral, PhysicalRegisterXmm, Register,
+                },
                 width::Width,
             },
             register_allocator::{
@@ -87,113 +89,159 @@ fn build_allocation_plan<M: MemAlloc>(
 
     let mut physical_used = PhysicalUsed::empty();
 
-    instructions.iter().enumerate().for_each(|(instruction_index, _instruction)| {
-        {
-            let ended_registers = live_ranges
-                .iter()
-                .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
-                .flatten()
-                .filter(|(_, range)| range.end() == Some(instruction_index))
-                .map(|(reg, _)| reg)
-                .collect::<Vec<_>>();
-
-            ended_registers.iter().for_each(|reg| match reg {
-                Register::Physical(phys_reg) => {
-                  physical_used.remove(phys_reg);
-                }
-                Register::Virtual(idx) => {
-                    let phys_reg = allocation_plan.get(&*idx).unwrap();
-                    physical_used.remove(phys_reg);
-                }
-                Register::Global(_) => {
-                    // TODO
-                }
-            });
-        }
-
-        let started_registers = live_ranges
-            .iter()
-            .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
-            .flatten()
-            .filter(|(_, range)| range.start() == instruction_index)
-            .map(|(reg, _)| reg)
-            .collect::<Vec<_>>();
-
-        started_registers
-            .iter()
-            .filter_map(|reg| if let Register::Physical(phys_reg) = reg { Some(phys_reg) } else { None })
-            .for_each(|phys_reg| {
-                if physical_used.contains(phys_reg) {
-                    let currently_live_registers = live_ranges
-                        .iter()
-                        .filter(|(_, ranges)|
-                            ranges.iter().any(|range| range.contains(instruction_index)
-                        ))
-                        .filter_map(|(reg, _)| if let Register::Virtual(idx) = reg { Some(*idx) } else { None })
-                        .collect::<Vec<usize>>();
-
-                    // vregs that use our just-started physical register
-                    let mut vregs = allocation_plan
-                        .iter()
-                        .filter(|(vreg, preg)| *preg == phys_reg && currently_live_registers.contains(vreg))
-                        .map(|(vreg, _)| *vreg)
-                        .collect::<Vec<_>>();
-
-                    assert!(vregs.len() == 1);
-
-                    let conflicting_vreg = vregs.pop().unwrap();
-                    log::trace!("detected conflict with preg {phys_reg} and vreg {}", conflicting_vreg);
-
-                    // todo: maybe only need to check intersections with start of current range
-
-                    // virt so should onyl have one range
-                    let vreg_range = live_ranges.get(&Register::Virtual(conflicting_vreg)).unwrap()[0];
-
-                    // now we need to choose a new phys reg
-
-                    // find all registers that intersect with the conflicting register
-                    let intersecting_registers = query_intersections(vreg_range, &live_ranges);
-
-                    let intersecting_physicals = intersecting_registers
-                        .iter()
-                        .filter_map(|reg| match reg {
-                            // intersects in the future but not yet allocated
-                            Register::Virtual(idx) => allocation_plan.get(&*idx).copied(),
-                            Register::Physical(phys_reg) => Some(*phys_reg),
-                            Register::Global(_) => None,
-                        })
-                        .collect::<Vec<_>>();
-
-                    // todo: maybe start at 0 and set bits, rather than copying currently used
-                    let mut temp_physical_used = physical_used.clone();
-                    for phys_reg in intersecting_physicals {
-                        temp_physical_used.insert(phys_reg);
-                    }
-                    let reallocated_phys = PhysicalRegisterGeneral::iter().map(PhysicalRegister::General).find(|phys_reg| !temp_physical_used.contains(phys_reg)).unwrap();
-                    physical_used.insert(reallocated_phys);
-
-                    allocation_plan.insert(conflicting_vreg, reallocated_phys);
-                } else {
-                    physical_used.insert(*phys_reg);
-                }
-            });
-
-        started_registers
-            .iter()
-            .filter_map(|reg| if let Register::Virtual(idx) = reg { Some(idx) } else { None })
-            .for_each(|vreg_idx| {
-                let phys_reg = PhysicalRegisterGeneral::iter().map(PhysicalRegister::General).find(|phys_reg| !physical_used.contains(phys_reg)).unwrap();
-
-                physical_used.insert(phys_reg);
-
-                // assert that virtual register never re-starts
-                if let Some(old_preg) = allocation_plan.insert(*vreg_idx, phys_reg) {
-                    panic!("cannot re-start virtual register! vreg: {vreg_idx}, old_preg: {old_preg}, new allocation: {phys_reg}");
-                }
-            })
-    });
+    instructions
+        .iter()
+        .enumerate()
+        .for_each(|(instruction_index, _instruction)| {
+            build_at_instruction_index(
+                live_ranges,
+                &mut allocation_plan,
+                &mut physical_used,
+                instruction_index,
+            );
+        });
 
     allocation_plan
+}
+
+fn build_at_instruction_index(
+    live_ranges: &HashMap<Register, Vec<Range>>,
+    allocation_plan: &mut HashMap<usize, PhysicalRegister>,
+    physical_used: &mut PhysicalUsed,
+    instruction_index: usize,
+) {
+    // ended registers at this index
+    live_ranges
+        .iter()
+        .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
+        .flatten()
+        .filter(|(_, range)| range.end() == Some(instruction_index))
+        .map(|(reg, _)| reg)
+        .for_each(|reg| match reg {
+            Register::Physical(phys_reg) => {
+                physical_used.remove(&phys_reg);
+            }
+            Register::Virtual(idx) => {
+                let phys_reg = allocation_plan.get(&idx).unwrap();
+                physical_used.remove(phys_reg);
+            }
+            Register::Global(_) => {
+                // TODO
+            }
+        });
+
+    // registers that start at this index
+    let started_registers = live_ranges
+        .iter()
+        .map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range)))
+        .flatten()
+        .filter(|(_, range)| range.start() == instruction_index)
+        .map(|(reg, range)| (reg, range.width()))
+        .collect::<Vec<_>>();
+
+    started_registers
+        .iter()
+        .filter_map(|(reg, width)| {
+            if let Register::Physical(phys_reg) = reg {
+                Some((phys_reg, width))
+            } else {
+                None
+            }
+        })
+        .for_each(|(phys_reg, width)| {
+            if physical_used.contains(phys_reg) {
+                let currently_live_registers = live_ranges
+                    .iter()
+                    .filter(|(_, ranges)| {
+                        ranges.iter().any(|range| range.contains(instruction_index))
+                    })
+                    .filter_map(|(reg, _)| {
+                        if let Register::Virtual(idx) = reg {
+                            Some(*idx)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<usize>>();
+
+                // vregs that use our just-started physical register
+                let mut vregs = allocation_plan
+                    .iter()
+                    .filter(|(vreg, preg)| {
+                        *preg == phys_reg && currently_live_registers.contains(vreg)
+                    })
+                    .map(|(vreg, _)| *vreg)
+                    .collect::<Vec<_>>();
+
+                assert!(vregs.len() == 1);
+
+                let conflicting_vreg = vregs.pop().unwrap();
+                log::trace!(
+                    "detected conflict with preg {phys_reg} and vreg {}",
+                    conflicting_vreg
+                );
+
+                // todo: maybe only need to check intersections with start of current range
+
+                // virt so should onyl have one range
+                let vreg_range = live_ranges
+                    .get(&Register::Virtual(conflicting_vreg))
+                    .unwrap()[0];
+
+                // now we need to choose a new phys reg
+
+                // find all registers that intersect with the conflicting register
+                let intersecting_registers = query_intersections(vreg_range, &live_ranges);
+
+                let intersecting_physicals = intersecting_registers
+                    .iter()
+                    .filter_map(|reg| match reg {
+                        // intersects in the future but not yet allocated
+                        Register::Virtual(idx) => allocation_plan.get(&*idx).copied(),
+                        Register::Physical(phys_reg) => Some(*phys_reg),
+                        Register::Global(_) => None,
+                    })
+                    .collect::<Vec<_>>();
+
+                // todo: maybe start at 0 and set bits, rather than copying currently used
+                let mut temp_physical_used = physical_used.clone();
+                for phys_reg in intersecting_physicals {
+                    temp_physical_used.insert(phys_reg);
+                }
+                let reallocated_phys = allocate_physical_register(&temp_physical_used, *width);
+                physical_used.insert(reallocated_phys);
+
+                allocation_plan.insert(conflicting_vreg, reallocated_phys);
+            } else {
+                physical_used.insert(*phys_reg);
+            }
+        });
+
+    started_registers
+        .iter()
+        .filter_map(|(reg, width)| if let Register::Virtual(idx) = reg { Some((idx, width)) } else { None })
+        .for_each(|(vreg_idx, width)| {
+            let phys_reg =allocate_physical_register(physical_used, *width);
+
+            physical_used.insert(phys_reg);
+
+            // assert that virtual register never re-starts
+            if let Some(old_preg) = allocation_plan.insert(*vreg_idx, phys_reg) {
+                panic!("cannot re-start virtual register! vreg: {vreg_idx}, old_preg: {old_preg}, new allocation: {phys_reg}");
+            }
+        })
+}
+
+fn allocate_physical_register(used: &PhysicalUsed, width: Width) -> PhysicalRegister {
+    match width {
+        Width::_128 => PhysicalRegisterXmm::iter()
+            .map(PhysicalRegister::Xmm)
+            .find(|phys_reg| !used.contains(phys_reg)),
+        Width::_64 | Width::_32 | Width::_16 | Width::_8 => PhysicalRegisterGeneral::iter()
+            .map(PhysicalRegister::General)
+            .find(|phys_reg| !used.contains(phys_reg)),
+    }
+    .unwrap()
 }
 
 fn build_live_ranges<M: MemAlloc>(
@@ -204,19 +252,19 @@ fn build_live_ranges<M: MemAlloc>(
     // stores stack pointer from brig, can't clobber
     live_ranges.insert(
         Register::Physical(PhysicalRegister::RSP),
-        alloc::vec![Range::new(0, usize::MAX)],
+        alloc::vec![Range::new(0, usize::MAX, Width::_64)],
     );
 
     // register file pointer
     live_ranges.insert(
         Register::Physical(PhysicalRegister::RBP),
-        alloc::vec![Range::new(0, usize::MAX)],
+        alloc::vec![Range::new(0, usize::MAX, Width::_64)],
     );
 
     // debug register for panics
     live_ranges.insert(
         Register::Physical(PhysicalRegister::R15),
-        alloc::vec![Range::new(0, usize::MAX)],
+        alloc::vec![Range::new(0, usize::MAX, Width::_64)],
     );
 
     let instrs_clone = instructions.to_vec();
@@ -245,7 +293,7 @@ fn build_live_ranges<M: MemAlloc>(
             } else {
                 instruction
                     .get_use_defs()
-                    .filter(|ud| {
+                    .filter(|(ud, _)| {
                         !matches!(
                             ud,
                             UseDef::Def(Register::Global(_))
@@ -253,7 +301,7 @@ fn build_live_ranges<M: MemAlloc>(
                                 | UseDef::UseDef(Register::Global(_))
                         )
                     })
-                    .for_each(|ud| {
+                    .for_each(|(ud, width)| {
                         let is_usedef = ud.is_usedef();
                         if let UseDef::Def(reg) | UseDef::UseDef(reg) = ud {
                             if is_usedef {
@@ -295,16 +343,16 @@ fn build_live_ranges<M: MemAlloc>(
                                                 )
                                             }
                                         } else {
-                                            live_ranges.push(Range::new_partial(instruction_index));
+                                            live_ranges.push(Range::new_partial(instruction_index, width));
                                         }
                                     }
                                 })
-                                .or_insert(alloc::vec![Range::new_partial(instruction_index)]);
+                                .or_insert(alloc::vec![Range::new_partial(instruction_index, width)]);
                         }
                     });
                 instruction
                     .get_use_defs()
-                    .filter(|ud| {
+                    .filter(|(ud, _)| {
                         !matches!(
                             ud,
                             UseDef::Def(Register::Global(_))
@@ -312,7 +360,7 @@ fn build_live_ranges<M: MemAlloc>(
                                 | UseDef::UseDef(Register::Global(_))
                         )
                     })
-                    .for_each(|ud| {
+                    .for_each(|(ud, _width)| {
                         if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud {
                             // assert exists
                             let live_ranges = live_ranges

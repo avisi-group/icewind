@@ -39,14 +39,24 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         let op = self.to_operand(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
-            if *value > (i32::MAX as u64) {
-                let tmp = Operand::vreg(op.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(op, tmp).unwrap());
-                return tmp;
-            }
-        }
+            // can't move immediates into XMM registers, but we're only storing 64 bits for
+            // immediates anyway
+            let shrunk_op = if op.width() == Width::_128 {
+                Operand::imm(Width::_64, *value)
+            } else {
+                op
+            };
 
-        op
+            if *value > (i32::MAX as u64) {
+                let tmp = Operand::vreg(shrunk_op.width(), self.next_vreg());
+                self.push_instruction(Instruction::mov(shrunk_op, tmp).unwrap());
+                tmp
+            } else {
+                shrunk_op
+            }
+        } else {
+            op
+        }
     }
 
     pub(super) fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
@@ -740,8 +750,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 dst
             }
             BinaryOperationKind::Or(_, _) => {
-                self.push_instruction(Instruction::mov(left, dst).unwrap());
-
+                self.push_instruction(
+                    Instruction::mov(left, dst).unwrap_or_else(|_| panic!("{left} | {right}")),
+                );
                 self.push_instruction(Instruction::or(right, dst));
                 dst
             }

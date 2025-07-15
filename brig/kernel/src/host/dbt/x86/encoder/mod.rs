@@ -520,16 +520,27 @@ impl<A: Alloc> Instruction<A> {
         if src.width() != dst.width() {
             return Err(());
         }
+        if let OperandKind::Immediate(_) = src.kind()
+            && src.width() == Width::_128
+        {
+            return Err(());
+        }
         Ok(Self(Opcode::MOV(src, dst)))
     }
 
     pub fn movzx(src: Operand<A>, dst: Operand<A>) -> Self {
-        assert!(src.width() < dst.width());
+        assert!(
+            src.width() < dst.width(),
+            "can't zero extend {src} to {dst}"
+        );
         Self(Opcode::MOVZX(src, dst))
     }
 
     pub fn movsx(src: Operand<A>, dst: Operand<A>) -> Self {
-        assert!(src.width() < dst.width());
+        assert!(
+            src.width() < dst.width(),
+            "can't sign extend {src} to {dst}"
+        );
         Self(Opcode::MOVSX(src, dst))
     }
 
@@ -1390,23 +1401,27 @@ impl<A: Alloc> Instruction<A> {
         }
     }
 
-    pub fn get_use_defs(&self) -> impl Iterator<Item = UseDef> + '_ {
+    pub fn get_use_defs(&self) -> impl Iterator<Item = (UseDef, Width)> + '_ {
         self.get_operands_copy()
             .into_iter()
-            .filter_map(|operand| match operand.1.kind {
+            .filter_map(|(direction, operand)| match operand.kind() {
                 OperandKind::Memory {
                     base: Some(base),
                     index: None,
                     ..
-                } => Some(alloc::vec![UseDef::Use(base)]),
+                } => Some(alloc::vec![(UseDef::Use(*base), Width::_64)]), //todo check me
                 OperandKind::Memory {
                     base: Some(base),
                     index: Some(index),
                     ..
-                } => Some(alloc::vec![UseDef::Use(base), UseDef::Use(index)]),
-                OperandKind::Register(register) => Some(alloc::vec![
-                    UseDef::from_operand_direction(operand.0, register).unwrap(),
+                } => Some(alloc::vec![
+                    (UseDef::Use(*base), Width::_64),
+                    (UseDef::Use(*index), Width::_64),
                 ]),
+                OperandKind::Register(register) => Some(alloc::vec![(
+                    UseDef::from_operand_direction(direction, *register).unwrap(),
+                    operand.width()
+                )]),
                 _ => None,
             })
             .flatten()

@@ -899,13 +899,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
-                if offset != self.model.registers().get(&name).unwrap().offset {
-                    panic!(
-                        "offset: {offset:x} != register start: {:x}, opcode = {:x}",
-                        self.model.registers().get(&name).unwrap().offset,
-                        CURRENT_OPCODE.load(Ordering::Relaxed)
-                    );
-                }
+                // if offset != self.model.registers().get(&name).unwrap().offset {
+                //     panic!(
+                //         "offset: {offset:x} != register start: {:x}, opcode = {:x}",
+                //         self.model.registers().get(&name).unwrap().offset,
+                //         CURRENT_OPCODE.load(Ordering::Relaxed)
+                //     );
+                // }
 
                 let value = value_store.get(*value);
 

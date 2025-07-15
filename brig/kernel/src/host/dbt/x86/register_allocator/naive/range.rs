@@ -1,4 +1,5 @@
 use {
+    crate::host::dbt::x86::encoder::width::Width,
     alloc::{borrow::ToOwned, string::ToString},
     core::fmt::{self, Display, Formatter},
 };
@@ -7,6 +8,7 @@ use {
 pub struct Range {
     start: usize,
     end: Option<usize>,
+    width: Width,
 }
 
 impl Display for Range {
@@ -24,15 +26,20 @@ impl Display for Range {
 }
 
 impl Range {
-    pub fn new(start: usize, end: usize) -> Self {
+    pub fn new(start: usize, end: usize, width: Width) -> Self {
         Self {
             start,
             end: Some(end),
+            width,
         }
     }
 
-    pub fn new_partial(start: usize) -> Self {
-        Self { start, end: None }
+    pub fn new_partial(start: usize, width: Width) -> Self {
+        Self {
+            start,
+            end: None,
+            width,
+        }
     }
 
     pub fn start(&self) -> usize {
@@ -45,6 +52,10 @@ impl Range {
 
     pub fn end_mut(&mut self) -> &mut Option<usize> {
         &mut self.end
+    }
+
+    pub fn width(&self) -> Width {
+        self.width
     }
 
     pub fn is_partial(&self) -> bool {

@@ -5095,6 +5095,7 @@ fn simd_128_reg_to_mem() {
 
     let addr = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
     emitter.write_memory(addr, result);
+    emitter.leave();
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
@@ -5104,9 +5105,8 @@ fn simd_128_reg_to_mem() {
     register_file.write("R0", &mut *mem as *mut _ as u64);
     register_file.write("SEE", -1i64);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
-    panic!("{mem:?}");
+    // todo: more complex test
+    assert_eq!(*mem, 0);
 }

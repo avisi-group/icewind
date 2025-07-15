@@ -308,6 +308,21 @@ impl From<PhysicalRegister> for AsmRegister64 {
     }
 }
 
+impl From<&PhysicalRegister> for AsmRegisterXmm {
+    fn from(phys: &PhysicalRegister) -> Self {
+        let PhysicalRegister::Xmm(xmm) = phys else {
+            panic!()
+        };
+        Self::from(xmm)
+    }
+}
+
+impl From<PhysicalRegister> for AsmRegisterXmm {
+    fn from(phys: PhysicalRegister) -> Self {
+        Self::from(&phys)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
     Physical(PhysicalRegister),

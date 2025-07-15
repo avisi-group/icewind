@@ -10,8 +10,8 @@ use {
         },
     },
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
-        byte_ptr, dword_ptr, word_ptr,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
+        AsmRegisterXmm, CodeAssembler, byte_ptr, dword_ptr, word_ptr, xmmword_ptr,
     },
 };
 
@@ -611,7 +611,41 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_128,
             },
-        ) => unimplemented!(),
+        ) => {
+            // todo: make this aligned!
+            assembler
+                .movdqu(
+                    dst.into(),
+                    xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                )
+                .unwrap();
+        }
+        // MOV R -> M
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_128,
+            },
+        ) => {
+            // todo: make this aligned!
+            assembler
+                .movdqu(
+                    xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    src.into(),
+                )
+                .unwrap();
+        }
         _ => todo!("mov {src} {dst}"),
     }
 }

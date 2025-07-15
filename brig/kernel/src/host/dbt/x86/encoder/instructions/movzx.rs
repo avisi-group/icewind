@@ -9,7 +9,7 @@ use {
         },
     },
     iced_x86::code_asm::{
-        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
 };
 
@@ -82,6 +82,9 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .unwrap(),
             (Width::_32, Width::_64) => assembler
                 .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .unwrap(),
+            (Width::_64, Width::_128) => assembler
+                .movq::<AsmRegisterXmm, AsmRegister64>(dst.into(), src.into())
                 .unwrap(),
 
             (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
