@@ -42,17 +42,15 @@ impl RegisterAllocator for FreshAllocator {
 
         let allocation_plan = build_allocation_plan(&live_ranges, instructions);
 
+        //        log::warn!("plan: {allocation_plan:?}");
+
         // apply allocation plan
         instructions.iter_mut().for_each(|instruction| {
             instruction.get_operands_mut().for_each(|op| {
                 if let Some((_, op)) = op {
-                    if let Operand {
-                        kind: OperandKind::Register(Register::Global(idx)),
-                        width_in_bits,
-                    } = op
-                    {
+                    if let OperandKind::Register(Register::Global(idx)) = op.kind() {
                         *op = Operand::mem_base_displ(
-                            *width_in_bits,
+                            op.width(),
                             Register::Physical(PhysicalRegister::RBP),
                             i32::try_from(self.global_register_offset + (*idx * 8)).unwrap(),
                         )
@@ -66,6 +64,19 @@ impl RegisterAllocator for FreshAllocator {
                     *reg = Register::Physical(*allocation_plan.get(vreg).unwrap());
                 }
             });
+
+            assert!(!matches!(
+                instruction,
+                Instruction(Opcode::MOV(
+                    Operand {
+                        kind: OperandKind::Register(Register::Physical(PhysicalRegister::General(
+                            _
+                        ))),
+                        width_in_bits: Width::_128
+                    },
+                    _
+                ))
+            ));
         });
 
         // kill redundant mov's
@@ -211,8 +222,15 @@ fn build_at_instruction_index(
                 let reallocated_phys = allocate_physical_register(&temp_physical_used, *width);
                 physical_used.insert(reallocated_phys);
 
+                if *width == Width::_128 {
+                    log::warn!("allocated big reg: {phys_reg:?}");
+                }
+
                 allocation_plan.insert(conflicting_vreg, reallocated_phys);
             } else {
+                if *width == Width::_128 {
+                    log::warn!("allocated big reg: {phys_reg:?}");
+                }
                 physical_used.insert(*phys_reg);
             }
         });
@@ -221,7 +239,11 @@ fn build_at_instruction_index(
         .iter()
         .filter_map(|(reg, width)| if let Register::Virtual(idx) = reg { Some((idx, width)) } else { None })
         .for_each(|(vreg_idx, width)| {
-            let phys_reg =allocate_physical_register(physical_used, *width);
+            let phys_reg = allocate_physical_register(physical_used, *width);
+
+            if *width == Width::_128 {
+                log::warn!("allocated big reg: {phys_reg:?}");
+            }
 
             physical_used.insert(phys_reg);
 
@@ -241,7 +263,7 @@ fn allocate_physical_register(used: &PhysicalUsed, width: Width) -> PhysicalRegi
             .map(PhysicalRegister::General)
             .find(|phys_reg| !used.contains(phys_reg)),
     }
-    .unwrap()
+    .expect("failed to allocate physical register")
 }
 
 fn build_live_ranges<M: MemAlloc>(
@@ -280,14 +302,14 @@ fn build_live_ranges<M: MemAlloc>(
             if matches!(instruction.0, Opcode::RET) {
                 if let Some(live_ranges) = live_ranges.get_mut(&Register::Physical(PhysicalRegister::RAX)) {
                     // update end
-                    let last_use = live_ranges
+                    let last_range = live_ranges
                         .as_mut_slice()
                         .last_mut()
                         .expect("should have at least one live range")
-                        .end_mut();
+                      ;
 
-                    if last_use.unwrap_or_default() < instruction_index {
-                        *last_use = Some(instruction_index);
+                    if last_range.end().unwrap_or_default() < instruction_index {
+                        last_range.set_end(instruction_index);
                     }
                 }
             } else {
@@ -328,7 +350,8 @@ fn build_live_ranges<M: MemAlloc>(
                                         //     "last live range had no end, but re-def'd: {reg} in {}",
                                         //     instr_clone
                                         // );
-                                       * last_range.end_mut() = Some(instruction_index);
+                                        last_range.set_end(instruction_index);
+
                                     }
 
                                     // start new live range if past the current end
@@ -350,6 +373,7 @@ fn build_live_ranges<M: MemAlloc>(
                                 .or_insert(alloc::vec![Range::new_partial(instruction_index, width)]);
                         }
                     });
+
                 instruction
                     .get_use_defs()
                     .filter(|(ud, _)| {
@@ -360,7 +384,7 @@ fn build_live_ranges<M: MemAlloc>(
                                 | UseDef::UseDef(Register::Global(_))
                         )
                     })
-                    .for_each(|(ud, _width)| {
+                    .for_each(|(ud, width)| {
                         if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud {
                             // assert exists
                             let live_ranges = live_ranges
@@ -368,14 +392,17 @@ fn build_live_ranges<M: MemAlloc>(
                                 .unwrap_or_else(|| panic!("use of undef'd register {reg} @ {instruction_index}"));
 
                             // update end
-                            let last_use = live_ranges
+                            let last_range = live_ranges
                                 .as_mut_slice()
                                 .last_mut()
-                                .expect("should have at least one live range")
-                                .end_mut();
+                                .expect("should have at least one live range");
 
-                            if last_use.unwrap_or_default() < instruction_index {
-                                *last_use = Some(instruction_index);
+                                // update width
+                            last_range.set_width(core::cmp::max(width, last_range.width()));
+
+                            if last_range.end().unwrap_or_default() < instruction_index {
+                                last_range.set_end(instruction_index);
+
                             }
                         }
                     });

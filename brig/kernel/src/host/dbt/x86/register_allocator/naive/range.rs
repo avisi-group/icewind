@@ -50,8 +50,12 @@ impl Range {
         self.end
     }
 
-    pub fn end_mut(&mut self) -> &mut Option<usize> {
-        &mut self.end
+    pub fn set_end(&mut self, end: usize) {
+        self.end = Some(end);
+    }
+
+    pub fn set_width(&mut self, width: Width) {
+        self.width = width;
     }
 
     pub fn width(&self) -> Width {

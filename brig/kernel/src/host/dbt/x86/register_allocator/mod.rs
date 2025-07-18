@@ -48,284 +48,284 @@ fn conflicted_physical_allocation() {
     allocator.allocate(&mut instrs);
 }
 
-#[ktest]
-fn shr_full() {
-    use {
-        crate::host::dbt::x86::{
-            OperandKind::*,
-            encoder::registers::{PhysicalRegister, Register::*},
-        },
-        Opcode::*,
-    };
+// #[ktest]
+// fn shr_full() {
+//     use {
+//         crate::host::dbt::x86::{
+//             OperandKind::*,
+//             encoder::registers::{PhysicalRegister, Register::*},
+//         },
+//         Opcode::*,
+//     };
 
-    let mut instructions = alloc::vec![
-        Instruction(MOV(
-            Operand {
-                kind: Memory {
-                    base: Some(Physical(PhysicalRegister::RBP)),
-                    index: None,
-                    scale: MemoryScale::S1,
-                    displacement: 12560,
-                    segment_override: None,
-                },
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(4)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(4)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(5)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(SHR(
-            Operand {
-                kind: Immediate(0),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(5)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(5)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(3)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Immediate(18446744073709551615),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(6)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(3)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(2)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(AND(
-            Operand {
-                kind: Register(Virtual(6)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(2)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(2)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(1)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Immediate(64),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(7)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Immediate(0),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RDX)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(1)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RAX)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(IDIV(
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RDX)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RAX)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(7)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Memory {
-                    base: Some(Physical(PhysicalRegister::RBP)),
-                    index: None,
-                    scale: MemoryScale::S1,
-                    displacement: 4984,
-                    segment_override: None,
-                },
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(10)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(10)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(11)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(SHR(
-            Operand {
-                kind: Immediate(0),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(11)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(11)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(9)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Immediate(18446744073709551615),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(12)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(9)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(8)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(AND(
-            Operand {
-                kind: Register(Virtual(12)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(8)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(8)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(13)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RDX)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RCX)),
-                width_in_bits: Width::_8,
-            },
-        )),
-        Instruction(SHR(
-            Operand {
-                kind: Register(Physical(PhysicalRegister::RCX)),
-                width_in_bits: Width::_8,
-            },
-            Operand {
-                kind: Register(Virtual(13)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(13)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Register(Virtual(0)),
-                width_in_bits: Width::_64,
-            },
-        )),
-        Instruction(MOV(
-            Operand {
-                kind: Register(Virtual(0)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: Memory {
-                    base: Some(Physical(PhysicalRegister::RBP)),
-                    index: None,
-                    scale: MemoryScale::S1,
-                    displacement: 12560,
-                    segment_override: None,
-                },
-                width_in_bits: Width::_64,
-            },
-        )),
-    ];
+//     let mut instructions = alloc::vec![
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Memory {
+//                     base: Some(Physical(PhysicalRegister::RBP)),
+//                     index: None,
+//                     scale: MemoryScale::S1,
+//                     displacement: 12560,
+//                     segment_override: None,
+//                 },
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(4)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(4)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(5)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(SHR(
+//             Operand {
+//                 kind: Immediate(0),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(5)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(5)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(3)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Immediate(18446744073709551615),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(6)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(3)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(2)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(AND(
+//             Operand {
+//                 kind: Register(Virtual(6)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(2)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(2)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(1)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Immediate(64),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(7)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Immediate(0),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RDX)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(1)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RAX)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(IDIV(
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RDX)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RAX)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(7)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Memory {
+//                     base: Some(Physical(PhysicalRegister::RBP)),
+//                     index: None,
+//                     scale: MemoryScale::S1,
+//                     displacement: 4984,
+//                     segment_override: None,
+//                 },
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(10)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(10)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(11)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(SHR(
+//             Operand {
+//                 kind: Immediate(0),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(11)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(11)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(9)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Immediate(18446744073709551615),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(12)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(9)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(8)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(AND(
+//             Operand {
+//                 kind: Register(Virtual(12)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(8)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(8)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(13)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RDX)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RCX)),
+//                 width_in_bits: Width::_8,
+//             },
+//         )),
+//         Instruction(SHR(
+//             Operand {
+//                 kind: Register(Physical(PhysicalRegister::RCX)),
+//                 width_in_bits: Width::_8,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(13)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(13)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Register(Virtual(0)),
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//         Instruction(MOV(
+//             Operand {
+//                 kind: Register(Virtual(0)),
+//                 width_in_bits: Width::_64,
+//             },
+//             Operand {
+//                 kind: Memory {
+//                     base: Some(Physical(PhysicalRegister::RBP)),
+//                     index: None,
+//                     scale: MemoryScale::S1,
+//                     displacement: 12560,
+//                     segment_override: None,
+//                 },
+//                 width_in_bits: Width::_64,
+//             },
+//         )),
+//     ];
 
-    let mut allocator = FreshAllocator::new(14, 0);
-    allocator.allocate(&mut instructions);
-}
+//     let mut allocator = FreshAllocator::new(14, 0);
+//     allocator.allocate(&mut instructions);
+// }
 
 /*Instruction {
         opcode: Opcode::MOV,

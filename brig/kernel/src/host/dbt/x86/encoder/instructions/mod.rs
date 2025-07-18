@@ -2,6 +2,7 @@ pub mod adc;
 pub mod add;
 pub mod and;
 pub mod cmp;
+pub mod jne;
 pub mod lea;
 pub mod mov;
 pub mod movsx;

@@ -5,7 +5,8 @@ use {
             emitter::{ARG_REGS, X86Block},
             encoder::{
                 instructions::{
-                    adc, add, and, cmp, lea, mov, movsx, movzx, or, setne, shl, shr, sub, test, xor,
+                    adc, add, and, cmp, jne, lea, mov, movsx, movzx, or, setne, shl, shr, sub,
+                    test, xor,
                 },
                 registers::{PhysicalRegister, Register, SegmentRegister},
                 width::Width,
@@ -257,32 +258,41 @@ impl<A: Alloc> Operand<A> {
     pub fn width(&self) -> Width {
         self.width_in_bits
     }
+    pub fn set_width(&mut self, width: Width) {
+        self.width_in_bits = width;
+    }
 
     pub fn imm(width_in_bits: Width, value: u64) -> Operand<A> {
         Operand {
             kind: OperandKind::Immediate(value),
-            width_in_bits: (width_in_bits),
+            width_in_bits,
         }
     }
 
     pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand<A> {
+        if let PhysicalRegister::General(_) = reg
+            && width_in_bits == Width::_128
+        {
+            panic!();
+        }
+
         Operand {
             kind: OperandKind::Register(Register::Physical(reg)),
-            width_in_bits: (width_in_bits),
+            width_in_bits,
         }
     }
 
     pub fn vreg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
             kind: OperandKind::Register(Register::Virtual(reg)),
-            width_in_bits: (width_in_bits),
+            width_in_bits,
         }
     }
 
     pub fn greg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
             kind: OperandKind::Register(Register::Global(reg)),
-            width_in_bits: (width_in_bits),
+            width_in_bits,
         }
     }
 
@@ -299,7 +309,7 @@ impl<A: Alloc> Operand<A> {
                 displacement,
                 segment_override: None,
             },
-            width_in_bits: (width_in_bits),
+            width_in_bits,
         }
     }
 
@@ -516,15 +526,40 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::ADC(a, b, c))
     }
 
-    pub fn mov(src: Operand<A>, dst: Operand<A>) -> Result<Self, ()> {
-        if src.width() != dst.width() {
-            return Err(());
+    pub fn mov(src: Operand<A>, dst: Operand<A>) -> Result<Self, Error<A>> {
+        if src.width() > Width::_64 || dst.width() > Width::_64 {
+            log::warn!("big mov {src} {dst}")
         }
+
+        // todo: remove these checks or enforce them earlier
+        if src.width() == Width::_128
+            && matches!(
+                src.kind(),
+                OperandKind::Register(Register::Physical(PhysicalRegister::General(_)))
+            )
+        {
+            return Err(Error::OversizeGeneralRegister(src));
+        }
+
+        if dst.width() >= Width::_128
+            && matches!(
+                dst.kind(),
+                OperandKind::Register(Register::Physical(PhysicalRegister::General(_)))
+            )
+        {
+            return Err(Error::OversizeGeneralRegister(dst));
+        }
+
+        if src.width() != dst.width() {
+            return Err(Error::MovWidthMismatch { src, dst });
+        }
+
         if let OperandKind::Immediate(_) = src.kind()
             && src.width() == Width::_128
         {
-            return Err(());
+            return Err(Error::MovImmediateSSE { src, dst });
         }
+
         Ok(Self(Opcode::MOV(src, dst)))
     }
 
@@ -736,15 +771,7 @@ impl<A: Alloc> Instruction<A> {
             XOR(src, dst) => xor::encode(assembler, src, dst),
 
             // control flow
-            JNE(Operand {
-                kind: T(target), ..
-            }) => {
-                let label = label_map
-                    .get(target)
-                    .unwrap_or_else(|| panic!("no label for {target:?} found"))
-                    .clone();
-                assembler.jne(label).unwrap();
-            }
+            JNE(tgt) => jne::encode(assembler, label_map, tgt),
             JE(Operand {
                 kind: T(target), ..
             }) => {
@@ -1427,7 +1454,7 @@ impl<A: Alloc> Instruction<A> {
             .flatten()
     }
 
-    pub fn get_use_defs_mut(&mut self) -> impl Iterator<Item = UseDefMut> + '_ {
+    pub fn get_use_defs_mut(&'_ mut self) -> impl Iterator<Item = UseDefMut<'_>> + '_ {
         self.get_operands_mut()
             .flatten()
             .filter_map(|operand| match &mut operand.1.kind {
@@ -1448,4 +1475,15 @@ impl<A: Alloc> Instruction<A> {
             })
             .flatten()
     }
+}
+
+/// Instruction encoding error
+#[derive(Debug, Clone, displaydoc::Display, thiserror::Error)]
+pub enum Error<A: Alloc> {
+    /// Mov operands have different widths, src: {src}, dst: {dst}
+    MovWidthMismatch { src: Operand<A>, dst: Operand<A> },
+    /// Cannot move an immediate ({src}) into an SSE register ({dst})
+    MovImmediateSSE { src: Operand<A>, dst: Operand<A> },
+    /// Found general register greater than 64-bits wide: {0}
+    OversizeGeneralRegister(Operand<A>),
 }

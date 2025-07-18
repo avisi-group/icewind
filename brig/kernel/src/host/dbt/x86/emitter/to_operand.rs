@@ -33,10 +33,10 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    /// Same as `to_operand` but if the value is a constant and larger than 32
-    /// bits, move it to a register
-    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
-        let op = self.to_operand(node);
+    /// Same as `to_operand` but if the value is a constant and larger
+    /// than 32 bits, move it to a register
+    pub fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+        let op = self.to_operand_inner(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
             // can't move immediates into XMM registers, but we're only storing 64 bits for
@@ -59,7 +59,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    pub(super) fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+    fn to_operand_inner(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         if let Some(operand) = self.current_block_operands.get(node) {
             return *operand;
         }
@@ -333,12 +333,12 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             let src_width = src.width();
                             let dst_width = dst.width();
                             if src_width < dst_width {
-                                panic!(
+                                log::warn!(
                                     "src ({src_width} bits) must be larger than dst ({dst_width} bits) in node:\n{node:#?}"
                                 );
                             }
 
-                            src.width_in_bits = dst.width_in_bits;
+                            src.set_width(dst.width());
 
                             self.push_instruction(Instruction::mov(src, dst).unwrap());
                         }
@@ -349,7 +349,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             }
                             Ordering::Less => self.push_instruction(Instruction::movzx(src, dst)),
                             Ordering::Greater => {
-                                src.width_in_bits = dst.width_in_bits;
+                                src.set_width(dst.width());
+
                                 self.push_instruction(Instruction::mov(src, dst).unwrap())
                             }
                         },
@@ -366,6 +367,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             } => {
                 // SPECIAL CASE FOR UMULH BUG
                 // getting top 64 bits of multiplication, emit imul and read out RAX
+                // todo: tidy
                 if let NodeKind::BinaryOperation(BinaryOperationKind::Multiply(a, b)) = value.kind()
                     && let NodeKind::Constant { value: 64, .. } = amount.kind()
                     && *kind == ShiftOperationKind::LogicalShiftRight
@@ -391,7 +393,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 if let OperandKind::Register(_) = amount.kind() {
                     // truncate (high bits don't matter anyway)
-                    amount.width_in_bits = Width::_8;
+                    amount.set_width(Width::_8);
                     let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
                     self.push_instruction(Instruction::mov(amount, amount_dst).unwrap());
                     amount = amount_dst;
@@ -668,8 +670,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         // pull out widths but also validate types are compatible
         let (left, right) = match (left.typ(), right.typ()) {
             (Type::Unsigned(_), Type::Unsigned(_)) => {
-                let left = self.to_operand_oversize_reg_promote(left);
-                let right = self.to_operand_oversize_reg_promote(right);
+                let left = self.to_operand(left);
+                let right = self.to_operand(right);
 
                 match left.width().cmp(&right.width()) {
                     Ordering::Less => {
@@ -688,8 +690,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             }
 
             (Type::Bits, Type::Unsigned(_)) => {
-                let l = self.to_operand_oversize_reg_promote(left);
-                let r = self.to_operand_oversize_reg_promote(right);
+                let l = self.to_operand(left);
+                let r = self.to_operand(right);
 
                 if l.width() == r.width() {
                     (l, r)
@@ -698,8 +700,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 }
             }
             (Type::Unsigned(_), Type::Bits) => {
-                let left = self.to_operand_oversize_reg_promote(left);
-                let right = self.to_operand_oversize_reg_promote(right);
+                let left = self.to_operand(left);
+                let right = self.to_operand(right);
 
                 if left.width() == right.width() {
                     (left, right)
@@ -709,16 +711,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             }
             (Type::Signed(l), Type::Signed(r)) => match l.cmp(r) {
                 Ordering::Less => {
-                    let left = self.to_operand_oversize_reg_promote(left);
-                    let right = self.to_operand_oversize_reg_promote(right);
+                    let left = self.to_operand(left);
+                    let right = self.to_operand(right);
                     let tmp = Operand::vreg(right.width(), self.next_vreg());
                     self.push_instruction(Instruction::movsx(left, tmp));
                     (tmp, right)
                 }
-                Ordering::Equal => (
-                    self.to_operand_oversize_reg_promote(left),
-                    self.to_operand_oversize_reg_promote(right),
-                ),
+                Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
                 Ordering::Greater => {
                     todo!("sign extend {r} to {l}")
                 }

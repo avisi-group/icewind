@@ -4,7 +4,11 @@ use {
         emitter::Emitter,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
-            encoder::{Instruction, Opcode, OperandKind},
+            encoder::{
+                Instruction, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register},
+                width::Width,
+            },
             register_allocator::naive::FreshAllocator,
         },
     },
@@ -191,6 +195,41 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                     num_virtual_registers,
                     global_register_offset,
                 ));
+        });
+
+        // temporary search for >64 bit general registers
+        // todo: deleteme
+        all_blocks.iter().for_each(|block| {
+            block
+                .get_mut(self.arena_mut())
+                .instructions()
+                .iter()
+                .for_each(|i| {
+                    assert!(!matches!(
+                        i,
+                        Instruction(Opcode::MOV(
+                            Operand {
+                                kind: OperandKind::Register(Register::Physical(
+                                    PhysicalRegister::General(_)
+                                )),
+                                width_in_bits: Width::_128
+                            },
+                            _
+                        ))
+                    ));
+                    assert!(!matches!(
+                        i,
+                        Instruction(Opcode::MOV(
+                            _,
+                            Operand {
+                                kind: OperandKind::Register(Register::Physical(
+                                    PhysicalRegister::General(_)
+                                )),
+                                width_in_bits: Width::_128
+                            }
+                        ))
+                    ));
+                });
         });
 
         log::trace!("encoding all blocks");
