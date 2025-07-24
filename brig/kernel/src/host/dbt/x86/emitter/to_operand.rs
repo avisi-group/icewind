@@ -19,8 +19,8 @@ use {
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
-    /// Same as `to_operand` but if the value is a constant, move it to a
-    /// register
+    /// Same as `to_operand` but if the value is a constant (of any size), move
+    /// it to a register
     pub fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         if let NodeKind::Constant { .. } | NodeKind::FunctionPointer(_) = node.kind() {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
@@ -33,8 +33,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    /// Same as `to_operand` but if the value is a constant and larger
-    /// than 32 bits, move it to a register
+    /// Same as `to_operand_inner` but handles XMM quirks
     pub fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         let op = self.to_operand_inner(node);
 
@@ -493,7 +492,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 }
 
                 let destination_width =
-                    Width::from_uncanonicalized(pattern_width * u16::try_from(count).unwrap())
+                    Width::from_uncanonicalized(pattern_width * u32::try_from(count).unwrap())
                         .unwrap();
 
                 let pattern_zx = Operand::vreg(destination_width, self.next_vreg());

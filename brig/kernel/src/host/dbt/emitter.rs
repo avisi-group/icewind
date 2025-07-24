@@ -114,15 +114,15 @@ pub trait Emitter<A: Alloc> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
-    Unsigned(u16),
-    Signed(u16),
-    Floating(u16),
+    Unsigned(u32),
+    Signed(u32),
+    Floating(u32),
     Bits,
     Tuple,
 }
 
 impl Type {
-    pub fn width(&self) -> u16 {
+    pub fn width(&self) -> u32 {
         match self {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => *w,
             Type::Bits => 64, // todo: should this be the runtime length?

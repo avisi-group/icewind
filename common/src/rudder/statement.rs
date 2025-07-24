@@ -337,10 +337,10 @@ impl Statement {
                 if let Self::Constant(length) = length.get(arena) {
                     Some(match length {
                         Constant::UnsignedInteger { value: l, .. } => Type::new_primitive(
-                            PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
+                            PrimitiveType::UnsignedInteger((*l).try_into().unwrap()),
                         ),
                         Constant::SignedInteger { value: l, .. } => Type::new_primitive(
-                            PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
+                            PrimitiveType::UnsignedInteger((*l).try_into().unwrap()),
                         ),
                         _ => panic!("non unsigned integer length: {length:#?}"),
                     })

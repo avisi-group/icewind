@@ -95,7 +95,11 @@ impl BuildContext {
             },
         );
 
-        log::debug!("adding register {name} @ {:x}", self.next_register_offset);
+        log::warn!(
+            "adding register {name} ({} bytes) @ {:#x}",
+            typ.width_bytes(),
+            self.next_register_offset
+        );
 
         // 8 byte aligned
         self.next_register_offset += u64::from(typ.width_bytes()).next_multiple_of(8)
@@ -181,13 +185,13 @@ impl BuildContext {
             }
             boom::Type::Integer { size } => {
                 Type::new_primitive(PrimitiveType::SignedInteger(match size {
-                    boom::Size::Static(size) => u16::try_from(*size).unwrap(),
+                    boom::Size::Static(size) => u32::try_from(*size).unwrap(),
                     boom::Size::Unknown => 64,
                 }))
             }
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => Type::new_primitive(PrimitiveType::UnsignedInteger(
-                    u16::try_from(*size).unwrap(),
+                    u32::try_from(*size).unwrap(),
                 )),
                 boom::Size::Unknown => Type::Bits,
             },
@@ -1120,8 +1124,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let width = args[1].get(self.statement_arena());
                 if let Statement::Constant(width) = width {
                     let width = match width {
-                        Constant::UnsignedInteger { value, .. } => u16::try_from(*value).unwrap(),
-                        Constant::SignedInteger { value, .. } => u16::try_from(*value).unwrap(),
+                        Constant::UnsignedInteger { value, .. } => u32::try_from(*value).unwrap(),
+                        Constant::SignedInteger { value, .. } => u32::try_from(*value).unwrap(),
                         _ => panic!(),
                     };
                     Some(build(
@@ -1166,7 +1170,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::Cast {
                         kind: CastOperationKind::SignExtend,
                         typ: Type::Primitive(PrimitiveType::UnsignedInteger(
-                            u16::try_from(width).unwrap(),
+                            u32::try_from(width).unwrap(),
                         )),
                         value: args[0],
                     },
@@ -1791,6 +1795,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 ))
             }
+
+            "CurrentVL_read" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant(Constant::new_signed(128, 64)),
+            )),
             _ => None,
         }
     }
@@ -2497,7 +2507,7 @@ fn build_constant_value(literal: &boom::Literal) -> Constant {
         }
         boom::Literal::Bits(bits) => Constant::new_unsigned(
             bits_to_int(bits).try_into().unwrap(),
-            u16::try_from(bits.len()).unwrap(),
+            u32::try_from(bits.len()).unwrap(),
         ),
         boom::Literal::Bit(bit) => Constant::new_unsigned(bit.value().try_into().unwrap(), 1),
 

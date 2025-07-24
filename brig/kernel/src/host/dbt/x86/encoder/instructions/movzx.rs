@@ -5,7 +5,10 @@ use {
             Operand,
             OperandKind::{Immediate as I, Register as R},
             Width,
-            registers::Register::Physical as PHYS,
+            registers::{
+                PhysicalRegister::{General as G, Xmm as X},
+                Register::Physical as PHYS,
+            },
         },
     },
     iced_x86::code_asm::{
@@ -15,6 +18,20 @@ use {
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
     match (src, dst) {
+        // MOVZX I -> XMM
+        (
+            Operand {
+                kind: I(0),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(X(dst))),
+                width_in_bits: Width::_128,
+            },
+        ) => assembler
+            .pxor::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), dst.into())
+            .unwrap(),
+
         // MOVZX I -> R
         (
             Operand {
@@ -51,8 +68,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
                     .unwrap();
             }
-
-            (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
+            (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),
         },
         // MOVZX R -> R
         (
@@ -87,7 +103,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .movq::<AsmRegisterXmm, AsmRegister64>(dst.into(), src.into())
                 .unwrap(),
 
-            (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
+            (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),
         },
 
         _ => todo!("movzx {src} {dst}"),

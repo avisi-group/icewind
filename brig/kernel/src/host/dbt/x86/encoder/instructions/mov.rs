@@ -5,13 +5,16 @@ use {
             Operand,
             OperandKind::{Immediate as I, Memory as M, Register as R},
             Width, memory_operand_to_iced,
-            registers::Register::Physical as PHYS,
+            registers::{
+                PhysicalRegister::{General as G, Xmm as X},
+                Register::Physical as PHYS,
+            },
             segment_memory_operand_to_iced,
         },
     },
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
-        byte_ptr, dword_ptr, word_ptr, xmmword_ptr,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
+        AsmRegisterXmm, CodeAssembler, byte_ptr, dword_ptr, qword_ptr, word_ptr, xmmword_ptr,
     },
 };
 
@@ -98,7 +101,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: R(PHYS(dst)),
+                kind: R(PHYS(G(dst))),
                 width_in_bits: Width::_64,
             },
         ) => {
@@ -658,6 +661,31 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             todo!("{src:?} {dst:?}");
+        }
+        // MOV M -> R
+        (
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(X(dst))),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            assembler
+                .movq::<AsmRegisterXmm, AsmMemoryOperand>(
+                    dst.into(),
+                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                )
+                .unwrap();
         }
         _ => todo!("mov {src} {dst}"),
     }

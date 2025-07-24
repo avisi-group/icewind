@@ -337,7 +337,7 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     promoted_locations: HashMapA<InternedString, usize, A>,
 
     /// Dynamic bitvector stack lengths
-    bits_stack_widths: HashMapA<usize, u16, A>,
+    bits_stack_widths: HashMapA<usize, u32, A>,
 
     /// Counter for allocating variable ids
     current_variable_id: Rc<AtomicUsize, A>,

@@ -1994,7 +1994,7 @@ fn replicate_bits_const() {
 
 #[ktest]
 fn replicate_bits_dynamic() {
-    fn harness(pattern: u64, pattern_width: u16, count: u64) -> u64 {
+    fn harness(pattern: u64, pattern_width: u32, count: u64) -> u64 {
         let model = models::get("aarch64").unwrap();
 
         let register_file = RegisterFile::init(&*model);
@@ -5039,7 +5039,21 @@ fn ldp_128() {
 
     translation.execute(&register_file);
 
-    todo!("q2, q3 == 0xABAB...")
+    let z_offset = model.reg_offset("_Z");
+
+    log::warn!("{z_offset:x}");
+
+    let q2_offset = z_offset + 2 * 256;
+    let q3_offset = z_offset + 3 * 256;
+
+    log::warn!("{q2_offset:x}");
+    log::warn!("{q3_offset:x}");
+
+    let q2 = register_file.read_raw::<[u8; 16]>(q2_offset.try_into().unwrap());
+    let q3 = register_file.read_raw::<[u8; 16]>(q3_offset.try_into().unwrap());
+
+    assert_eq!(q2, [0xAB; 16]);
+    assert_eq!(q3, [0xAB; 16]);
 }
 
 #[ktest]
@@ -5109,4 +5123,171 @@ fn simd_128_reg_to_mem() {
 
     // todo: more complex test
     assert_eq!(*mem, 0);
+}
+
+// todo: const asserts during execution
+//#[ktest]
+fn _currentvl_read() {
+    //CurrentVL_read
+
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let res = translate(
+        Global,
+        &*model,
+        "CurrentVL_read",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R0"), res);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
+    panic!("{}", register_file.read::<u64>("R0"));
+}
+
+#[ktest]
+fn v_set() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let mem = alloc::boxed::Box::new(0xABCD_EF01_2345_6789_9876_5432_10FE_DCBAu128);
+    let address = emitter.constant(&*mem as *const u128 as u64, Type::Unsigned(64));
+    let value = emitter.read_memory(address, Type::Unsigned(128));
+    let n = emitter.constant(3, Type::Signed(64));
+    let width = emitter.constant(128, Type::Signed(64));
+    translate(
+        Global,
+        &*model,
+        "V_set",
+        &[n, width, value],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    log::warn!("{z_offset:x}");
+
+    let q3_offset = z_offset + 3 * 256;
+
+    log::warn!("{q3_offset:x}");
+
+    let q3 = register_file.read_raw::<[u8; 16]>(q3_offset.try_into().unwrap());
+
+    panic!("{q3:?}");
+}
+
+#[ktest]
+fn slice_mask() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // [
+    //     X86NodeRef(X86Node {
+    //         typ: Signed(64),
+    //         kind: Constant {
+    //             value: 2048,
+    //             width: 64,
+    //         },
+    //     }),
+    //     X86NodeRef(X86Node {
+    //         typ: Signed(64),
+    //         kind: Constant {
+    //             value: 128,
+    //             width: 64,
+    //         },
+    //     }),
+    //     X86NodeRef(X86Node {
+    //         typ: Signed(64),
+    //         kind: BinaryOperation(Add(
+    //             X86NodeRef(X86Node {
+    //                 typ: Signed(64),
+    //                 kind: BinaryOperation(Sub(
+    //                     X86NodeRef(X86Node {
+    //                         typ: Signed(64),
+    //                         kind: BinaryOperation(Sub(
+    //                             X86NodeRef(X86Node {
+    //                                 typ: Signed(64),
+    //                                 kind: ReadStackVariable { id: 4, width:
+    // 64 },
+    //.                            }),
+    //                             X86NodeRef(X86Node {
+    //                                 typ: Signed(64),
+    //                                 kind: Constant {
+    //                                     value: 1,
+    //                                     width: 64,
+    //                                 },
+    //                             }),
+    //                         )),
+    //                     }),
+    //                     X86NodeRef(X86Node {
+    //                         typ: Signed(64),
+    //                         kind: Constant {
+    //                             value: 128,
+    //                             width: 64,
+    //                         },
+    //                     }),
+    //                 )),
+    //             }),
+    //             X86NodeRef(X86Node {
+    //                 typ: Signed(64),
+    //                 kind: Constant {
+    //                     value: 1,
+    //                     width: 64,
+    //                 },
+    //             }),
+    //         )),
+    //     }),
+    // ]
+
+    let n = emitter.constant(2048, Type::Signed(64));
+    let i = emitter.constant(128, Type::Signed(64));
+    let l = emitter.constant(0, Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "slice_mask",
+        &[n, i, l],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.leave();
+
+    panic!("{res:?}");
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
 }

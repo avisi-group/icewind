@@ -168,7 +168,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef {
         // evil bits that's really a fixed unsigned pretending to be a bitvector
         if let NodeKind::Constant { value: length, .. } = length.kind() {
-            let length = u16::try_from(*length).unwrap();
+            let length = u32::try_from(*length).unwrap();
             let target_type = match value.typ() {
                 Type::Unsigned(_) => Type::Unsigned(length),
                 Type::Signed(_) => Type::Signed(length),
@@ -810,7 +810,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 NodeKind::Constant { value: length, .. },
             ) => self.constant(
                 bit_extract(*value, *start, *length),
-                Type::Unsigned(u16::try_from(*length).unwrap()),
+                Type::Unsigned(u32::try_from(*length).unwrap()),
             ),
             // register read direct
             (
@@ -821,7 +821,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     ..
                 },
             ) => {
-                let length = u16::try_from(*length_value).unwrap();
+                let length = u32::try_from(*length_value).unwrap();
 
                 let new_typ = match typ {
                     Type::Unsigned(_) => Type::Unsigned(length),
@@ -873,7 +873,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 let cast = self.cast(
                     shifted,
-                    Type::Unsigned(u16::try_from(*length_value).unwrap()),
+                    Type::Unsigned(u32::try_from(*length_value).unwrap()),
                     CastOperationKind::Truncate,
                 );
 
@@ -983,7 +983,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 self.constant(
                     dest,
-                    Type::Unsigned(*pattern_width * u16::try_from(*count).unwrap()),
+                    Type::Unsigned(*pattern_width * u32::try_from(*count).unwrap()),
                 )
             }
             // todo pattern const non const count -> make all possible values and select?
@@ -1553,7 +1553,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 },
                 CastOperationKind::Truncate,
             ) => {
-                let target_length = u16::try_from(*length_value).unwrap();
+                let target_length = u32::try_from(*length_value).unwrap();
 
                 assert!(target_length <= *value_width);
 
@@ -1576,7 +1576,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 },
                 CastOperationKind::SignExtend,
             ) => {
-                let target_length = u16::try_from(*length_value).unwrap();
+                let target_length = u32::try_from(*length_value).unwrap();
 
                 assert!(target_length >= *value_width);
 
@@ -1602,7 +1602,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 },
                 CastOperationKind::ZeroExtend,
             ) => {
-                let target_length = u16::try_from(*length_value).unwrap();
+                let target_length = u32::try_from(*length_value).unwrap();
 
                 assert!(target_length >= *value_width);
 
@@ -1623,7 +1623,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 CastOperationKind::SignExtend,
             ) => self.cast(
                 value,
-                Type::Signed(u16::try_from(*length_value).unwrap()),
+                Type::Signed(u32::try_from(*length_value).unwrap()),
                 CastOperationKind::SignExtend,
             ),
             _ => {
@@ -1652,7 +1652,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     }
 }
 
-fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
+fn sign_extend(value: u64, original_width: u32, target_width: u32) -> u64 {
     if value == 0 {
         return 0;
     }
@@ -1723,7 +1723,7 @@ pub struct X86Node<A: Alloc> {
 pub enum NodeKind<A: Alloc> {
     Constant {
         value: u64,
-        width: u16,
+        width: u32,
     },
     FunctionPointer(u64),
     GuestRegister {
@@ -1747,7 +1747,7 @@ pub enum NodeKind<A: Alloc> {
     ReadStackVariable {
         // positive offset here (will be subtracted from RSP)
         id: usize,
-        width: u16,
+        width: u32,
     },
     BitExtract {
         value: X86NodeRef<A>,

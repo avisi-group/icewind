@@ -427,7 +427,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     width,
                 } => {
                     let value = self.resolve(value);
-                    let target_width = u16::try_from(self.resolve_u64(width)).unwrap();
+                    let target_width = u32::try_from(self.resolve_u64(width)).unwrap();
                     match (kind, typ, &value) {
                         (
                             CastOperationKind::ZeroExtend,
@@ -485,12 +485,12 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     Some(match value {
                         Value::UnsignedInteger { value, .. } => Value::UnsignedInteger {
                             value: bit_extract(value, start, width),
-                            width: u16::try_from(width).unwrap(),
+                            width: u32::try_from(width).unwrap(),
                         },
                         // todo: test/verify this
                         Value::SignedInteger { value, .. } => Value::SignedInteger {
                             value: bit_extract(value as u64, start, width) as i64,
-                            width: u16::try_from(width).unwrap(),
+                            width: u32::try_from(width).unwrap(),
                         },
                         _ => todo!("{value:?}"),
                     })
@@ -545,7 +545,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                     Some(Value::UnsignedInteger {
                         value,
-                        width: u16::try_from(width).unwrap(),
+                        width: u32::try_from(width).unwrap(),
                     })
                 }
                 Statement::SizeOf { value } => {
@@ -712,7 +712,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 Value::Vector(
                     (0..*element_count)
                         .into_iter()
-                        .map(|i| (offset + (i * usize::from(element_width))))
+                        .map(|i| (offset + (i * usize::try_from(element_width).unwrap())))
                         .map(|element_offset| self.read_register(&element_type, element_offset))
                         .collect(),
                 )
@@ -724,8 +724,8 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    UnsignedInteger { value: u64, width: u16 },
-    SignedInteger { value: i64, width: u16 },
+    UnsignedInteger { value: u64, width: u32 },
+    SignedInteger { value: i64, width: u32 },
     FloatingPoint(f64),
     String(InternedString),
     Vector(Vec<Value>),
@@ -1006,8 +1006,8 @@ enum BlockResult {
     ReturnValue(Option<Value>),
 }
 
-fn sign_extend(value: i64, source_width: u16, dest_width: u16) -> i64 {
-    let shift_amount = i64::BITS - u32::from(source_width);
+fn sign_extend(value: i64, source_width: u32, dest_width: u32) -> i64 {
+    let shift_amount = i64::BITS - source_width;
 
     let signed_extended = (value << shift_amount) >> shift_amount;
 

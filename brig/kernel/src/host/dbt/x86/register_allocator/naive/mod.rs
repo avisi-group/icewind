@@ -77,6 +77,28 @@ impl RegisterAllocator for FreshAllocator {
                     _
                 ))
             ));
+            // assert!(!matches!(
+            //     instruction,
+            //     Instruction(Opcode::MOV(
+            //         Operand {
+            //             kind:
+            // OperandKind::Register(Register::Physical(PhysicalRegister::Xmm(_))),
+            //             width_in_bits: Width::_64
+            //         },
+            //         _,
+            //     ))
+            // ));
+            // assert!(!matches!(
+            //     instruction,
+            //     Instruction(Opcode::MOV(
+            //         _,
+            //         Operand {
+            //             kind:
+            // OperandKind::Register(Register::Physical(PhysicalRegister::Xmm(_))),
+            //             width_in_bits: Width::_64
+            //         },
+            //     ))
+            // ));
         });
 
         // kill redundant mov's

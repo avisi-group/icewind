@@ -10,13 +10,13 @@ use {
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveType {
-    UnsignedInteger(u16),
-    SignedInteger(u16),
-    FloatingPoint(u16),
+    UnsignedInteger(u32),
+    SignedInteger(u32),
+    FloatingPoint(u32),
 }
 
 impl PrimitiveType {
-    pub fn width(&self) -> u16 {
+    pub fn width(&self) -> u32 {
         match self {
             Self::FloatingPoint(w) | Self::SignedInteger(w) | Self::UnsignedInteger(w) => *w,
         }
@@ -64,26 +64,18 @@ impl Type {
         }
     }
 
-    fn width_bits_alinged(&self) -> u16 {
+    fn width_bits_alinged(&self) -> u32 {
         self.width_bytes() * 8
     }
 
-    pub fn width_bits(&self) -> u16 {
+    pub fn width_bits(&self) -> u32 {
         match self {
             Self::Primitive(p) => p.width(),
             Self::Vector {
                 element_count,
                 element_type,
-            } => u16::try_from((element_type.width_bits_alinged()) as usize * *element_count)
-                .unwrap_or_else(|_| {
-                    // todo: filter out oversized numbers earlier
-                    // log::trace!(
-                    //     "vector [{element_type};{element_count}] ({}) too big",
-                    //     element_type.width_bits() as usize * *element_count
-                    // );
-
-                    0
-                }),
+            } => u32::try_from((element_type.width_bits_alinged()) as usize * *element_count)
+                .unwrap(),
 
             Self::Bits => 64,
 
@@ -94,7 +86,7 @@ impl Type {
         }
     }
 
-    pub fn width_bytes(&self) -> u16 {
+    pub fn width_bytes(&self) -> u32 {
         self.width_bits().div_ceil(8)
     }
 

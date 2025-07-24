@@ -5,7 +5,7 @@ use {
             emitter::{ARG_REGS, X86Block},
             encoder::{
                 instructions::{
-                    adc, add, and, cmp, jne, lea, mov, movsx, movzx, or, setne, shl, shr, sub,
+                    adc, add, and, cmp, jne, lea, mov, movsx, movzx, not, or, setne, shl, shr, sub,
                     test, xor,
                 },
                 registers::{PhysicalRegister, Register, SegmentRegister},
@@ -13,7 +13,7 @@ use {
             },
         },
     },
-    alloc::vec::Vec,
+    alloc::{string::String, vec::Vec},
     common::{arena::Ref, hashmap::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
@@ -342,7 +342,7 @@ impl<A: Alloc> Operand<A> {
     }
 
     pub fn mem_seg_displ(
-        width_in_bits: u16,
+        width_in_bits: u32,
         segment: SegmentRegister,
         displacement: i32,
     ) -> Operand<A> {
@@ -769,6 +769,7 @@ impl<A: Alloc> Instruction<A> {
             ADC(src, dst, carry) => adc::encode(assembler, src, dst, carry),
             CMP(left, right) => cmp::encode(assembler, left, right),
             XOR(src, dst) => xor::encode(assembler, src, dst),
+            NOT(dst) => not::encode(assembler, dst),
 
             // control flow
             JNE(tgt) => jne::encode(assembler, label_map, tgt),
@@ -914,22 +915,7 @@ impl<A: Alloc> Instruction<A> {
             }) => {
                 assembler.setge::<AsmRegister8>(dst.into()).unwrap();
             }
-            NOT(Operand {
-                kind: R(PHYS(value)),
-                width_in_bits: Width::_64,
-            }) => assembler.not::<AsmRegister64>(value.into()).unwrap(),
-            NOT(Operand {
-                kind: R(PHYS(value)),
-                width_in_bits: Width::_32,
-            }) => assembler.not::<AsmRegister32>(value.into()).unwrap(),
-            NOT(Operand {
-                kind: R(PHYS(value)),
-                width_in_bits: Width::_16,
-            }) => assembler.not::<AsmRegister16>(value.into()).unwrap(),
-            NOT(Operand {
-                kind: R(PHYS(value)),
-                width_in_bits: Width::_8,
-            }) => assembler.not::<AsmRegister8>(value.into()).unwrap(),
+
             NEG(Operand {
                 kind: R(PHYS(value)),
                 ..

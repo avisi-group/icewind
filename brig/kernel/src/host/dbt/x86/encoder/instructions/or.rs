@@ -9,7 +9,7 @@ use {
         },
     },
     iced_x86::code_asm::{
-        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
 };
 
@@ -138,6 +138,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .or::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_128,
+            },
+        ) => {
+            assembler
+                .por::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
                 .unwrap();
         }
         _ => todo!("or {src} {dst}"),

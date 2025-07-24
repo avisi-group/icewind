@@ -348,3 +348,11 @@ impl Into<iced_x86::Register> for PhysicalRegisterGeneral {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, displaydoc::Display, thiserror::Error)]
+enum RegisterConversionError {
+    /// XMM register {0} cannot be converted to `AsmRegister64`
+    InvalidXmmAs64(PhysicalRegisterXmm),
+    /// General register {0} cannot be converted to `AsmRegisterXmm`
+    InvalidGeneralAsXmm(PhysicalRegisterGeneral),
+}

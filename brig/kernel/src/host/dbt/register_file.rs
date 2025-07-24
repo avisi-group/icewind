@@ -42,7 +42,7 @@ impl RegisterFile {
                         *name,
                         (
                             usize::try_from(desc.offset).unwrap(),
-                            usize::from(desc.typ.width_bytes()),
+                            usize::try_from(desc.typ.width_bytes()).unwrap(),
                         ),
                     )
                 })
@@ -163,7 +163,7 @@ impl RegisterFile {
 
         if offset + V::SIZE > *end {
             panic!(
-                "writing a {} ({} bytes) at offset {offset:#x} goes past beginning of adjacent register at offset {end:#x}",
+                "writing a {} ({} bits) at offset {offset:#x} goes past beginning of adjacent register at offset {end:#x}",
                 type_name::<V>(),
                 V::SIZE,
             )
@@ -259,6 +259,22 @@ impl RegisterValue for bool {
             1 => true,
             _ => unreachable!(),
         }
+    }
+}
+
+impl<const N: usize> RegisterValue for [u8; N] {
+    const SIZE: usize = N * 8;
+
+    type Inner = Self;
+
+    fn write(&self, dest: &mut [u8]) {
+        dest.copy_from_slice(self);
+    }
+
+    fn read(src: &[u8]) -> Self {
+        let mut celf = [0u8; N];
+        celf.copy_from_slice(&src[..N]);
+        celf
     }
 }
 

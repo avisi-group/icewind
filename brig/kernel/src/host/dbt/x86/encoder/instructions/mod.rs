@@ -14,3 +14,4 @@ pub mod shr;
 pub mod sub;
 pub mod test;
 pub mod xor;
+pub mod not;

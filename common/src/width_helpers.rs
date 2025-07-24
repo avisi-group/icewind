@@ -1,4 +1,4 @@
-pub fn signed_smallest_width_of_value(value: i64) -> u16 {
+pub fn signed_smallest_width_of_value(value: i64) -> u32 {
     let value = if value.is_negative() {
         value.abs() - 1
     } else {
@@ -8,8 +8,8 @@ pub fn signed_smallest_width_of_value(value: i64) -> u16 {
     unsigned_smallest_width_of_value(u64::try_from(value).unwrap()) + 1 // +1 becuase it's a signed value
 }
 
-pub fn unsigned_smallest_width_of_value(value: u64) -> u16 {
-    u16::try_from((value + 1).next_power_of_two().ilog2()).unwrap()
+pub fn unsigned_smallest_width_of_value(value: u64) -> u32 {
+    u32::try_from((value + 1).next_power_of_two().ilog2()).unwrap()
 }
 
 #[cfg(test)]

@@ -12,26 +12,26 @@ mod operations;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Constant {
-    UnsignedInteger { value: u64, width: u16 },
-    SignedInteger { value: i64, width: u16 },
-    FloatingPoint { value: f64, width: u16 },
+    UnsignedInteger { value: u64, width: u32 },
+    SignedInteger { value: i64, width: u32 },
+    FloatingPoint { value: f64, width: u32 },
     String(InternedString),
     Tuple(Vec<Constant>),
     Vector(Vec<Constant>),
 }
 
 impl Constant {
-    pub fn new_float(value: f64, width: u16) -> Self {
+    pub fn new_float(value: f64, width: u32) -> Self {
         match width {
             64 => Self::FloatingPoint { value, width },
             _ => todo!("{width}"),
         }
     }
 
-    pub fn new_signed(value: i64, width: u16) -> Self {
+    pub fn new_signed(value: i64, width: u32) -> Self {
         let masked = (value as u64) & mask(width);
 
-        let shift_amount = (i64::BITS as u16) - width;
+        let shift_amount = (i64::BITS as u32) - width;
 
         let sign_extended = ((masked as i64) << shift_amount) >> shift_amount;
 
@@ -41,7 +41,7 @@ impl Constant {
         }
     }
 
-    pub fn new_unsigned(value: u64, width: u16) -> Self {
+    pub fn new_unsigned(value: u64, width: u32) -> Self {
         Self::UnsignedInteger {
             value: value & mask(width),
             width,
