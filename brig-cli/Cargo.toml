@@ -9,14 +9,14 @@ common = { path = "../common" }
 
 ovmf-prebuilt = "0.2.3" # used for UEFI booting in QEMU
 bootloader = { version = "0.11.10", default-features = false, features = ["uefi"] }
-cargo_metadata = "0.19.2"
+cargo_metadata = "0.21.0"
 itertools = "0.14.0"
-clap = { version = "4.5.37", features = ["derive"] }
-color-eyre = "0.6.4"
+clap = { version = "4.5.41", features = ["derive"] }
+color-eyre = "0.6.5"
 tar = "0.4.44"
 walkdir = "2.5.0"
-elf = "0.7.4"
-postcard = { version = "1.1.1", features = ["alloc"] }
-memmap2 = "0.9.5"
+elf = "0.8.0"
+postcard = { version = "1.1.2", features = ["alloc"] }
+memmap2 = "0.9.7"
 clap-num = "1.2.0"
 embedded-time = "0.12.1"

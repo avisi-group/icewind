@@ -26,20 +26,20 @@ buddy_system_allocator = "0.11.0"
 spin = "0.10.0"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
 log = { version = "0.4.27", default-features = false }
-elf = { version = "0.7.4", default-features = false }
-rustc-demangle = { version = "0.1.24", default-features = false }
+elf = { version = "0.8.0", default-features = false }
+rustc-demangle = { version = "0.1.25", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = [
     "derive",
     "alloc",
 ] }
-serde_json = { version = "1.0.140", default-features = false, features = [
+serde_json = { version = "1.0.141", default-features = false, features = [
     "alloc",
 ] }
-phf = { version = "0.11.3", default-features = false, features = ["macros"] }
-tar-no-std = { version = "0.3.3", features = ["alloc"] }
+phf = { version = "0.12.1", default-features = false, features = ["macros"] }
+tar-no-std = { version = "0.3.4", features = ["alloc"] }
 thiserror = { version = "2.0.12", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
-uuid = { version = "1.16.0", default-features = false }
+uuid = { version = "1.17.0", default-features = false }
 fastrand = { version = "2.3.0", default-features = false, features = ["alloc"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.5.0", default-features = false }
@@ -55,14 +55,14 @@ iced-x86 = { version = "1.21.0", default-features = false, features = [
 elfloader = { git = "https://github.com/avisi-group/rust-elfloader", rev = "c7e6230" }
 bitset-core = { version = "0.1.1", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
-linkme = "0.3.32"
+linkme = "0.3.33"
 num-rational = { version = "0.4.2", default-features = false }
-postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
+postcard = { version = "1.1.2", features = ["alloc"], default-features = false }
 disarm64 = "0.1.25"
-derive-where = "1.4.0"
+derive-where = "1.5.0"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
 paste = "1.0.15"
 embedded-time = "0.12.1"
-bitfields = "0.13.2"
+bitfields = "1.0.0"
 virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
-strum = { version = "0.27.1", features = ["derive"], default-features = false }
+strum = { version = "0.27.2", features = ["derive"], default-features = false }

@@ -33,5 +33,5 @@ pretty_assertions = "1.4.1"
 dot = "0.1.4"
 itertools = "0.14.0"
 kinded = "0.3.0"
-memmap2 = "0.9.5"
-postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
+memmap2 = "0.9.7"
+postcard = { version = "1.1.2", features = ["alloc"], default-features = false }
