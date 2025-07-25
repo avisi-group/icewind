@@ -39,7 +39,7 @@ fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
             if let Some(thread_to) = target_for_threadable(f, target) {
                 terminator_ref
                     .get_mut(block_ref.get_mut(f.arena_mut()).arena_mut())
-                    .replace_kind(Statement::Jump { target: thread_to });
+                    .replace(Statement::Jump { target: thread_to });
                 true
             } else {
                 false
@@ -70,7 +70,7 @@ fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
             if changed {
                 terminator_ref
                     .get_mut(block_ref.get_mut(f.arena_mut()).arena_mut())
-                    .replace_kind(Statement::Branch {
+                    .replace(Statement::Branch {
                         condition,
                         true_target,
                         false_target,

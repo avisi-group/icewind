@@ -42,13 +42,13 @@ pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
             if value.is_zero() == Some(true) {
                 terminator_ref
                     .get_mut(block.arena_mut())
-                    .replace_kind(Statement::Jump {
+                    .replace(Statement::Jump {
                         target: false_target,
                     });
             } else {
                 terminator_ref
                     .get_mut(block.arena_mut())
-                    .replace_kind(Statement::Jump {
+                    .replace(Statement::Jump {
                         target: true_target,
                     });
             }
@@ -64,7 +64,7 @@ pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
 
                     terminator_ref
                         .get_mut(block.arena_mut())
-                        .replace_kind(Statement::Branch {
+                        .replace(Statement::Branch {
                             condition: value,
                             true_target: new_true,
                             false_target: new_false,
@@ -81,7 +81,7 @@ pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
 
             terminator_ref
                 .get_mut(block.arena_mut())
-                .replace_kind(Statement::Jump {
+                .replace(Statement::Jump {
                     target: true_target,
                 }); // todo: verify this will be inlined/threaded if needed?
             changed = true;

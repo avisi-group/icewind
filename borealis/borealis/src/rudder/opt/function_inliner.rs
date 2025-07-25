@@ -178,7 +178,7 @@ fn inline_function(
     // call work
     call_statement
         .get_mut(b.get_mut(function.arena_mut()).arena_mut())
-        .replace_kind(Statement::ReadVariable {
+        .replace(Statement::ReadVariable {
             symbol: intermediate_return_symbol,
         });
 }

@@ -56,7 +56,7 @@ pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
                         };
 
                         read.get_mut(block.get_mut(f.arena_mut()).arena_mut())
-                            .replace_kind(Statement::Constant(value.clone()));
+                            .replace(Statement::Constant(value.clone()));
 
                         changed = true;
                     }

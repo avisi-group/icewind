@@ -232,8 +232,7 @@ pub enum Statement {
         width: Ref<Statement>,
     },
 
-    // creating bits and getting the value done through casting
-    // gets the width when applied to bits
+    // Returns the size of the type of a statement
     SizeOf {
         value: Ref<Statement>,
     },
@@ -413,7 +412,7 @@ impl Statement {
         }
     }
 
-    pub fn replace_kind(&mut self, kind: Statement) {
+    pub fn replace(&mut self, kind: Statement) {
         *self = kind;
     }
 

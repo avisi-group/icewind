@@ -53,7 +53,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 UnaryOperationKind::Not => {
                     let constant = Statement::Constant(!constant);
 
-                    stmt.get_mut(arena).replace_kind(constant);
+                    stmt.get_mut(arena).replace(constant);
 
                     true
                 }
@@ -94,7 +94,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         }
                     };
 
-                    stmt.get_mut(arena).replace_kind(Statement::Constant(cv));
+                    stmt.get_mut(arena).replace(Statement::Constant(cv));
 
                     true
                 }
@@ -134,6 +134,27 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 _ => false,
             }
         }
+        Statement::SizeOf { value } => {
+            let target = value.get(arena);
+            match target.typ(&arena) {
+                // nothing to do
+                Some(Type::Bits) => false,
+                Some(typ) => {
+                    let constant = Statement::Constant(Constant::UnsignedInteger {
+                        value: typ.width_bits().into(),
+                        width: 16,
+                    });
+
+                    stmt.get_mut(arena).replace(constant);
+
+                    true
+                }
+                None => panic!(
+                    "cannot get size of statement with no value {}",
+                    target.to_string(arena)
+                ),
+            }
+        }
         Statement::Cast {
             kind: CastOperationKind::ZeroExtend,
             typ,
@@ -144,7 +165,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             if let Type::Primitive(_) = &typ {
                 if let Statement::Constant(value) = value.get(arena).clone() {
                     let value = cast_integer(value, typ.clone());
-                    stmt.get_mut(arena).replace_kind(Statement::Constant(value));
+                    stmt.get_mut(arena).replace(Statement::Constant(value));
                     true
                 } else {
                     false
@@ -183,8 +204,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     _ => todo!("{typ}"),
                 };
 
-                stmt.get_mut(arena)
-                    .replace_kind(Statement::Constant(truncated));
+                stmt.get_mut(arena).replace(Statement::Constant(truncated));
 
                 true
             } else {
@@ -199,13 +219,12 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             if let Statement::Constant(value) = value.get(arena) {
                 let value = cast_integer(value.clone(), typ.clone());
 
-                stmt.get_mut(arena).replace_kind(Statement::Constant(value));
+                stmt.get_mut(arena).replace(Statement::Constant(value));
                 true
             } else {
                 false
             }
         }
-
         _ => {
             //trace!("candidate for folding not implemented: {}", stmt);
             false

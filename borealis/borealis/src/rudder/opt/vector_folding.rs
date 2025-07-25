@@ -97,7 +97,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
 
                     // replace kind to make sure future uses aren't invalidated
                     // todo: actually this is a write, we can just delete it and build it again
-                    stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
+                    stmt.get_mut(block.get_mut(arena).arena_mut()).replace(
                         Statement::WriteRegister {
                             offset,
                             value: assign_value,
@@ -163,12 +163,11 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
 
                 // replace kind to make sure future uses aren't invalidated
                 // todo: actually this is a write, we can just delete it and build it again
-                stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
-                    Statement::ReadRegister {
+                stmt.get_mut(block.get_mut(arena).arena_mut())
+                    .replace(Statement::ReadRegister {
                         typ: element_type,
                         offset: new_offset,
-                    },
-                );
+                    });
 
                 did_change = true;
             }
