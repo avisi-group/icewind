@@ -131,7 +131,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     block,
                     arena,
                     Statement::Constant(Constant::new_signed(
-                        i64::try_from(element_type.width_bytes()).unwrap(),
+                        i128::try_from(element_type.width_bytes()).unwrap(),
                         64,
                     )),
                     Location::Before(stmt),

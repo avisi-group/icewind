@@ -75,22 +75,22 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         BinaryOperationKind::Xor => lhs ^ rhs,
                         BinaryOperationKind::PowI => lhs.powi(rhs),
                         BinaryOperationKind::CompareEqual => {
-                            Constant::new_unsigned((lhs == rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs == rhs).unwrap(), 1)
                         }
                         BinaryOperationKind::CompareNotEqual => {
-                            Constant::new_unsigned((lhs != rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs != rhs).unwrap(), 1)
                         }
                         BinaryOperationKind::CompareLessThan => {
-                            Constant::new_unsigned((lhs < rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs < rhs).unwrap(), 1)
                         }
                         BinaryOperationKind::CompareLessThanOrEqual => {
-                            Constant::new_unsigned((lhs <= rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs <= rhs).unwrap(), 1)
                         }
                         BinaryOperationKind::CompareGreaterThan => {
-                            Constant::new_unsigned((lhs > rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs > rhs).unwrap(), 1)
                         }
                         BinaryOperationKind::CompareGreaterThanOrEqual => {
-                            Constant::new_unsigned((lhs >= rhs) as u64, 1)
+                            Constant::new_unsigned(u128::try_from(lhs >= rhs).unwrap(), 1)
                         }
                     };
 
@@ -165,7 +165,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     Type::Primitive(PrimitiveType::UnsignedInteger(width)) => {
                         let value = match value {
                             Constant::UnsignedInteger { value, .. } => value,
-                            Constant::SignedInteger { value, .. } => u64::try_from(value).unwrap(),
+                            Constant::SignedInteger { value, .. } => u128::try_from(value).unwrap(),
                             _ => todo!("{value}"),
                         };
                         Constant::new_unsigned(value, width)
@@ -174,7 +174,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         let value = match value {
                             Constant::SignedInteger { value, .. } => value,
                             Constant::UnsignedInteger { value, .. } => {
-                                i64::try_from(value).unwrap()
+                                i128::try_from(value).unwrap()
                             }
                             _ => todo!("{value}"),
                         };
@@ -217,13 +217,13 @@ fn cast_integer(value: Constant, typ: Type) -> Constant {
     match &typ {
         Type::Primitive(primitive) => match (value, primitive) {
             (Constant::UnsignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
-                Constant::new_signed(i64::try_from(value).unwrap(), *width)
+                Constant::new_signed(i128::try_from(value).unwrap(), *width)
             }
             (Constant::SignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
                 Constant::new_signed(value, *width)
             }
             (Constant::SignedInteger { value, .. }, PrimitiveType::UnsignedInteger(width)) => {
-                Constant::new_unsigned(u64::try_from(value).unwrap(), *width)
+                Constant::new_unsigned(u128::try_from(value).unwrap(), *width)
             }
             (Constant::UnsignedInteger { value, .. }, PrimitiveType::UnsignedInteger(width)) => {
                 Constant::new_unsigned(value, *width)

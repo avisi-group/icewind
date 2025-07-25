@@ -91,7 +91,7 @@ impl Debug for Translation {
     }
 }
 
-fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
+fn bit_insert(target: u128, source: u128, start: u32, length: u32) -> u128 {
     // todo: hack
     if start >= 64 {
         if source == 0 {
@@ -101,14 +101,10 @@ fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
         }
     }
 
-    let length = u32::try_from(length).unwrap();
-
     let cleared_target = {
-        let mask = !(mask(length)
-            .checked_shl(u32::try_from(start).unwrap())
-            .unwrap_or_else(|| {
-                panic!("overflow in shl with {target:b} {source:?} {start:?} {length:?}")
-            }));
+        let mask = !(mask(length).checked_shl(start).unwrap_or_else(|| {
+            panic!("overflow in shl with {target:b} {source:?} {start:?} {length:?}")
+        }));
         target & mask
     };
 
@@ -121,6 +117,6 @@ fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
     cleared_target | shifted_source
 }
 
-fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
-    (value >> start) & mask(u32::try_from(length).unwrap())
+fn bit_extract(value: u128, start: u32, length: u32) -> u128 {
+    (value >> start) & mask(length)
 }

@@ -56,7 +56,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_32,
             },
         ) => {
-            if *left < i32::MAX as u64 {
+            if *left < i32::MAX as u128 {
                 assembler
                     .or::<AsmRegister32, i32>(right.into(), *left as i32)
                     .unwrap();
@@ -75,7 +75,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
         ) => {
-            if *left < i32::MAX as u64 {
+            if *left < i32::MAX as u128 {
                 assembler
                     .or::<AsmRegister64, i32>(right.into(), *left as i32)
                     .unwrap();

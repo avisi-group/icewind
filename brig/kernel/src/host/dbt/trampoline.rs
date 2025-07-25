@@ -9,12 +9,6 @@ pub struct ExecutionResult {
     _reserved: u32,
 }
 
-impl ExecutionResult {
-    pub fn as_u32(&self) -> u32 {
-        self.into_bits()
-    }
-}
-
 #[inline(never)] // only disabled to make debugging easier
 pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResult {
     let mut status: u32;

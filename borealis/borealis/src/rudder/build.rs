@@ -1773,7 +1773,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let offset_const = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant(Constant::new_unsigned(offset, 32)),
+                    Statement::Constant(Constant::new_unsigned(offset.into(), 32)),
                 );
 
                 let read_reg = build(
@@ -1873,7 +1873,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block,
                         self.block_arena_mut(),
                         Statement::Constant(Constant::new_unsigned(
-                            u64::try_from(register_offset).unwrap(),
+                            register_offset.try_into().unwrap(),
                             32,
                         )),
                     );
@@ -1924,7 +1924,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block,
                         self.block_arena_mut(),
                         Statement::Constant(Constant::new_unsigned(
-                            u64::try_from(register_offset).unwrap(),
+                            register_offset.try_into().unwrap(),
                             32,
                         )),
                     );
@@ -1998,7 +1998,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let target_tag = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant(Constant::new_signed(i64::from(target_tag), 64)),
+                    Statement::Constant(Constant::new_signed(target_tag.try_into().unwrap(), 64)),
                 );
 
                 let read_tag = {
@@ -2382,7 +2382,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant(Constant::new_unsigned(
-                        u64::try_from(right_width).unwrap(),
+                        right_width.try_into().unwrap(),
                         16,
                     )),
                 );
@@ -2417,10 +2417,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let left_width = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant(Constant::new_unsigned(
-                        u64::try_from(left_width).unwrap(),
-                        16,
-                    )),
+                    Statement::Constant(Constant::new_unsigned(left_width.try_into().unwrap(), 16)),
                 );
 
                 let length = build(
@@ -2466,7 +2463,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant(Constant::new_unsigned(
-                        u64::try_from(right_width).unwrap(),
+                        right_width.try_into().unwrap(),
                         16,
                     )),
                 );
@@ -2500,8 +2497,8 @@ fn build_constant_value(literal: &boom::Literal) -> Constant {
     match literal {
         boom::Literal::Int(i) => {
             let value = i.try_into().unwrap_or_else(|_| {
-                log::error!("failed to convert {i} to i64");
-                i64::MAX
+                log::error!("failed to convert {i} to i128");
+                i128::MAX
             });
             Constant::new_signed(value, 64)
         }

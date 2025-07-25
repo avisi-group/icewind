@@ -110,8 +110,10 @@ pub fn variable_corrupted_example(
         {
             let a = a.get_mut(func.arena_mut());
             let s_arena = a.arena_mut();
-            let r0_offset =
-                s_arena.insert(Statement::Constant(Constant::new_unsigned(r0_offset, 64)));
+            let r0_offset = s_arena.insert(Statement::Constant(Constant::new_unsigned(
+                r0_offset.into(),
+                64,
+            )));
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
                 offset: r0_offset,
@@ -151,8 +153,10 @@ pub fn variable_corrupted_example(
         {
             let d = d.get_mut(func.arena_mut());
             let s_arena = d.arena_mut();
-            let r1_offset =
-                s_arena.insert(Statement::Constant(Constant::new_unsigned(r1_offset, 64)));
+            let r1_offset = s_arena.insert(Statement::Constant(Constant::new_unsigned(
+                r1_offset.into(),
+                64,
+            )));
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
                 offset: r1_offset,
@@ -185,8 +189,10 @@ pub fn variable_corrupted_example(
             let read = s_arena.insert(Statement::ReadVariable {
                 symbol: ret_val.clone(),
             });
-            let r2_offset =
-                s_arena.insert(Statement::Constant(Constant::new_unsigned(r2_offset, 64)));
+            let r2_offset = s_arena.insert(Statement::Constant(Constant::new_unsigned(
+                r2_offset.into(),
+                64,
+            )));
             let w = s_arena.insert(Statement::WriteRegister {
                 offset: r2_offset,
                 value: read,

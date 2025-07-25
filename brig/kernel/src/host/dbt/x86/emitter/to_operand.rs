@@ -46,7 +46,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 op
             };
 
-            if *value > (i32::MAX as u64) {
+            if *value > (i32::MAX as u128) {
                 let tmp = Operand::vreg(shrunk_op.width(), self.next_vreg());
                 self.push_instruction(Instruction::mov(shrunk_op, tmp).unwrap());
                 tmp
@@ -72,7 +72,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     .unwrap_or_else(|e| panic!("failed to canonicalize width of {node:?}: {e}")),
                 *value,
             ),
-            NodeKind::FunctionPointer(target) => Operand::imm(Width::_64, *target),
+            NodeKind::FunctionPointer(target) => Operand::imm(Width::_64, (*target).into()),
             NodeKind::CallReturnValue => Operand::preg(Width::_64, PhysicalRegister::RAX),
             NodeKind::GuestRegister { offset } => {
                 let width = Width::from_uncanonicalized(node.typ().width()).unwrap_or_else(|e| {
@@ -504,7 +504,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 for _ in 1..count {
                     self.push_instruction(Instruction::shl(
-                        Operand::imm(Width::_8, u64::from(pattern_width)),
+                        Operand::imm(Width::_8, pattern_width.into()),
                         dest,
                     ));
                     self.push_instruction(Instruction::or(pattern_zx, dest));

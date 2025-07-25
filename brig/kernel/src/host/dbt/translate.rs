@@ -113,7 +113,7 @@ pub fn translate_instruction<A: Alloc>(
 
         register_file.write("have_exception", 0u8);
 
-        let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
+        let opcode = emitter.constant(u128::from(opcode), Type::Unsigned(32));
 
         let res = translate(
             allocator,
@@ -179,15 +179,12 @@ fn translate_with_variable_ids<A: Alloc>(
     variable_ids: Rc<AtomicUsize, A>,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
-        let mut iter = arguments
-            .iter()
-            .map(|node| {
-                let NodeKind::Constant { value, .. } = node.kind() else {
-                    panic!()
-                };
-                value
-            })
-            .copied();
+        let mut iter = arguments.iter().map(|node| {
+            let NodeKind::Constant { value, .. } = node.kind() else {
+                panic!()
+            };
+            u64::try_from(*value).unwrap()
+        });
 
         let op0 = iter.next().unwrap();
         let op1 = iter.next().unwrap();
@@ -204,7 +201,7 @@ fn translate_with_variable_ids<A: Alloc>(
             if function == "AArch64_SysRegRead" {
                 let function = emitter.function_ptr(sys_reg_read as u64);
 
-                let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
+                let arg0 = emitter.constant(u128::from(sysreg_id), Type::Unsigned(64));
 
                 let mut arguments = Vec::new_in(allocator);
                 arguments.push(arg0);
@@ -214,7 +211,7 @@ fn translate_with_variable_ids<A: Alloc>(
                 let offset = model.reg_offset(alloc::format!("R{t}"));
                 emitter.write_register(offset, return_value);
             } else {
-                let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
+                let arg0 = emitter.constant(u128::from(sysreg_id), Type::Unsigned(64));
 
                 // no R31 so handle zero register
                 let arg1 = if t == 31 {
@@ -728,10 +725,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 StatementResult::Data(Some(match value {
                     Constant::UnsignedInteger { value, .. } => self.emitter.constant(*value, typ),
                     Constant::SignedInteger { value, .. } => {
-                        self.emitter.constant(*value as u64, typ)
+                        self.emitter.constant(*value as u128, typ)
                     }
                     Constant::FloatingPoint { value, .. } => {
-                        self.emitter.constant(*value as u64, typ)
+                        self.emitter.constant(*value as u128, typ)
                     }
 
                     Constant::String(_) => self
@@ -857,7 +854,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::ReadRegister { typ, offset } => {
                 let offset = match value_store.get(*offset).kind() {
-                    NodeKind::Constant { value, .. } => *value,
+                    NodeKind::Constant { value, .. } => u64::try_from(*value).unwrap(),
                     k => panic!("can't read non constant offset: {k:#?}"),
                 };
 
@@ -874,10 +871,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     | RegisterCacheType::ReadWrite => {
                         let offset = usize::try_from(offset).unwrap();
                         let value = match typ.width() {
-                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset)),
-                            9..=16 => u64::from(self.register_file.read_raw::<u16>(offset)),
-                            17..=32 => u64::from(self.register_file.read_raw::<u32>(offset)),
-                            33..=64 => u64::from(self.register_file.read_raw::<u64>(offset)),
+                            1..=8 => u128::from(self.register_file.read_raw::<u8>(offset)),
+                            9..=16 => u128::from(self.register_file.read_raw::<u16>(offset)),
+                            17..=32 => u128::from(self.register_file.read_raw::<u32>(offset)),
+                            33..=64 => u128::from(self.register_file.read_raw::<u64>(offset)),
                             w => todo!("width {w}"),
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
@@ -890,7 +887,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::WriteRegister { offset, value } => {
                 let offset = match value_store.get(*offset).kind() {
-                    NodeKind::Constant { value, .. } => *value,
+                    NodeKind::Constant { value, .. } => u64::try_from(*value).unwrap(),
                     k => panic!("can't write non constant offset: {k:#?}"),
                 };
 
@@ -931,7 +928,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 1..=8 => self.register_file.write::<u8>(name, (*value) as u8),
                                 9..=16 => self.register_file.write::<u16>(name, (*value) as u16),
                                 17..=32 => self.register_file.write::<u32>(name, (*value) as u32),
-                                33..=64 => self.register_file.write::<u64>(name, *value),
+                                33..=64 => self.register_file.write::<u64>(name, (*value) as u64),
                                 w => todo!("width {w}"),
                             }
 

@@ -13,7 +13,7 @@ pub trait Emitter<A: Alloc> {
     type BlockRef;
     type NodeRef;
 
-    fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
+    fn constant(&mut self, val: u128, typ: Type) -> Self::NodeRef;
     fn function_ptr(&mut self, val: u64) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;

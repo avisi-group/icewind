@@ -14,7 +14,7 @@ use {
         },
     },
     alloc::{string::String, vec::Vec},
-    common::{arena::Ref, hashmap::HashMapA},
+    common::{arena::Ref, hashmap::HashMapA, mask::mask},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
     displaydoc::Display,
@@ -166,7 +166,7 @@ impl Into<i32> for MemoryScale {
 #[derive(Clone, Copy)]
 #[derive_where(PartialEq, Eq)]
 pub enum OperandKind<A: Alloc> {
-    Immediate(u64),
+    Immediate(u128),
     Memory {
         base: Option<Register>,
         index: Option<Register>,
@@ -262,7 +262,10 @@ impl<A: Alloc> Operand<A> {
         self.width_in_bits = width;
     }
 
-    pub fn imm(width_in_bits: Width, value: u64) -> Operand<A> {
+    pub fn imm(width_in_bits: Width, value: u128) -> Operand<A> {
+        // mask value to correct width
+        let value = value & mask(width_in_bits.as_u16());
+
         Operand {
             kind: OperandKind::Immediate(value),
             width_in_bits,

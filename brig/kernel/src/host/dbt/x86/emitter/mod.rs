@@ -143,7 +143,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.current_block
     }
 
-    fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
+    fn constant(&mut self, value: u128, typ: Type) -> Self::NodeRef {
         let width = typ.width();
         if width == 0 {
             panic!(
@@ -200,7 +200,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 } => self.node(X86Node {
                     typ: value.typ().clone(),
                     kind: NodeKind::Constant {
-                        value: (*constant_value == 0) as u64,
+                        value: (*constant_value == 0).try_into().unwrap(),
                         width: *width,
                     },
                 }),
@@ -272,10 +272,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         panic!()
                     };
 
-                    let num = *num as i64;
-                    let den = *den as i64;
+                    let num = *num as i128;
+                    let den = *den as i128;
 
-                    let value = num.div_floor(den) as u64;
+                    let value = num.div_floor(den) as u128;
 
                     self.node(X86Node {
                         typ: Type::Signed(64),
@@ -772,10 +772,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 },
                 ShiftOperationKind::ArithmeticShiftRight,
             ) => {
-                let signed_value = *value_value as i64;
+                let signed_value = *value_value as i128;
                 let shifted = signed_value
                     .checked_shr(u32::try_from(*amount_value).unwrap())
-                    .unwrap() as u64;
+                    .unwrap() as u128;
 
                 // mask to width of value
                 self.constant(shifted, typ)
@@ -809,7 +809,11 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 NodeKind::Constant { value: start, .. },
                 NodeKind::Constant { value: length, .. },
             ) => self.constant(
-                bit_extract(*value, *start, *length),
+                bit_extract(
+                    *value,
+                    u32::try_from(*start).unwrap(),
+                    u32::try_from(*length).unwrap(),
+                ),
                 Type::Unsigned(u32::try_from(*length).unwrap()),
             ),
             // register read direct
@@ -913,7 +917,12 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 NodeKind::Constant { value: start, .. },
                 NodeKind::Constant { value: length, .. },
             ) => self.constant(
-                bit_insert(*target, *source, *start, *length),
+                bit_insert(
+                    *target,
+                    *source,
+                    u32::try_from(*start).unwrap(),
+                    u32::try_from(*length).unwrap(),
+                ),
                 Type::Unsigned(*target_width),
             ),
             // constant start and length
@@ -1290,9 +1299,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         ));
 
         // If the execution result we're returning is non-zero, then OR it in.
-        if self.execution_result.as_u32() != 0 {
+        if self.execution_result.into_bits() != 0 {
             self.push_instruction(Instruction::or(
-                Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+                Operand::imm(Width::_32, self.execution_result.into_bits().into()),
                 Operand::preg(Width::_32, PhysicalRegister::RAX),
             ));
         }
@@ -1321,9 +1330,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Operand::preg(Width::_32, PhysicalRegister::RAX),
         ));
 
-        if self.execution_result.as_u32() != 0 {
+        if self.execution_result.into_bits() != 0 {
             self.push_instruction(Instruction::or(
-                Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+                Operand::imm(Width::_32, self.execution_result.into_bits().into()),
                 Operand::preg(Width::_32, PhysicalRegister::RAX),
             ));
         }
@@ -1365,7 +1374,11 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         let tag = Operand::vreg(Width::_64, self.next_vreg());
         let chain_cache_reg = Operand::vreg(Width::_64, self.next_vreg());
         self.push_instruction(
-            Instruction::mov(Operand::imm(Width::_64, chain_cache), chain_cache_reg).unwrap(),
+            Instruction::mov(
+                Operand::imm(Width::_64, chain_cache.into()),
+                chain_cache_reg,
+            )
+            .unwrap(),
         );
 
         self.push_instruction(
@@ -1446,7 +1459,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::test(op, op));
                 self.push_instruction(
                     Instruction::mov(
-                        Operand::imm(Width::_64, meta),
+                        Operand::imm(Width::_64, meta.into()),
                         Operand::preg(Width::_64, PhysicalRegister::R15),
                     )
                     .unwrap(),
@@ -1510,19 +1523,19 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef {
         match value.typ() {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => {
-                self.constant(u64::from(*w), Type::Unsigned(16))
+                self.constant((*w).into(), Type::Unsigned(16))
             }
 
             Type::Bits => {
                 if let NodeKind::Constant { width, .. } = value.kind() {
-                    self.constant(u64::from(*width), Type::Unsigned(16))
+                    self.constant((*width).into(), Type::Unsigned(16))
                 } else {
                     match value.kind() {
                         NodeKind::Cast {
                             value,
                             kind: CastOperationKind::ZeroExtend,
                         } => match value.typ() {
-                            Type::Unsigned(w) => self.constant(u64::from(*w), Type::Unsigned(16)),
+                            Type::Unsigned(w) => self.constant((*w).into(), Type::Unsigned(16)),
                             _ => todo!(),
                         },
                         NodeKind::ReadStackVariable { .. } => self.constant(64, Type::Unsigned(16)),
@@ -1587,9 +1600,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 };
 
                 let sign_extended =
-                    ((*value_value as i64) << (64 - value_width)) >> (64 - value_width);
+                    ((*value_value as i128) << (64 - value_width)) >> (64 - value_width);
 
-                self.constant(sign_extended as u64 & mask(target_length), typ)
+                self.constant(sign_extended as u128 & mask(target_length), typ)
             }
             (
                 NodeKind::Constant {
@@ -1652,26 +1665,30 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     }
 }
 
-fn sign_extend(value: u64, original_width: u32, target_width: u32) -> u64 {
+fn sign_extend(value: u128, original_width: u32, target_width: u32) -> u128 {
     if value == 0 {
         return 0;
     }
 
-    const CONTAINER_WIDTH: u32 = u64::BITS;
+    const CONTAINER_WIDTH: u32 = u128::BITS;
 
     let original_width = u32::from(original_width);
 
-    let signed_value = value as i64;
+    let signed_value = value as i128;
 
     let shifted_left = signed_value
         .checked_shl(CONTAINER_WIDTH - original_width)
-        .unwrap_or_else(|| panic!("failed to shift left {value} by 64 - {original_width}"));
+        .unwrap_or_else(|| {
+            panic!("failed to shift left {value} by {CONTAINER_WIDTH} - {original_width}")
+        });
 
     let shifted_right = shifted_left
         .checked_shr(CONTAINER_WIDTH - original_width)
-        .unwrap_or_else(|| panic!("failed to shift right {value} by 64 - {target_width}"));
+        .unwrap_or_else(|| {
+            panic!("failed to shift right {value} by {CONTAINER_WIDTH} - {target_width}")
+        });
 
-    shifted_right as u64
+    shifted_right as u128
 }
 
 #[ktest]
@@ -1722,7 +1739,7 @@ pub struct X86Node<A: Alloc> {
 #[derive_where(Debug, PartialEq, Eq)]
 pub enum NodeKind<A: Alloc> {
     Constant {
-        value: u64,
+        value: u128,
         width: u32,
     },
     FunctionPointer(u64),
@@ -2028,7 +2045,7 @@ fn emit_compare<A: Alloc>(
             emitter.node(X86Node {
                 typ: left.typ().clone(),
                 kind: NodeKind::Constant {
-                    value: result as u64,
+                    value: result.try_into().unwrap(),
                     width: 1,
                 },
             })

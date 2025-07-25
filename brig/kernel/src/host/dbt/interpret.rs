@@ -97,7 +97,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
             .clone()
     }
 
-    fn resolve_u64<R: Borrow<Ref<Statement>>>(&self, statement_ref: R) -> u64 {
+    fn resolve_int<R: Borrow<Ref<Statement>>>(&self, statement_ref: R) -> u128 {
         match self.resolve(statement_ref) {
             Value::UnsignedInteger { value: u, width: _ } => u,
             Value::SignedInteger { value: i, width: _ } => i
@@ -128,7 +128,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         .clone(),
                 ),
                 Statement::ReadRegister { typ, offset } => {
-                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
+                    let offset = usize::try_from(self.resolve_int(offset)).unwrap();
 
                     Some(self.read_register(typ, offset))
                 }
@@ -138,7 +138,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     // todo: technically should get the last statement or
                     // something
                     Some(Value::UnsignedInteger {
-                        value: u64::from(self.flags),
+                        value: u128::from(self.flags),
                         width: 4,
                     })
                 }
@@ -152,7 +152,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             };
 
                             Some(Value::UnsignedInteger {
-                                value: (value == 0) as u64,
+                                value: (value == 0).try_into().unwrap(),
                                 width: 1,
                             })
                         }
@@ -175,27 +175,27 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                     Some(match kind {
                         BinaryOperationKind::CompareEqual => Value::UnsignedInteger {
-                            value: (left == right) as u64,
+                            value: (left == right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::CompareNotEqual => Value::UnsignedInteger {
-                            value: (left != right) as u64,
+                            value: (left != right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::CompareLessThan => Value::UnsignedInteger {
-                            value: (left < right) as u64,
+                            value: (left < right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::CompareLessThanOrEqual => Value::UnsignedInteger {
-                            value: (left <= right) as u64,
+                            value: (left <= right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::CompareGreaterThan => Value::UnsignedInteger {
-                            value: (left > right) as u64,
+                            value: (left > right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::CompareGreaterThanOrEqual => Value::UnsignedInteger {
-                            value: (left >= right) as u64,
+                            value: (left >= right).try_into().unwrap(),
                             width: 1,
                         },
                         BinaryOperationKind::Sub => left - right,
@@ -235,17 +235,16 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                         // not correct for lengths other than 64
                         let unsigned_sum = u128::from(a) + u128::from(b) + u128::from(c);
-                        let signed_sum =
-                            i128::from(a as i64) + i128::from(b as i64) + i128::from(c as i64);
-                        let u_result = unsigned_sum as u64;
-                        let i_result = unsigned_sum as i64;
+                        let signed_sum = (a as i128) + (b as i128) + (c as i128);
+                        let u_result = unsigned_sum as u128;
+                        let i_result = unsigned_sum as i128;
 
-                        let n = u_result >> 63;
-                        let z = (u_result == 0) as u64;
-                        let c = (u128::from(u_result) != unsigned_sum) as u64;
-                        let v = (i128::from(i_result) != signed_sum) as u64;
+                        let n = u8::try_from(u_result >> 63).unwrap();
+                        let z = u8::try_from(u_result == 0).unwrap();
+                        let c = u8::try_from(u128::from(u_result) != unsigned_sum).unwrap();
+                        let v = u8::try_from(i128::from(i_result) != signed_sum).unwrap();
 
-                        self.flags = u8::try_from(n << 3 | z << 2 | c << 1 | v).unwrap();
+                        self.flags = n << 3 | z << 2 | c << 1 | v;
 
                         Some(Value::UnsignedInteger {
                             value: u_result,
@@ -259,7 +258,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     value,
                     amount,
                 } => {
-                    let amount = self.resolve_u64(amount);
+                    let amount = self.resolve_int(amount);
 
                     let value = self.resolve(value);
 
@@ -349,7 +348,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::SignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: ((*value as u64) & mask(*width)) as i64,
+                            value: ((*value as u128) & mask(*width)) as i128,
                             width: *width,
                         }),
                         (
@@ -357,7 +356,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: i64::try_from(*value & mask(*width)).unwrap(),
+                            value: i128::try_from(*value & mask(*width)).unwrap(),
                             width: *width,
                         }),
                         (
@@ -365,7 +364,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::SignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: i64::try_from(*value as u64 & mask(*width)).unwrap(),
+                            value: i128::try_from(*value as u128 & mask(*width)).unwrap(),
                             width: *width,
                         }),
                         (
@@ -403,7 +402,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: i64::try_from(*value).unwrap(),
+                            value: i128::try_from(*value).unwrap(),
                             width: *width,
                         }),
                         (
@@ -411,7 +410,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             Type::Primitive(PrimitiveType::UnsignedInteger(width)),
                             Value::SignedInteger { value, .. },
                         ) => Some(Value::UnsignedInteger {
-                            value: u64::try_from(*value).unwrap() & mask(*width),
+                            value: u128::try_from(*value).unwrap() & mask(*width),
                             width: *width,
                         }),
                         (CastOperationKind::Convert, Type::Bits, Value::UnsignedInteger { .. }) => {
@@ -427,7 +426,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     width,
                 } => {
                     let value = self.resolve(value);
-                    let target_width = u32::try_from(self.resolve_u64(width)).unwrap();
+                    let target_width = u32::try_from(self.resolve_int(width)).unwrap();
                     match (kind, typ, &value) {
                         (
                             CastOperationKind::ZeroExtend,
@@ -465,7 +464,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     true_value,
                     false_value,
                 } => {
-                    let condition = self.resolve_u64(condition);
+                    let condition = self.resolve_int(condition);
 
                     Some(self.resolve(if condition != 0 {
                         true_value
@@ -479,17 +478,25 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     width,
                 } => {
                     let value = self.resolve(value);
-                    let start = self.resolve_u64(start);
-                    let width = self.resolve_u64(width);
+                    let start = self.resolve_int(start);
+                    let width = self.resolve_int(width);
 
                     Some(match value {
                         Value::UnsignedInteger { value, .. } => Value::UnsignedInteger {
-                            value: bit_extract(value, start, width),
+                            value: bit_extract(
+                                value,
+                                start.try_into().unwrap(),
+                                width.try_into().unwrap(),
+                            ),
                             width: u32::try_from(width).unwrap(),
                         },
                         // todo: test/verify this
                         Value::SignedInteger { value, .. } => Value::SignedInteger {
-                            value: bit_extract(value as u64, start, width) as i64,
+                            value: bit_extract(
+                                value as u128,
+                                start.try_into().unwrap(),
+                                width.try_into().unwrap(),
+                            ) as i128,
                             width: u32::try_from(width).unwrap(),
                         },
                         _ => todo!("{value:?}"),
@@ -509,11 +516,16 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         panic!()
                     };
 
-                    let source = self.resolve_u64(source);
-                    let start = self.resolve_u64(start);
-                    let width = self.resolve_u64(width);
+                    let source = self.resolve_int(source);
+                    let start = self.resolve_int(start);
+                    let width = self.resolve_int(width);
                     Some(Value::UnsignedInteger {
-                        value: bit_insert(target, source, start, width),
+                        value: bit_insert(
+                            target,
+                            source,
+                            start.try_into().unwrap(),
+                            width.try_into().unwrap(),
+                        ),
                         width: target_width,
                     })
                 }
@@ -529,7 +541,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 } => {
                     let vector = self.resolve(vector);
                     let value = self.resolve(value);
-                    let index = usize::try_from(self.resolve_u64(index)).unwrap();
+                    let index = usize::try_from(self.resolve_int(index)).unwrap();
 
                     let Value::Vector(mut vec) = vector else {
                         panic!()
@@ -540,8 +552,8 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     Some(Value::Vector(vec))
                 }
                 Statement::CreateBits { value, width } => {
-                    let value = self.resolve_u64(value);
-                    let width = self.resolve_u64(width);
+                    let value = self.resolve_int(value);
+                    let width = self.resolve_int(width);
 
                     Some(Value::UnsignedInteger {
                         value,
@@ -552,7 +564,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     let value = self.resolve(value);
                     match value {
                         Value::UnsignedInteger { width, .. } => Some(Value::UnsignedInteger {
-                            value: u64::from(width),
+                            value: u128::from(width),
                             width: 16,
                         }),
                         _ => todo!("size-of {value:?}"),
@@ -582,12 +594,12 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     let (value, width) = match self.resolve(value) {
                         Value::UnsignedInteger { value, width } => (value, width),
                         Value::SignedInteger { value, width } => {
-                            (value as u64 & mask(width), width)
+                            (value as u128 & mask(width), width)
                         }
                         t => todo!("{t:?}"),
                     };
 
-                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
+                    let offset = usize::try_from(self.resolve_int(offset)).unwrap();
 
                     match width {
                         1..=8 => self
@@ -599,10 +611,11 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         17..=32 => self
                             .register_file
                             .write_raw(offset, u32::try_from(value).unwrap()),
-                        33..=64 => self.register_file.write_raw(offset, value),
+                        33..=64 => self
+                            .register_file
+                            .write_raw(offset, u64::try_from(value).unwrap()),
                         65..=128 => {
                             self.register_file.write_raw(offset, value);
-                            self.register_file.write_raw(offset + 8, 0u64); // todo: hack
                         }
                         w => {
                             log::trace!(
@@ -617,7 +630,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 Statement::WritePc { value } => {
                     self.register_file.write_raw(
                         self.model.reg_offset(InternedString::from_static("_PC")) as usize,
-                        self.resolve_u64(value),
+                        u64::try_from(self.resolve_int(value)).unwrap(),
                     );
                     None
                 }
@@ -629,7 +642,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     true_target,
                     false_target,
                 } => {
-                    let condition = self.resolve_u64(condition);
+                    let condition = self.resolve_int(condition);
 
                     return BlockResult::NextBlock(if condition != 0 {
                         *true_target
@@ -648,7 +661,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 }
 
                 Statement::Assert { condition } => {
-                    let condition = self.resolve_u64(condition);
+                    let condition = self.resolve_int(condition);
                     if condition == 0 {
                         panic!(
                             "{}: block {block_ref:?}: {statement_ref:?} assert failed: {condition:?} != 0",
@@ -677,11 +690,11 @@ impl<'f, 'r> Interpreter<'f, 'r> {
         match typ {
             Type::Primitive(ptyp) => {
                 let value = match ptyp.width() {
-                    1..=8 => self.register_file.read_raw::<u8>(offset) as u64,
-                    9..=16 => self.register_file.read_raw::<u16>(offset) as u64,
-                    17..=32 => self.register_file.read_raw::<u32>(offset) as u64,
-                    33..=64 => self.register_file.read_raw::<u64>(offset),
-                    65..=128 => u64::try_from(self.register_file.read_raw::<u128>(offset)).unwrap(),
+                    1..=8 => self.register_file.read_raw::<u8>(offset).into(),
+                    9..=16 => self.register_file.read_raw::<u16>(offset).into(),
+                    17..=32 => self.register_file.read_raw::<u32>(offset).into(),
+                    33..=64 => self.register_file.read_raw::<u64>(offset).into(),
+                    65..=128 => self.register_file.read_raw::<u128>(offset),
 
                     w => {
                         log::trace!(
@@ -697,7 +710,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         width: *width,
                     },
                     PrimitiveType::SignedInteger(width) => Value::SignedInteger {
-                        value: (value & mask(*width)) as i64,
+                        value: (value & mask(*width)) as i128,
                         width: *width,
                     },
                     _ => todo!("{typ}"),
@@ -724,8 +737,8 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    UnsignedInteger { value: u64, width: u32 },
-    SignedInteger { value: i64, width: u32 },
+    UnsignedInteger { value: u128, width: u32 },
+    SignedInteger { value: i128, width: u32 },
     FloatingPoint(f64),
     String(InternedString),
     Vector(Vec<Value>),
@@ -827,7 +840,7 @@ impl Sub for Value {
                     width: right_length,
                 },
             ) => Value::SignedInteger {
-                value: left - i64::try_from(right).unwrap(),
+                value: left - i128::try_from(right).unwrap(),
                 width: max(left_length, right_length),
             },
             (left, right) => todo!("{left:?} {right:?}"),
@@ -863,7 +876,7 @@ impl Add for Value {
                     width: right_length,
                 },
             ) => Value::SignedInteger {
-                value: i64::try_from(left).unwrap() + right,
+                value: i128::try_from(left).unwrap() + right,
                 width: max(left_length, right_length),
             },
             (
@@ -876,7 +889,7 @@ impl Add for Value {
                     width: right_length,
                 },
             ) => Value::SignedInteger {
-                value: left + i64::try_from(right).unwrap(),
+                value: left + i128::try_from(right).unwrap(),
                 width: max(left_length, right_length),
             },
             (left, right) => todo!("{left:?} {right:?}"),
@@ -912,7 +925,7 @@ impl Mul for Value {
                     width: right_length,
                 },
             ) => Value::SignedInteger {
-                value: left * i64::try_from(right).unwrap(),
+                value: left * i128::try_from(right).unwrap(),
                 width: max(left_length, right_length),
             },
             (
@@ -1006,10 +1019,10 @@ enum BlockResult {
     ReturnValue(Option<Value>),
 }
 
-fn sign_extend(value: i64, source_width: u32, dest_width: u32) -> i64 {
-    let shift_amount = i64::BITS - source_width;
+fn sign_extend(value: i128, source_width: u32, dest_width: u32) -> i128 {
+    let shift_amount = i128::BITS - source_width;
 
     let signed_extended = (value << shift_amount) >> shift_amount;
 
-    ((signed_extended as u64) & mask(dest_width)) as i64
+    ((signed_extended as u128) & mask(dest_width)) as i128
 }

@@ -52,14 +52,14 @@ impl Add for Constant {
                     width: l_width,
                 },
                 Self::UnsignedInteger { value: r, .. },
-            ) => Self::new_signed(l + i64::try_from(r).unwrap(), l_width),
+            ) => Self::new_signed(l + i128::try_from(r).unwrap(), l_width),
             (
                 Self::UnsignedInteger {
                     value: l,
                     width: l_width,
                 },
                 Self::SignedInteger { value: r, .. },
-            ) => Self::new_signed(i64::try_from(l).unwrap() + r, l_width),
+            ) => Self::new_signed(i128::try_from(l).unwrap() + r, l_width),
             (
                 Self::SignedInteger {
                     value: l,
@@ -135,7 +135,7 @@ impl Mul for Constant {
                     width: l_width,
                 },
                 Constant::UnsignedInteger { value: r, .. },
-            ) => Constant::new_signed(l * i64::try_from(r).unwrap(), l_width),
+            ) => Constant::new_signed(l * i128::try_from(r).unwrap(), l_width),
             (
                 Constant::FloatingPoint {
                     value: l,
@@ -185,8 +185,8 @@ impl Not for Constant {
     fn not(self) -> Self::Output {
         match self {
             Constant::UnsignedInteger { value, width } => Constant::new_unsigned(!value, width),
-            Constant::SignedInteger { .. } => todo!("neg??"), /* ConstantValue::SignedInteger(!
-                                                                * v), */
+            Constant::SignedInteger { .. } => todo!("neg??"), /* ConstantValue::SignedInteger(! */
+            // v),
             Constant::FloatingPoint { .. }
             | Constant::String(_)
             | Constant::Tuple(_)

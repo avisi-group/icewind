@@ -291,7 +291,7 @@ pub enum Type {
         size: Size,
     },
 
-    Constant(i64),
+    Constant(i128),
 
     Union {
         name: InternedString,

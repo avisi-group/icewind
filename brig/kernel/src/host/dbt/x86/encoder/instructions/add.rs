@@ -61,7 +61,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
         ) => {
-            assert!(*src < i32::MAX as u64);
+            assert!(*src < i32::MAX as u128);
 
             assembler
                 .add::<AsmMemoryOperand, i32>(

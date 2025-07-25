@@ -21,7 +21,7 @@ use {
                     VirtualMemoryArea,
                 },
             },
-            dbt::models,
+            dbt::{models, x86::emitter::NodeKind},
             devices::manager::SharedDeviceManager,
             fs::{Filesystem, tar::TarFilesystem},
             memory::bytes,
@@ -30,6 +30,7 @@ use {
         logger::WRITER,
         models::ModelDevice,
     },
+    alloc::alloc::Global,
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     core::{any::Any, panic::PanicInfo},
     x86::io::outw,
@@ -86,6 +87,8 @@ fn continue_start() {
     // let serial_in_task = tasks::create_task(serial_in);
     // serial_in_task.start();
 
+    // panic!("{}", size_of::<NodeKind<Global>>());
+
     let device_manager = SharedDeviceManager::get();
     let device = device_manager
         .get_device_by_alias("disk00:03.0")
@@ -139,19 +142,14 @@ fn panic(info: &PanicInfo) -> ! {
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
-    let device = ((&**unsafe {
-        crate::guest::GUEST
-            .get()
-            .unwrap()
-            .devices
-            .get(&("core0".into()))
-            .unwrap()
-    }) as &dyn Any)
-        .downcast_ref::<ModelDevice>()
-        .unwrap();
-
-    let pc = device.register_file.read::<u64>("_PC");
-    log::error!("Guest PC = {pc:016x}");
+    if let Some(guest) = unsafe { crate::guest::GUEST.get() } {
+        if let Some(device) = guest.devices.get(&("core0".into())) {
+            if let Some(model) = (device as &dyn Any).downcast_ref::<ModelDevice>() {
+                let pc = model.register_file.read::<u64>("_PC");
+                log::error!("Guest PC = {pc:016x}");
+            }
+        }
+    }
 
     backtrace();
 

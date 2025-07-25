@@ -198,7 +198,7 @@ impl ModelDevice {
         // u__SetConfig(&mut state, &NoopTracer, "cpu.cpu0.RVBAR", 0x8000_0000);
         // u__SetConfig(&mut state, &NoopTracer, "cpu.has_tlb", 0x0);
 
-        register_file.write("_PC", initial_pc);
+        register_file.write::<u64>("_PC", initial_pc);
 
         Self {
             id: ObjectId::new(),
@@ -328,7 +328,7 @@ impl ModelDevice {
         emitter.prologue();
 
         // reset BranchTaken
-        let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+        let _false = emitter.constant(0, Type::Unsigned(1));
         emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
 
         // instruction translation loop
