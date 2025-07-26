@@ -544,9 +544,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 ) => {
                     if *lhs_value == 0 {
                         self.constant(0, *rhs.typ())
-                    } else if *lhs_value == mask(rhs.typ().width())
-                        && matches!(rhs.typ().width(), 8 | 16 | 32 | 64)
-                    {
+                    } else if is_no_op_and(*rhs.typ(), *lhs.typ(), *lhs_value) {
                         rhs.clone()
                     } else {
                         self.node(X86Node {
@@ -563,9 +561,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 ) => {
                     if *rhs_value == 0 {
                         self.constant(0, *lhs.typ())
-                    } else if *rhs_value == mask(lhs.typ().width())
-                        && matches!(rhs.typ().width(), 8 | 16 | 32 | 64)
-                    {
+                    } else if is_no_op_and(*lhs.typ(), *rhs.typ(), *rhs_value) {
                         lhs.clone()
                     } else {
                         self.node(X86Node {
@@ -2149,4 +2145,14 @@ fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> 
 
         _ => panic!(),
     }
+}
+
+fn is_no_op_and(left_type: Type, right_type: Type, right_constant: u64) -> bool {
+    // right hand side is all 1s for the width of the left hand side value
+    (right_constant == mask(left_type.width())
+                        // and it's a whole power of two (had some weird issues with intermediate width sizes, todo: fixme)
+                        && matches!(right_type.width(), 8 | 16 | 32 | 64 | 128))
+                        // OR the width is wider than the container for constants, so we assume the high bits would be 1s if they existed
+                        // also todo: fixme because this is super hacky
+                        || (left_type.width() > 64 && right_constant == u64::MAX)
 }

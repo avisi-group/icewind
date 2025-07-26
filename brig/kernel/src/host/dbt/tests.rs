@@ -5032,6 +5032,8 @@ fn ldp_128() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
+    log::warn!("{translation:?}");
+
     let mem = alloc::boxed::Box::new([0xABu8; 32]);
 
     register_file.write("R0", &*mem as *const _ as u64);
@@ -5167,7 +5169,9 @@ fn v_set() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let mem = alloc::boxed::Box::new(0xABCD_EF01_2345_6789_9876_5432_10FE_DCBAu128);
+    let magic = 0xABCD_EF01_2345_6789_9876_5432_10FE_DCBAu128;
+
+    let mem = alloc::boxed::Box::new(magic);
     let address = emitter.constant(&*mem as *const u128 as u64, Type::Unsigned(64));
     let value = emitter.read_memory(address, Type::Unsigned(128));
     let n = emitter.constant(3, Type::Signed(64));
@@ -5186,6 +5190,9 @@ fn v_set() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
+
+    log::warn!("{translation:?}");
+
     translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
@@ -5198,7 +5205,7 @@ fn v_set() {
 
     let q3 = register_file.read_raw::<[u8; 16]>(q3_offset.try_into().unwrap());
 
-    panic!("{q3:?}");
+    assert_eq!(u128::from_ne_bytes(q3), magic)
 }
 
 #[ktest]
