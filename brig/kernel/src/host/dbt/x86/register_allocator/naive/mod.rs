@@ -244,15 +244,8 @@ fn build_at_instruction_index(
                 let reallocated_phys = allocate_physical_register(&temp_physical_used, *width);
                 physical_used.insert(reallocated_phys);
 
-                if *width == Width::_128 {
-                    log::warn!("allocated big reg: {phys_reg:?}");
-                }
-
                 allocation_plan.insert(conflicting_vreg, reallocated_phys);
             } else {
-                if *width == Width::_128 {
-                    log::warn!("allocated big reg: {phys_reg:?}");
-                }
                 physical_used.insert(*phys_reg);
             }
         });
@@ -262,10 +255,6 @@ fn build_at_instruction_index(
         .filter_map(|(reg, width)| if let Register::Virtual(idx) = reg { Some((idx, width)) } else { None })
         .for_each(|(vreg_idx, width)| {
             let phys_reg = allocate_physical_register(physical_used, *width);
-
-            if *width == Width::_128 {
-                log::warn!("allocated big reg: {phys_reg:?}");
-            }
 
             physical_used.insert(phys_reg);
 

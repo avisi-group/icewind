@@ -261,8 +261,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         panic!()
                     };
 
-                    assert_eq!(*num.typ(), Type::Signed(64));
-                    assert_eq!(*den.typ(), Type::Signed(64));
+                    assert_eq!(num.typ(), Type::Signed(64));
+                    assert_eq!(den.typ(), Type::Signed(64));
 
                     let (
                         NodeKind::Constant { value: num, .. },
@@ -543,8 +543,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     ..,
                 ) => {
                     if *lhs_value == 0 {
-                        self.constant(0, *rhs.typ())
-                    } else if is_no_op_and(*rhs.typ(), *lhs.typ(), *lhs_value) {
+                        self.constant(0, rhs.typ())
+                    } else if is_no_op_and(rhs.typ(), lhs.typ(), *lhs_value) {
                         rhs.clone()
                     } else {
                         self.node(X86Node {
@@ -560,8 +560,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     },
                 ) => {
                     if *rhs_value == 0 {
-                        self.constant(0, *lhs.typ())
-                    } else if is_no_op_and(*lhs.typ(), *rhs.typ(), *rhs_value) {
+                        self.constant(0, lhs.typ())
+                    } else if is_no_op_and(lhs.typ(), rhs.typ(), *rhs_value) {
                         lhs.clone()
                     } else {
                         self.node(X86Node {
@@ -683,7 +683,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             }
             _ => match cast_kind {
                 CastOperationKind::Reinterpret | CastOperationKind::Truncate => {
-                    if *value.typ() == target_type {
+                    if value.typ() == target_type {
                         value
                     } else {
                         self.node(X86Node {
@@ -927,7 +927,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         (!(mask(length).checked_shl(start).unwrap_or_else(|| {
                             panic!("overflow in shl with {start:?} {length:?}")
                         }))) & mask(target.typ().width()),
-                        *target.typ(),
+                        target.typ(),
                     );
 
                     self.binary_operation(BinaryOperationKind::And(target.clone(), mask))
@@ -935,9 +935,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 let shifted_source = {
                     let cast_source =
-                        self.cast(source, *target.typ(), CastOperationKind::ZeroExtend);
+                        self.cast(source, target.typ(), CastOperationKind::ZeroExtend);
 
-                    let mask = self.constant(mask(length), *cast_source.typ());
+                    let mask = self.constant(mask(length), cast_source.typ());
 
                     let masked_source =
                         self.binary_operation(BinaryOperationKind::And(cast_source, mask));
@@ -1506,7 +1506,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef {
         match value.typ() {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => {
-                self.constant(u64::from(*w), Type::Unsigned(16))
+                self.constant(w.into(), Type::Unsigned(16))
             }
 
             Type::Bits => {
@@ -1518,7 +1518,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                             value,
                             kind: CastOperationKind::ZeroExtend,
                         } => match value.typ() {
-                            Type::Unsigned(w) => self.constant(u64::from(*w), Type::Unsigned(16)),
+                            Type::Unsigned(w) => self.constant(w.into(), Type::Unsigned(16)),
                             _ => todo!(),
                         },
                         NodeKind::ReadStackVariable { .. } => self.constant(64, Type::Unsigned(16)),
@@ -1703,8 +1703,8 @@ impl<A: Alloc> X86NodeRef<A> {
         &self.0.kind
     }
 
-    pub fn typ(&self) -> &Type {
-        &self.0.typ
+    pub fn typ(&self) -> Type {
+        self.0.typ
     }
 }
 

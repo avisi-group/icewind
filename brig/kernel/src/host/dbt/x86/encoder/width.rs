@@ -31,10 +31,10 @@ impl Width {
             9..=16 => Ok(Self::_16),
             17..=32 => Ok(Self::_32),
             33..=64 => Ok(Self::_64),
-            //  65..=128 => Ok(Self::_128),
+            65..=128 => Ok(Self::_128),
             0 => Err(WidthError::Zero),
             // n => Err(WidthError::Oversize(n)),
-            _ => Ok(Self::_64), // todo: fix PhysicalCount and other oversized registers
+            _ => Ok(Self::_128), // todo: fix PhysicalCount and other oversized registers
         }
     }
 

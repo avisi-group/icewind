@@ -5032,30 +5032,28 @@ fn ldp_128() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::warn!("{translation:?}");
+    //  log::warn!("{translation:?}");
 
-    let mem = alloc::boxed::Box::new([0xABu8; 32]);
+    let mem = alloc::boxed::Box::new((
+        u128::from_ne_bytes([0xABu8; 16]),
+        u128::from_ne_bytes([0xBAu8; 16]),
+    ));
 
-    register_file.write("R0", &*mem as *const _ as u64);
+    register_file.write("R0", (&*mem as *const _ as u64) - 32);
     register_file.write("SEE", -1i64);
 
     translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
 
-    log::warn!("{z_offset:x}");
-
     let q2_offset = z_offset + 2 * 256;
     let q3_offset = z_offset + 3 * 256;
 
-    log::warn!("{q2_offset:x}");
-    log::warn!("{q3_offset:x}");
+    let q2 = register_file.read_raw::<u128>(q2_offset.try_into().unwrap());
+    let q3 = register_file.read_raw::<u128>(q3_offset.try_into().unwrap());
 
-    let q2 = register_file.read_raw::<[u8; 16]>(q2_offset.try_into().unwrap());
-    let q3 = register_file.read_raw::<[u8; 16]>(q3_offset.try_into().unwrap());
-
-    assert_eq!(q2, [0xAB; 16]);
-    assert_eq!(q3, [0xAB; 16]);
+    assert_eq!(q2.to_ne_bytes(), [0xAB; 16]);
+    assert_eq!(q3.to_ne_bytes(), [0xBA; 16]);
 }
 
 #[ktest]
@@ -5084,7 +5082,7 @@ fn simd_128_reg_minimal() {
         result.kind(),
         NodeKind::GuestRegister { offset: _ }
     ));
-    assert_eq!(result.typ(), &Type::Unsigned(128));
+    assert_eq!(result.typ(), Type::Unsigned(128));
 }
 
 #[ktest]
@@ -5191,17 +5189,11 @@ fn v_set() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::warn!("{translation:?}");
-
     translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
 
-    log::warn!("{z_offset:x}");
-
     let q3_offset = z_offset + 3 * 256;
-
-    log::warn!("{q3_offset:x}");
 
     let q3 = register_file.read_raw::<[u8; 16]>(q3_offset.try_into().unwrap());
 
@@ -5292,9 +5284,11 @@ fn slice_mask() {
 
     emitter.leave();
 
-    panic!("{res:?}");
-
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0,
+            width: 2048
+        }
+    )
 }

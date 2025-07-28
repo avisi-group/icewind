@@ -527,10 +527,6 @@ impl<A: Alloc> Instruction<A> {
     }
 
     pub fn mov(src: Operand<A>, dst: Operand<A>) -> Result<Self, Error<A>> {
-        if src.width() > Width::_64 || dst.width() > Width::_64 {
-            log::warn!("big mov {src} {dst}")
-        }
-
         // todo: remove these checks or enforce them earlier
         if src.width() == Width::_128
             && matches!(

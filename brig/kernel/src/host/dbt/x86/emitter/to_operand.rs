@@ -708,7 +708,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     todo!()
                 }
             }
-            (Type::Signed(l), Type::Signed(r)) => match l.cmp(r) {
+            (Type::Signed(l), Type::Signed(r)) => match l.cmp(&r) {
                 Ordering::Less => {
                     let left = self.to_operand(left);
                     let right = self.to_operand(right);
