@@ -5,6 +5,7 @@ use {
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };
 
+mod bit_simplification;
 mod block_inliner;
 mod branch_simplification;
 mod constant_folding;
@@ -57,6 +58,7 @@ static DEAD_WRITE_ELIMINATION: FunctionPass =
 static DEAD_STMT_ELIMINATION: FunctionPass = ("dead-stmt-elimination", dead_stmt_elimination::run);
 static CONSTANT_PROPAGATION: FunctionPass = ("constant-propagation", constant_propagation::run);
 static CONSTANT_FOLDING: FunctionPass = ("constant-folding", constant_folding::run);
+static BIT_SIMPLIFICATION: FunctionPass = ("bit-simplification", bit_simplification::run);
 //static RETURN_PROPAGATION: FunctionPass = ("return-propagation",
 // return_propagation::run);
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
@@ -88,6 +90,7 @@ fn run_function_passes(ctx: &OptimizationContext, model: &mut Model) -> bool {
             DEAD_STMT_ELIMINATION,
             USELESS_CAST_ELIMINATION,
             VARIABLE_ELIMINATION,
+            BIT_SIMPLIFICATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             LOCAL_TUPLE_REMOVAL,
