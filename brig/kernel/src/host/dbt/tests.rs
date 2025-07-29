@@ -5292,3 +5292,39 @@ fn slice_mask() {
         }
     )
 }
+
+#[ktest]
+fn mrs_ttbr() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    // d5382021        mrs     x1, ttbr1_el1
+    let opcode = emitter.constant(0xd5382021, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R1", 0x0);
+    register_file.write::<u64>("_TTBR1_EL1_bits", 0x8224e000);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 0x8224e000);
+}

@@ -151,7 +151,12 @@ fn panic(info: &PanicInfo) -> ! {
         .unwrap();
 
     let pc = device.register_file.read::<u64>("_PC");
-    log::error!("Guest PC = {pc:016x}");
+    log::error!("Guest PC = {pc:#016x}");
+
+    log::error!(
+        "Opcode = {:#x}",
+        host::dbt::translate::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
+    );
 
     backtrace();
 

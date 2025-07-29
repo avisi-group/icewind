@@ -519,10 +519,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .unwrap();
             } else {
                 assembler
-                    .mov::<AsmRegister32, u32>(
-                        dst.into(),
-                        u32::try_from(*src).unwrap_or_else(|_| panic!("{src:x} too big :(")),
-                    )
+                    .mov::<AsmRegister32, u32>(dst.into(), *src as u32)
                     .unwrap();
             }
         }

@@ -2,6 +2,7 @@ use {
     crate::rudder::opt::OptimizationContext,
     common::{
         arena::{Arena, Ref},
+        mask::mask,
         rudder::{
             block::Block,
             constant::Constant,
@@ -98,7 +99,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
 
                     true
                 }
-                (_lhs, Statement::Constant(rhs)) => match kind {
+                (lhs, Statement::Constant(rhs)) => match kind {
                     BinaryOperationKind::Multiply => match rhs {
                         Constant::UnsignedInteger {
                             value: rhs_value, ..
@@ -124,10 +125,20 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                                 false
                             }
                         }
-                        Constant::FloatingPoint { .. } => false,
-                        Constant::String(_interned_string) => false,
-                        Constant::Tuple(_vec) => false,
-                        Constant::Vector(_vec) => false,
+                        _ => false,
+                    },
+                    BinaryOperationKind::And => match rhs {
+                        Constant::UnsignedInteger { value, .. } => {
+                            if value == mask(lhs.typ(arena).unwrap().width_bits())
+                                || value == u64::MAX
+                            {
+                                stmt.get_mut(arena).replace(lhs);
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
                     },
                     _ => false,
                 },
