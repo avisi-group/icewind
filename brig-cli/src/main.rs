@@ -394,10 +394,6 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     cmd.args(["-debugcon", "file:/tmp/debugcon"]);
 
-    // cmd.arg("-device");
-    // cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
-    // cmd.arg("-drive");
-    // cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.args(["-M", "q35"]);
 
     cmd.args(["-qmp", "unix:/tmp/qmp.sock,server,nowait"]);

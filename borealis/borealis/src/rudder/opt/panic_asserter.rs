@@ -1,10 +1,9 @@
 use {
-    crate::rudder::{analysis::dfa::StatementUseAnalysis, opt::OptimizationContext},
+    crate::rudder::opt::OptimizationContext,
     common::{
         arena::{Arena, Ref},
         rudder::{block::Block, function::Function},
     },
-    log::trace,
 };
 
 pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {

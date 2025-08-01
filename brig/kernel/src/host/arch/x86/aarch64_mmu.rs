@@ -10,7 +10,6 @@ use {
         qemu_exit,
     },
     aarch64_paging::paging::Descriptor,
-    proc_macro_lib::ktest,
 };
 
 // returns guest physical address
@@ -161,6 +160,9 @@ pub fn take_arm_exception(
     retaddr: u64,
     mut voff: u64,
 ) {
+    log::trace!(
+        "called take_arm_exception: target_el={target_el:#x}, typ={typ:#x}, syndrom={syndrome:#x}, retaddr={retaddr:#x}"
+    );
     let spsr = get_psr_from_pstate(device);
     log::trace!("spsr: {spsr:032b}");
 
@@ -206,11 +208,11 @@ pub fn take_arm_exception(
     device.register_file.write::<u8>("PSTATE_I", 1);
     device.register_file.write::<u8>("PSTATE_F", 1);
 
-    let vbar = device.register_file.read::<u64>(match current_el {
+    let vbar = device.register_file.read::<u64>(match target_el {
         1 => "VBAR_EL1",
         2 => "VBAR_EL2",
         3 => "VBAR_EL3",
-        _ => exit_with_message!("invalid EL \"{current_el}\""),
+        _ => exit_with_message!("invalid EL \"{target_el}\""),
     });
     log::trace!("vbar: {:x}", vbar);
 

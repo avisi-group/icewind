@@ -2,13 +2,7 @@ use {
     crate::rudder::opt::OptimizationContext,
     common::{
         arena::{Arena, Ref},
-        rudder::{
-            block::Block,
-            constant::Constant,
-            function::Function,
-            statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
-            types::{PrimitiveType, Type},
-        },
+        rudder::{block::Block, constant::Constant, function::Function, statement::Statement},
     },
 };
 

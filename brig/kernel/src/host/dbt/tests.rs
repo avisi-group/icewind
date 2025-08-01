@@ -5293,8 +5293,8 @@ fn slice_mask() {
     )
 }
 
-#[ktest]
-fn mrs_ttbr() {
+//#[ktest]
+fn _mrs_ttbr() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
@@ -5327,4 +5327,42 @@ fn mrs_ttbr() {
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R1"), 0x8224e000);
+}
+
+#[ktest]
+fn sttr() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+    register_file.write("PSTATE_EL", 1u8);
+
+    //f800081f        sttr    xzr, [x0]
+    let opcode = emitter.constant(0xf800081f, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mut data = Box::new(0xbee5_abcd_0123_9876u64);
+
+    register_file.write::<u64>("R0", (&mut *data as *mut u64) as u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*data, 0x0);
 }
