@@ -47,7 +47,9 @@ impl VirtioBlock {
         };
 
         // in 512 byte sectors
-        celf.config.capacity = 33554432 / 512;
+        //  62914560 b
+        // /home/fm208/Documents/Sync/icewind/brig-cli/guest_data/rootfs.ext2
+        celf.config.capacity = 62914560 / 512; // = 122880
         celf.config.blk_size = 512;
 
         celf.virtio.lock().set_host_feature(6);
