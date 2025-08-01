@@ -345,9 +345,7 @@ impl VirtQueueEvent {
 
         match req.typ {
             BlkReqType::In => self.handle_read_event(req.sector, queue, irq, isr),
-            BlkReqType::Out => {
-                // handle write event
-            }
+            BlkReqType::Out => self.handle_write_event(req.sector, queue, irq, isr),
             BlkReqType::Flush => todo!(),
             BlkReqType::GetId => todo!(),
             BlkReqType::GetLifetime => todo!(),
@@ -391,6 +389,64 @@ impl VirtQueueEvent {
         unsafe { self.write_buffers[1].data.write(0x00) }; // success
 
         self.response_size = 1 + self.write_buffers[0].size;
+        self.submit(queue, irq, isr);
+    }
+
+    fn handle_write_event(
+        &mut self,
+        sector: u64,
+        queue: &mut VirtQueue,
+        irq: &Irq,
+        isr: &AtomicU32,
+    ) {
+        log::debug!("write event: {sector:x}");
+
+        //         assert(evt->read_buffers.size() == 2);
+        assert_eq!(self.read_buffers.len(), 2);
+
+        // 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write Event";
+
+        // 	BlockDeviceRequest *rq = new BlockDeviceRequest();
+        // 	rq->block_count = evt->read_buffers.back().size /
+        // _bdev.block_size(); 	rq->block_offset = sector;
+        // 	rq->buffer = (uint8_t *)evt->read_buffers.back().data;
+        // 	rq->is_read = false;
+        // 	rq->opaque = evt;
+
+        // 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Submitting write request,
+        // offset=" << rq->block_offset << ", count=" << rq->block_count << ",
+        // buffer=" << std::hex << (uint64_t)rq->buffer;
+
+        let dev = SharedDeviceManager::get()
+            .get_device_by_alias("disk00:04.0")
+            .unwrap();
+        let mut dev = dev.lock();
+        let blk = dev.as_block();
+
+        let source = unsafe {
+            core::slice::from_raw_parts(
+                self.read_buffers[1].data,
+                usize::try_from(self.read_buffers[1].size).unwrap(),
+            )
+        };
+
+        log::debug!("writing {} bytes @ {sector:x}", source.len());
+
+        let offset = (usize::try_from(sector).unwrap() * 512) / blk.block_size();
+        blk.write(source, offset).unwrap();
+
+        // 	if (!_bdev.submit_request(rq, write_event_callback)) {
+        // 		*(uint8_t *)evt->write_buffers.back().data = 1;
+        // 		evt->response_size = 1;
+        // 		submit_event(evt);
+        // #ifdef SYNCHRONOUS
+        // 		evt->complete.signal(false);
+        // #endif
+
+        // callback logic just inlined here
+        unsafe { self.write_buffers[1].data.write(0x00) }; // success
+
+        self.response_size = 1;
         self.submit(queue, irq, isr);
     }
 
