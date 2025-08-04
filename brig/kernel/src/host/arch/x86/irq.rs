@@ -4,7 +4,7 @@ use {
         host::{
             arch::x86::{
                 MachineContext,
-                aarch64_mmu::guest_translate,
+                aarch64_mmu::{TranslationType, guest_translate},
                 dbg,
                 memory::{
                     GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
@@ -167,6 +167,8 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
     let error_code = PageFaultErrorCode::from_bits(machine_context.error_code).unwrap();
 
+    let is_write = error_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE);
+
     if faulting_address <= LOW_HALF_CANONICAL_END {
         log::debug!("guest fault @ {faulting_address:#x}");
         let exec_ctx = crate::guest::GuestExecutionContext::current();
@@ -202,7 +204,13 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             // * map that guest physical address into the correct location in host virtual
             //   memory
 
-            guest_translate(device, unmasked_address.as_u64()).unwrap()
+            let typ = if is_write {
+                TranslationType::Write
+            } else {
+                TranslationType::Read
+            };
+
+            guest_translate(device, unmasked_address.as_u64(), typ)
         } else {
             unmasked_address.as_u64()
         };
@@ -258,14 +266,12 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                             let offset = guest_physical - rgn.base();
 
-                            let write = error_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE);
-
                             let data = unsafe { &*(machine_context.rip as *const [u8; 15]) };
 
                             let mut decoder = iced_x86::Decoder::new(64, data, 0);
                             let faulting_instruction = decoder.decode();
 
-                            if write {
+                            if is_write {
                                 log::debug!(
                                     "device write @ {offset:x} with instr {faulting_instruction:?}"
                                 );

@@ -2,7 +2,7 @@ use {
     crate::{
         host::{
             arch::x86::{
-                aarch64_mmu::{self, take_arm_exception},
+                aarch64_mmu::{self, TranslationType, take_arm_exception},
                 memory::VirtualMemoryArea,
                 safepoint::record_safepoint,
             },
@@ -234,7 +234,12 @@ impl ModelDevice {
                 if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
                     pc
                 } else {
-                    let pc = aarch64_mmu::guest_translate(self, block_start_virtual_pc).unwrap();
+                    let pc = aarch64_mmu::guest_translate(
+                        self,
+                        block_start_virtual_pc,
+                        TranslationType::Fetch,
+                    );
+
                     translation_cache.insert(block_start_virtual_pc as usize, pc);
                     pc
                 };

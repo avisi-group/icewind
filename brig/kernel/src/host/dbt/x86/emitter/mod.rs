@@ -922,10 +922,18 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 let length = u32::try_from(*length).unwrap();
                 let start = u32::try_from(*start).unwrap();
 
+                // todo: hack fixme
+                if start >= 64 {
+                    return target;
+                }
+
                 let cleared_target = {
                     let mask = self.constant(
                         (!(mask(length).checked_shl(start).unwrap_or_else(|| {
-                            panic!("overflow in shl with {start:?} {length:?}")
+                            panic!(
+                                "overflow in shl with {start:?} {length:?} {:?}",
+                                target.typ()
+                            )
                         }))) & mask(target.typ().width()),
                         target.typ(),
                     );

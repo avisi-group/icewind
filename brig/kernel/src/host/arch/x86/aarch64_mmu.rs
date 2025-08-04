@@ -9,14 +9,18 @@ use {
         },
         qemu_exit,
     },
-    aarch64_paging::paging::Descriptor,
+    aarch64_paging::paging::{Attributes, Descriptor},
 };
 
 // returns guest physical address
-pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Option<u64> {
+pub fn guest_translate(
+    device: &ModelDevice,
+    guest_virtual_address: u64,
+    typ: TranslationType,
+) -> u64 {
     let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
     if !mmu_enabled {
-        return Some(guest_virtual_address);
+        return guest_virtual_address;
     }
     // let ttbcr = device.register_file.read::<u32>("TTBCR_S_bits");
     // log::trace!("{ttbcr:032b}");
@@ -49,90 +53,135 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     //log::trace!("table: {table:x?}");
 
     // Skip L0, because 3-level page tables.
-    translate_l1(device, table, guest_virtual_address)
-}
 
-fn _translate_l0(
-    device: &ModelDevice,
-    table: &[Descriptor; 512],
-    guest_virtual_address: u64,
-) -> Option<u64> {
-    let entry_idx = ((guest_virtual_address >> 39) & 0x1ff) as usize;
-
-    log::trace!("entry_idx: {entry_idx:x?}");
-    let entry = &table[entry_idx];
-    log::trace!("entry: {entry:x?}");
-
-    if entry.is_table_or_page() {
-        translate_l1(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        exit_with_message!("entry was not table or page")
+    match translate_l1(table, guest_virtual_address, typ) {
+        Ok(addr) => addr,
+        Err(error) => {
+            guest_page_fault(device, guest_virtual_address, error);
+            unreachable!();
+        }
     }
 }
 
 fn translate_l1(
-    device: &ModelDevice,
     table: &[Descriptor; 512],
     guest_virtual_address: u64,
-) -> Option<u64> {
+    typ: TranslationType,
+) -> Result<u64, TranslationError> {
     let entry_idx = ((guest_virtual_address >> 30) & 0x1ff) as usize;
     log::trace!("l1 entry_idx: {entry_idx:x?}");
     let entry = &table[entry_idx];
     log::trace!("l1 entry: {entry:x?}");
 
     if !entry.is_valid() {
-        // guest page fault, look up exception vector table (VBAR_EL2)
-        guest_page_fault(device, guest_virtual_address);
-        exit_with_message!("invalid L1")
+        return Err(TranslationError {
+            level: FaultLevel::L1,
+            fault_type: FaultType::Translation,
+            translation_type: typ,
+        });
     }
 
     if entry.is_table_or_page() {
-        translate_l2(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        let mask = (1 << 30) - 1;
-        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
+        return translate_l2(entry_to_table(&entry), guest_virtual_address, typ);
+    } // else is block
+
+    if !entry.flags().contains(Attributes::ACCESSED) {
+        return Err(TranslationError {
+            level: FaultLevel::L1,
+            fault_type: FaultType::AccessFlag,
+            translation_type: typ,
+        });
     }
+
+    if !has_permission(TranslationPrivilege::Supervisor, typ, entry.flags()) {
+        return Err(TranslationError {
+            level: FaultLevel::L1,
+            fault_type: FaultType::Permission,
+            translation_type: typ,
+        });
+    }
+
+    let mask = (1 << 30) - 1;
+    Ok((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
 }
 
 fn translate_l2(
-    device: &ModelDevice,
     table: &[Descriptor; 512],
     guest_virtual_address: u64,
-) -> Option<u64> {
+    typ: TranslationType,
+) -> Result<u64, TranslationError> {
     let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
     log::trace!("l2 entry_idx: {entry_idx:x?}");
     let entry = &table[entry_idx];
     log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
-        exit_with_message!("invalid L2")
+        return Err(TranslationError {
+            level: FaultLevel::L2,
+            fault_type: FaultType::Translation,
+            translation_type: typ,
+        });
     }
 
     if entry.is_table_or_page() {
-        translate_l3(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        let mask = (1 << 21) - 1;
-        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
+        return translate_l3(entry_to_table(&entry), guest_virtual_address, typ);
+    } // else is block
+
+    if !entry.flags().contains(Attributes::ACCESSED) {
+        return Err(TranslationError {
+            level: FaultLevel::L2,
+            fault_type: FaultType::AccessFlag,
+            translation_type: typ,
+        });
     }
+
+    if !has_permission(TranslationPrivilege::Supervisor, typ, entry.flags()) {
+        return Err(TranslationError {
+            level: FaultLevel::L2,
+            fault_type: FaultType::Permission,
+            translation_type: typ,
+        });
+    }
+
+    let mask = (1 << 21) - 1;
+    Ok((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
 }
 
 fn translate_l3(
-    device: &ModelDevice,
     table: &[Descriptor; 512],
     guest_virtual_address: u64,
-) -> Option<u64> {
+    typ: TranslationType,
+) -> Result<u64, TranslationError> {
     let entry_idx = ((guest_virtual_address >> 12) & 0x1ff) as usize;
     log::trace!("l3 entry_idx: {entry_idx:x?}");
     let entry = &table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
-    if entry.is_table_or_page() {
-        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
-    } else {
-        log::warn!("invalid L3");
-        guest_page_fault(device, guest_virtual_address);
-        None
+    if !entry.is_table_or_page() {
+        return Err(TranslationError {
+            level: FaultLevel::L3,
+            fault_type: FaultType::Translation,
+            translation_type: typ,
+        });
     }
+
+    if !entry.flags().contains(Attributes::ACCESSED) {
+        return Err(TranslationError {
+            level: FaultLevel::L3,
+            fault_type: FaultType::AccessFlag,
+            translation_type: typ,
+        });
+    }
+
+    if !has_permission(TranslationPrivilege::Supervisor, typ, entry.flags()) {
+        return Err(TranslationError {
+            level: FaultLevel::L3,
+            fault_type: FaultType::Permission,
+            translation_type: typ,
+        });
+    }
+
+    Ok((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
 }
 
 fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
@@ -141,12 +190,20 @@ fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
     }
 }
 
-fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64) {
+fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64, error: TranslationError) {
     log::warn!("guest page fault @ {guest_virtual_address}");
 
     let retaddr = device.register_file.read::<u64>("_PC");
 
-    take_arm_exception(device, 1, 1, 0, guest_virtual_address, retaddr, 0);
+    let typ = if error.translation_type == TranslationType::Fetch {
+        4
+    } else {
+        1
+    };
+
+    let syndrome = error.to_syndrome();
+
+    take_arm_exception(device, 1, typ, syndrome, guest_virtual_address, retaddr, 0);
 
     interrupt_restore_safepoint(1);
 }
@@ -155,7 +212,7 @@ pub fn take_arm_exception(
     device: &ModelDevice,
     target_el: u8,
     typ: u8,
-    syndrome: u32,
+    syndrome: u64,
     vaddr: u64,
     retaddr: u64,
     mut voff: u64,
@@ -190,9 +247,9 @@ pub fn take_arm_exception(
         // If it's NOT an IRQ...
         if typ != 255 {
             let ec = get_exception_class(current_el, target_el, typ);
-            device.register_file.write::<u32>(
+            device.register_file.write::<u64>(
                 "ESR_EL1_bits",
-                (ec << 26) | (1 << 25) | (syndrome & 0x1ffffff),
+                (ec << 26) | (1 << 25) | syndrome & 0x1ffffff,
             );
 
             if typ == 1 || typ == 4 {
@@ -235,7 +292,7 @@ fn get_psr_from_pstate(device: &ModelDevice) -> u32 {
     n << 31 | z << 30 | c << 29 | v << 28 | d << 9 | a << 8 | i << 7 | f << 6 | el << 2 | sp
 }
 
-fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
+fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u64 {
     match typ {
         0 => {
             // Software Breakpoint
@@ -272,5 +329,104 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
         _ => {
             exit_with_message!("trap")
         }
+    }
+}
+
+struct TranslationError {
+    level: FaultLevel,
+    fault_type: FaultType,
+    translation_type: TranslationType,
+}
+
+impl TranslationError {
+    pub fn to_syndrome(&self) -> u64 {
+        let level = match self.level {
+            FaultLevel::L0 => 0,
+            FaultLevel::L1 => 1,
+            FaultLevel::L2 => 2,
+            FaultLevel::L3 => 3,
+        };
+
+        let typ = match self.fault_type {
+            FaultType::AddressSize => 0,
+            FaultType::Translation => 4,
+            FaultType::AccessFlag => 8,
+            FaultType::Permission => 12,
+        };
+
+        //    ctx.private_data = (uint64_t) type | (uint64_t) level;
+
+        // if (ctx.type == AddressTranslationType::WRITE) {
+        // 	ctx.private_data |= 0x40;
+        // }
+
+        typ | level
+            | if self.translation_type == TranslationType::Write {
+                0x40
+            } else {
+                0x0
+            }
+    }
+}
+
+enum FaultLevel {
+    L0,
+    L1,
+    L2,
+    L3,
+}
+
+enum FaultType {
+    AddressSize,
+    Translation,
+    AccessFlag,
+    Permission,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TranslationPrivilege {
+    User,
+    Supervisor,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TranslationType {
+    Read,
+    Write,
+    Fetch,
+}
+
+fn has_permission(
+    privilege: TranslationPrivilege,
+    typ: TranslationType,
+    entry_flags: Attributes,
+) -> bool {
+    let user = entry_flags.contains(Attributes::USER);
+    let read_only = entry_flags.contains(Attributes::READ_ONLY);
+
+    match (user, read_only) {
+        // EL1 RW, EL0 -
+        (false, false) => {
+            if privilege == TranslationPrivilege::User {
+                false
+            } else {
+                true
+            }
+        }
+
+        // EL1 RW, EL0 RW
+        (true, false) => true,
+
+        // EL1 RO, EL0 -
+        (false, true) => {
+            if privilege == TranslationPrivilege::User {
+                false
+            } else {
+                typ == TranslationType::Read || typ == TranslationType::Fetch
+            }
+        }
+
+        // EL1 RO, EL0 RO
+        (true, true) => typ == TranslationType::Read || typ == TranslationType::Fetch,
     }
 }
