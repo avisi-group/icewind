@@ -178,7 +178,14 @@ fn translate_with_variable_ids<A: Alloc>(
     register_file: &RegisterFile,
     variable_ids: Rc<AtomicUsize, A>,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
-    if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
+    let (is_sysreg, is_read) = match function {
+        "AArch64_SysRegRead" => (true, true),
+        "AArch64_SysRegWrite" => (true, false),
+        "AArch64_SysInstr" => (true, false),
+        _ => (false, false),
+    };
+
+    if is_sysreg {
         let mut iter = arguments
             .iter()
             .map(|node| {
@@ -201,7 +208,7 @@ fn translate_with_variable_ids<A: Alloc>(
 
         if sysreg_helpers::handler_exists(sysreg_id) {
             // find whether we are reading or writing
-            if function == "AArch64_SysRegRead" {
+            if is_read {
                 let function = emitter.function_ptr(sys_reg_read as u64);
 
                 let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
@@ -650,8 +657,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         // finish translation with current block set to the exit block
         self.emitter.set_current_block(exit_block);
 
-        log::debug!("finished translating {:?}", self.function.name());
-
         Ok(self.read_return_value())
     }
 
@@ -1095,7 +1100,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.emitter.execution_result.set_need_tlb_invalidate(true);
                 }
 
-                StatementResult::Data(translate_with_variable_ids(
+                let res = StatementResult::Data(translate_with_variable_ids(
                     self.allocator.clone(),
                     self.model,
                     target.as_ref(),
@@ -1106,7 +1111,15 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                                        * so
                                                        * called functions' variables
                                                        * don't corrupt this function's */
-                )?)
+                )?);
+
+                log::debug!(
+                    "finished translating {:?}, now in {:?}",
+                    target.as_ref(),
+                    self.function.name()
+                );
+
+                res
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
@@ -1340,7 +1353,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     fn read_variable(&mut self, variable: LocalVariable<A>) -> X86NodeRef<A> {
         match variable {
             LocalVariable::Virtual { value } => {
-                value.expect("local virtual variable never written to")
+                value.unwrap_or_else(|| panic!("local virtual variable never written to"))
             }
             LocalVariable::Stack { id, typ } => {
                 let read = self.emitter.read_stack_variable(id, typ);

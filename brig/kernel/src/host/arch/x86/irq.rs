@@ -479,7 +479,7 @@ fn dbt_handler_default_terminator(_machine_context: *mut MachineContext) {
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_const_assert(_machine_context: *mut MachineContext) {
-    exit_with_message!("DBT interrupt: const assert")
+    panic!("DBT interrupt: const assert")
 }
 
 #[irq_handler(with_code = true)]
