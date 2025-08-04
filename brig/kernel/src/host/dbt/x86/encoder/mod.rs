@@ -570,7 +570,7 @@ impl<A: Alloc> Instruction<A> {
     pub fn movsx(src: Operand<A>, dst: Operand<A>) -> Self {
         assert!(
             src.width() < dst.width(),
-            "can't sign extend {src} to {dst}"
+            "can't sign extend {src} to {dst} (dst width must be greater than src width)"
         );
         Self(Opcode::MOVSX(src, dst))
     }

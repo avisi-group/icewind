@@ -5366,3 +5366,40 @@ fn sttr() {
 
     assert_eq!(*data, 0x0);
 }
+
+#[ktest]
+fn at() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+    register_file.write("PSTATE_EL", 1u8);
+
+    // d5087816        at      s1e1r, x22
+    // AT_S1E1R_SysOpsWrite_efb944f010174dbe
+    let opcode = emitter.constant(0xd5087816, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    log::warn!("{translation:?}");
+
+    register_file.write::<u64>("R22", 0xffff); //???
+
+    translation.execute(&register_file);
+}

@@ -134,116 +134,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     dst
                 }
             },
-            NodeKind::UnaryOperation(kind) => match &kind {
-                UnaryOperationKind::Complement(value) => {
-                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-                    let value = self.to_operand(value);
-                    self.push_instruction(Instruction::mov(value, dst).unwrap());
-                    self.push_instruction(Instruction::not(dst));
-                    dst
-                }
-                UnaryOperationKind::Not(value) => {
-                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
-                    let value = self.to_operand(value);
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    self.push_instruction(Instruction::cmp(Operand::imm(width, 0), value));
-                    self.push_instruction(Instruction::sete(dst));
-                    self.push_instruction(Instruction::and(Operand::imm(width, 1), dst));
-
-                    dst
-                }
-                UnaryOperationKind::Ceil(value) => {
-                    let NodeKind::Tuple(real) = value.kind() else {
-                        panic!();
-                    };
-
-                    let [num, den] = real.as_slice() else {
-                        panic!();
-                    };
-
-                    assert_eq!(num.typ().width(), den.typ().width());
-
-                    let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
-                    let num = self.to_operand(num);
-                    let den = self.to_operand(den);
-                    let divisor = Operand::vreg(width, self.next_vreg());
-
-                    let rax = Operand::preg(width, PhysicalRegister::RAX);
-                    let rdx = Operand::preg(width, PhysicalRegister::RDX);
-
-                    self.push_instruction(Instruction::xor(rdx, rdx));
-                    self.push_instruction(Instruction::mov(num, rax).unwrap());
-                    self.push_instruction(Instruction::mov(den, divisor).unwrap());
-                    self.push_instruction(Instruction::idiv(rdx, rax, divisor));
-
-                    let quotient = Operand::vreg(width, self.next_vreg());
-                    let remainder = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::mov(rax, quotient).unwrap());
-                    self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
-
-                    let nz = Operand::vreg(Width::_8, self.next_vreg());
-                    let g = Operand::vreg(Width::_8, self.next_vreg());
-
-                    self.push_instruction(Instruction::test(remainder, remainder));
-                    self.push_instruction(Instruction::setnz(nz));
-                    self.push_instruction(Instruction::test(num, num));
-                    self.push_instruction(Instruction::setg(g));
-                    self.push_instruction(Instruction::and(g, nz));
-                    let mask = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(nz, mask));
-
-                    self.push_instruction(Instruction::add(mask, quotient));
-
-                    quotient
-                }
-                UnaryOperationKind::Floor(value) => {
-                    let NodeKind::Tuple(real) = value.kind() else {
-                        panic!();
-                    };
-
-                    let [num, den] = real.as_slice() else {
-                        panic!();
-                    };
-
-                    assert_eq!(num.typ().width(), den.typ().width());
-
-                    let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
-                    let num = self.to_operand(num);
-                    let den = self.to_operand(den);
-                    let divisor = Operand::vreg(width, self.next_vreg());
-
-                    let rax = Operand::preg(width, PhysicalRegister::RAX);
-                    let rdx = Operand::preg(width, PhysicalRegister::RDX);
-
-                    self.push_instruction(Instruction::xor(rdx, rdx));
-                    self.push_instruction(Instruction::mov(num, rax).unwrap());
-                    self.push_instruction(Instruction::mov(den, divisor).unwrap());
-                    self.push_instruction(Instruction::idiv(rdx, rax, divisor));
-
-                    let quotient = Operand::vreg(width, self.next_vreg());
-                    let remainder = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::mov(rax, quotient).unwrap());
-                    self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
-
-                    let nz = Operand::vreg(Width::_8, self.next_vreg());
-                    let s = Operand::vreg(Width::_8, self.next_vreg());
-
-                    self.push_instruction(Instruction::test(remainder, remainder));
-                    self.push_instruction(Instruction::setnz(nz));
-                    self.push_instruction(Instruction::test(num, num));
-                    self.push_instruction(Instruction::sets(s));
-                    self.push_instruction(Instruction::and(s, nz));
-                    let mask = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(nz, mask));
-
-                    self.push_instruction(Instruction::sub(mask, quotient));
-
-                    quotient
-                }
-                kind => todo!("{kind:?}"),
-            },
+            NodeKind::UnaryOperation(kind) => self.unary_operation_to_operand(kind),
             NodeKind::BitExtract {
                 value,
                 start,
@@ -495,19 +386,25 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     Width::from_uncanonicalized(pattern_width * u32::try_from(count).unwrap())
                         .unwrap();
 
-                let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
-                self.push_instruction(Instruction::movzx(pattern, pattern_zx));
+                // zero extend pattern if necessary
+                let pattern = if pattern.width() != destination_width {
+                    let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
+                    self.push_instruction(Instruction::movzx(pattern, pattern_zx));
+                    pattern_zx
+                } else {
+                    pattern
+                };
 
                 let dest = Operand::vreg(destination_width, self.next_vreg());
 
-                self.push_instruction(Instruction::mov(pattern_zx, dest).unwrap());
+                self.push_instruction(Instruction::mov(pattern, dest).unwrap());
 
                 for _ in 1..count {
                     self.push_instruction(Instruction::shl(
                         Operand::imm(Width::_8, u64::from(pattern_width)),
                         dest,
                     ));
-                    self.push_instruction(Instruction::or(pattern_zx, dest));
+                    self.push_instruction(Instruction::or(pattern, dest));
                 }
 
                 dest
@@ -636,6 +533,126 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         op
     }
 
+    fn unary_operation_to_operand(&mut self, kind: &UnaryOperationKind<A>) -> Operand<A> {
+        match &kind {
+            UnaryOperationKind::Complement(value) => {
+                let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
+                let dst = Operand::vreg(width, self.next_vreg());
+                let value = self.to_operand(value);
+                self.push_instruction(Instruction::mov(value, dst).unwrap());
+                self.push_instruction(Instruction::not(dst));
+                dst
+            }
+            UnaryOperationKind::Not(value) => {
+                let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
+                let value = self.to_operand(value);
+                let dst = Operand::vreg(width, self.next_vreg());
+
+                self.push_instruction(Instruction::cmp(Operand::imm(width, 0), value));
+                self.push_instruction(Instruction::sete(dst));
+                self.push_instruction(Instruction::and(Operand::imm(width, 1), dst));
+
+                dst
+            }
+            UnaryOperationKind::Negate(value) => {
+                let value = self.to_operand(value);
+
+                self.push_instruction(Instruction::neg(value));
+
+                value
+            }
+            UnaryOperationKind::Ceil(value) => {
+                let NodeKind::Tuple(real) = value.kind() else {
+                    panic!();
+                };
+
+                let [num, den] = real.as_slice() else {
+                    panic!();
+                };
+
+                assert_eq!(num.typ().width(), den.typ().width());
+
+                let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
+                let num = self.to_operand(num);
+                let den = self.to_operand(den);
+                let divisor = Operand::vreg(width, self.next_vreg());
+
+                let rax = Operand::preg(width, PhysicalRegister::RAX);
+                let rdx = Operand::preg(width, PhysicalRegister::RDX);
+
+                self.push_instruction(Instruction::xor(rdx, rdx));
+                self.push_instruction(Instruction::mov(num, rax).unwrap());
+                self.push_instruction(Instruction::mov(den, divisor).unwrap());
+                self.push_instruction(Instruction::idiv(rdx, rax, divisor));
+
+                let quotient = Operand::vreg(width, self.next_vreg());
+                let remainder = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::mov(rax, quotient).unwrap());
+                self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
+
+                let nz = Operand::vreg(Width::_8, self.next_vreg());
+                let g = Operand::vreg(Width::_8, self.next_vreg());
+
+                self.push_instruction(Instruction::test(remainder, remainder));
+                self.push_instruction(Instruction::setnz(nz));
+                self.push_instruction(Instruction::test(num, num));
+                self.push_instruction(Instruction::setg(g));
+                self.push_instruction(Instruction::and(g, nz));
+                let mask = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::movzx(nz, mask));
+
+                self.push_instruction(Instruction::add(mask, quotient));
+
+                quotient
+            }
+            UnaryOperationKind::Floor(value) => {
+                let NodeKind::Tuple(real) = value.kind() else {
+                    panic!();
+                };
+
+                let [num, den] = real.as_slice() else {
+                    panic!();
+                };
+
+                assert_eq!(num.typ().width(), den.typ().width());
+
+                let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
+                let num = self.to_operand(num);
+                let den = self.to_operand(den);
+                let divisor = Operand::vreg(width, self.next_vreg());
+
+                let rax = Operand::preg(width, PhysicalRegister::RAX);
+                let rdx = Operand::preg(width, PhysicalRegister::RDX);
+
+                self.push_instruction(Instruction::xor(rdx, rdx));
+                self.push_instruction(Instruction::mov(num, rax).unwrap());
+                self.push_instruction(Instruction::mov(den, divisor).unwrap());
+                self.push_instruction(Instruction::idiv(rdx, rax, divisor));
+
+                let quotient = Operand::vreg(width, self.next_vreg());
+                let remainder = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::mov(rax, quotient).unwrap());
+                self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
+
+                let nz = Operand::vreg(Width::_8, self.next_vreg());
+                let s = Operand::vreg(Width::_8, self.next_vreg());
+
+                self.push_instruction(Instruction::test(remainder, remainder));
+                self.push_instruction(Instruction::setnz(nz));
+                self.push_instruction(Instruction::test(num, num));
+                self.push_instruction(Instruction::sets(s));
+                self.push_instruction(Instruction::and(s, nz));
+                let mask = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::movzx(nz, mask));
+
+                self.push_instruction(Instruction::sub(mask, quotient));
+
+                quotient
+            }
+            kind => todo!("{kind:?}"),
+        }
+    }
+
     fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind<A>) -> Operand<A> {
         use BinaryOperationKind::*;
 
@@ -713,6 +730,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     let left = self.to_operand(left);
                     let right = self.to_operand(right);
                     let tmp = Operand::vreg(right.width(), self.next_vreg());
+
+                    if left.width() == right.width() {
+                        panic!("true widths different but normalized widths equal")
+                    }
+
                     self.push_instruction(Instruction::movsx(left, tmp));
                     (tmp, right)
                 }

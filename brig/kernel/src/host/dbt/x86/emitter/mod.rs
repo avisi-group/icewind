@@ -289,6 +289,11 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 }
             }
 
+            Negate(value) => self.node(X86Node {
+                typ: value.typ().clone(),
+                kind: NodeKind::UnaryOperation(op),
+            }),
+
             _ => {
                 todo!("{op:?}")
             }
