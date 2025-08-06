@@ -155,7 +155,7 @@ fn panic(info: &PanicInfo) -> ! {
 
     log::error!(
         "Opcode = {:#x}",
-        host::dbt::translate::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
+        models::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
     );
 
     backtrace();

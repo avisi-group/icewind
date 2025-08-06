@@ -8,7 +8,9 @@ use {
             registers::Register::Physical as PHYS,
         },
     },
-    iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},
+    iced_x86::code_asm::{
+        AsmMemoryOperand, AsmRegister32, AsmRegister64, CodeAssembler, qword_ptr,
+    },
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
@@ -28,6 +30,21 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                 .unwrap();
         }
+        // ADD R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .add::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .unwrap();
+        }
         // ADD IMM -> R
         (
             Operand {
@@ -41,6 +58,21 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
+                .unwrap();
+        }
+        // ADD IMM -> R
+        (
+            Operand {
+                kind: I(src),
+                width_in_bits: _,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .add::<AsmRegister32, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
                 .unwrap();
         }
         // ADD IMM -> M

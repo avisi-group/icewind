@@ -94,7 +94,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     }
 
     pub fn push_target(&mut self, target: Ref<X86Block<A>>) {
-        log::debug!("adding target {target:?} to {:?}", self.current_block);
+        log::trace!("adding target {target:?} to {:?}", self.current_block);
         self.current_block
             .get_mut(self.ctx.arena_mut())
             .push_next(target);
@@ -635,10 +635,34 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn ternary_operation(&mut self, op: TernaryOperationKind<A>) -> Self::NodeRef {
         use TernaryOperationKind::*;
         match &op {
-            AddWithCarry(src, _dst, _carry) => self.node(X86Node {
-                typ: src.typ().clone(),
-                kind: NodeKind::TernaryOperation(op),
-            }),
+            AddWithCarry(src, dst, carry) => {
+                // todo: fix this
+                // // if any are const, let add infrastructure handle this
+                // if matches!(src.kind(), NodeKind::Constant { .. })
+                //     || matches!(dst.kind(), NodeKind::Constant { .. })
+                //     || matches!(carry.kind(), NodeKind::Constant { .. })
+                // {
+                //     let carry = self.cast(carry.clone(), dst.typ(),
+                // CastOperationKind::ZeroExtend);     let src =
+                // self.cast(src.clone(), dst.typ(), CastOperationKind::Reinterpret);
+
+                //     let sum =
+                //         self.binary_operation(BinaryOperationKind::Add(src.clone(),
+                // dst.clone()));
+
+                //     self.binary_operation(BinaryOperationKind::Add(carry, sum.clone()))
+                // } else {
+                //     self.node(X86Node {
+                //         typ: src.typ().clone(),
+                //         kind: NodeKind::TernaryOperation(op),
+                //     })
+                // }
+
+                self.node(X86Node {
+                    typ: src.typ().clone(),
+                    kind: NodeKind::TernaryOperation(op),
+                })
+            }
         }
     }
 

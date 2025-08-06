@@ -1137,7 +1137,6 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     register_file.write("SEE", -1i64);
 
     // cmp    x0, x1
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xeb01001f, Type::Unsigned(32));
     translate(
         Global,
@@ -1153,6 +1152,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
+
     translation.execute(&register_file);
 
     register_file.read::<u8>("PSTATE_N") << 3
@@ -5397,9 +5397,40 @@ fn at() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::warn!("{translation:?}");
-
     register_file.write::<u64>("R22", 0xffff); //???
+
+    translation.execute(&register_file);
+}
+
+#[ktest]
+fn svc() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+    register_file.write("PSTATE_EL", 0u8);
+
+    //    0xd4000001  svc     #0x0
+    // execute_aarch64_instrs_system_exceptions_runtime_svc
+    let opcode = emitter.constant(0xd4000001, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
 
     translation.execute(&register_file);
 }

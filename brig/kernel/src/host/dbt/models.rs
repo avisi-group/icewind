@@ -41,6 +41,7 @@ use {
     core::{
         alloc::Layout,
         fmt::{self, Debug},
+        sync::atomic::{AtomicU32, Ordering},
     },
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
@@ -62,6 +63,8 @@ pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
+
+pub static CURRENT_OPCODE: AtomicU32 = AtomicU32::new(0);
 
 pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -280,6 +283,11 @@ impl ModelDevice {
             }
 
             instructions_executed += translated_block.opcodes.len();
+
+            CURRENT_OPCODE.store(
+                *translated_block.opcodes.first().unwrap(),
+                Ordering::Relaxed,
+            );
 
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",

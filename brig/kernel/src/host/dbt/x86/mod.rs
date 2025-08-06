@@ -257,8 +257,11 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             }
 
             // assembler
-            //     .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) +
-            // block.index()))     .unwrap();
+            //     .nop_1::<iced_x86::code_asm::AsmMemoryOperand>(iced_x86::code_asm::qword_ptr(
+            //         iced_x86::code_asm::AsmRegister64::from(iced_x86::code_asm::rax)
+            //             + block.index(),
+            //     ))
+            //     .unwrap();
 
             let instrs = block.get(self.arena()).instructions();
 

@@ -1745,7 +1745,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "UsingAArch32"
             | "ELUsingAArch32"
             | "EffectiveTBI"
-            | "GCSPCREnabled" =>
+            | "GCSPCREnabled"
+            | "EndOfInstruction" =>
             // todo: don't replace with constant, delete
             {
                 Some(build(

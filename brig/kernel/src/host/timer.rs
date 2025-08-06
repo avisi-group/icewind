@@ -50,6 +50,10 @@ fn timer_interrupt() {
 
     let current_time = GLOBAL_CLOCK.now(); // TODO: compute this period from timer interrupt frequency
 
+    if current_time > Nanoseconds::new(90_000_000_000u64) {
+        panic!()
+    }
+
     handle_tickables(current_time);
 
     scheduler::schedule();

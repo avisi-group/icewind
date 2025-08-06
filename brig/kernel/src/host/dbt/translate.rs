@@ -82,8 +82,6 @@ enum ControlFlow<A: Alloc> {
 
 const NUM_TRANSLATE_ATTEMPTS: usize = 3;
 
-pub static CURRENT_OPCODE: AtomicU32 = AtomicU32::new(0);
-
 /// Top-level translation of a given guest instruction opcode
 ///
 /// Includes logic for retrying decoding if a SEE exception is thrown.
@@ -96,8 +94,6 @@ pub fn translate_instruction<A: Alloc>(
     opcode: u32,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     register_file.write("SEE", -1i64);
-
-    CURRENT_OPCODE.store(opcode, Ordering::Relaxed);
 
     let initial_block = emitter.get_current_block();
 
@@ -343,6 +339,9 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     // don't re-promote stack variables to a different location
     promoted_locations: HashMapA<InternedString, usize, A>,
 
+    /// Cached registers
+    cached_registers: HashMapA<usize, X86NodeRef<A>, A>,
+
     /// Dynamic bitvector stack lengths
     bits_stack_widths: HashMapA<usize, u32, A>,
 
@@ -510,6 +509,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             entry_variables: BTreeMap::new_in(emitter.ctx().allocator()),
             promoted_locations: hashmap_in(emitter.ctx().allocator()),
             bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
+            cached_registers: hashmap_in(emitter.ctx().allocator()),
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_variable_id,
             emitter,
@@ -576,7 +576,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     variables,
                 } => {
                     self.emitter.set_current_block(x86_block);
-                    log::trace!(
+                    log::debug!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
                     let res = self.translate_block(rudder_block, false, variables)?;
@@ -725,7 +725,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
     ) -> Result<StatementResult<A>, Error> {
-        log::trace!("translate stmt: {statement:?}");
+        //  log::trace!("translate stmt: {statement:?}");
 
         Ok(match statement {
             Statement::Constant(value) => {
@@ -816,7 +816,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                             );
 
                             let id = if let Some(id) = self.promoted_locations.get(&symbol.name()) {
-                                log::trace!(
+                                log::debug!(
                                     "variable {:?} already promoted to stack @ {id:#x}",
                                     symbol.name()
                                 );
@@ -825,7 +825,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 let id = self.allocate_variable_id();
                                 self.promoted_locations.insert(symbol.name(), id);
 
-                                log::trace!(
+                                log::debug!(
                                     "variable {:?} promoted to stack @ {id:#x}",
                                     symbol.name()
                                 );
@@ -878,15 +878,22 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
                         let offset = usize::try_from(offset).unwrap();
-                        let value = match typ.width() {
-                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset)),
-                            9..=16 => u64::from(self.register_file.read_raw::<u16>(offset)),
-                            17..=32 => u64::from(self.register_file.read_raw::<u32>(offset)),
-                            33..=64 => u64::from(self.register_file.read_raw::<u64>(offset)),
-                            w => todo!("width {w}"),
+
+                        let value = if let Some(value) = self.cached_registers.get(&offset) {
+                            value.clone()
+                        } else {
+                            let value = match typ.width() {
+                                1..=8 => u64::from(self.register_file.read_raw::<u8>(offset)),
+                                9..=16 => u64::from(self.register_file.read_raw::<u16>(offset)),
+                                17..=32 => u64::from(self.register_file.read_raw::<u32>(offset)),
+                                33..=64 => u64::from(self.register_file.read_raw::<u64>(offset)),
+                                w => todo!("width {w}"),
+                            };
+                            self.emitter.constant(value, typ)
                         };
-                        log::trace!("read from cacheable {name:?}: {value:x}");
-                        StatementResult::Data(Some(self.emitter.constant(value, typ)))
+
+                        log::trace!("read from cacheable {name:?}: {value:x?}");
+                        StatementResult::Data(Some(value))
                     }
                     RegisterCacheType::None => {
                         StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
@@ -930,7 +937,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         panic!("cannot write to constant register {name:?}")
                     }
                     RegisterCacheType::ReadWrite => {
-                        log::trace!("attempting write to cacheable {name:?}: {value:?}");
+                        log::trace!("attempting write to r/w cacheable {name:?}: {value:?}");
                         if let NodeKind::Constant { value, width } = value.kind() {
                             match width {
                                 1..=8 => self.register_file.write::<u8>(name, (*value) as u8),
@@ -945,11 +952,20 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                             StatementResult::Data(None)
                         } else {
                             panic!(
-                                "attempting to write non-constant value to cacheable register {name:?}"
+                                "attempting to write non-constant value to r/w cacheable register {name:?}"
                             );
                         }
                     }
-                    RegisterCacheType::None | RegisterCacheType::Read => {
+                    RegisterCacheType::Read => {
+                        // otherwise emit a write register that will mutate the register file during
+                        // execution
+                        self.cached_registers
+                            .insert(usize::try_from(offset).unwrap(), value.clone());
+
+                        self.emitter.write_register(offset, value);
+                        StatementResult::Data(None)
+                    }
+                    RegisterCacheType::None => {
                         // otherwise emit a write register that will mutate the register file during
                         // execution
                         self.emitter.write_register(offset, value);

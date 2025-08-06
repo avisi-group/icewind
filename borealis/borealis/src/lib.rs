@@ -187,15 +187,13 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     {
         let func = rudder
             .functions()
-            .get(&InternedString::from_static(
-                "decode_hint_aarch64_instrs_system_hints",
-            ))
+            .get(&InternedString::from_static("AArch64_TakeException"))
             .unwrap();
         rudder::dot::render(
             &mut create_file_buffered(
                 dump_ir
                     .unwrap()
-                    .join("decode_hint_aarch64_instrs_system_hints.rudder.opt.dot"),
+                    .join("AArch64_TakeException.rudder.opt.dot"),
             )
             .unwrap(),
             func.arena(),
