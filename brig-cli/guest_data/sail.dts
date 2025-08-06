@@ -15,7 +15,7 @@
 	#size-cells = <2>;
 
 	chosen {
-	       bootargs = "earlycon=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug keep_bootcon nohlt root=/dev/vda";
+	       bootargs = "earlycon=pl011,0x3c000000 console=tty0 loglevel=9 debug acpi=off sched_debug keep_bootcon nohlt root=/dev/vda";
 	};
 
 	cpus {
