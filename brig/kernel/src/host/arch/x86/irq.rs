@@ -13,6 +13,7 @@ use {
             dbt::models::ModelDevice,
         },
         qemu_exit,
+        util::get_current_device,
     },
     alloc::alloc::alloc_zeroed,
     bitset_core::BitSet,
@@ -174,16 +175,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
-        let device = ((&**unsafe {
-            crate::guest::GUEST
-                .get()
-                .unwrap()
-                .devices
-                .get(&("core0".into()))
-                .unwrap()
-        }) as &dyn Any)
-            .downcast_ref::<ModelDevice>()
-            .unwrap();
+        let device = get_current_device();
 
         let pc = device.register_file.read::<u64>("_PC");
         log::debug!("PC = {pc:016x}");

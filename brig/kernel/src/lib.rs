@@ -29,6 +29,7 @@ use {
         },
         logger::WRITER,
         models::ModelDevice,
+        util::get_current_device,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     core::{any::Any, panic::PanicInfo},
@@ -139,19 +140,10 @@ fn panic(info: &PanicInfo) -> ! {
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
-    let device = ((&**unsafe {
-        crate::guest::GUEST
-            .get()
-            .unwrap()
-            .devices
-            .get(&("core0".into()))
-            .unwrap()
-    }) as &dyn Any)
-        .downcast_ref::<ModelDevice>()
-        .unwrap();
-
-    let pc = device.register_file.read::<u64>("_PC");
-    log::error!("Guest PC = {pc:#016x}");
+    log::error!(
+        "Guest PC = {:#016x}",
+        get_current_device().register_file.read::<u64>("_PC")
+    );
 
     log::error!(
         "Opcode = {:#x}",

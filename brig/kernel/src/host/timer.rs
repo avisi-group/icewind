@@ -1,8 +1,11 @@
 use {
     crate::{
-        host::{arch::x86::irq::assign_irq, objects::tickable::Tickable},
+        host::{
+            arch::x86::irq::assign_irq, dbt::models::CURRENT_OPCODE, objects::tickable::Tickable,
+        },
         println,
         scheduler::{self, TIMER_FREQUENCY},
+        util::get_current_device,
     },
     alloc::{sync::Arc, vec::Vec},
     core::sync::atomic::{AtomicU64, Ordering},
@@ -51,7 +54,15 @@ fn timer_interrupt() {
     let current_time = GLOBAL_CLOCK.now(); // TODO: compute this period from timer interrupt frequency
 
     if current_time > Nanoseconds::new(90_000_000_000u64) {
-        panic!()
+        log::error!(
+            "{:#016x} ({:08x})",
+            get_current_device().register_file.read::<u64>("_PC"),
+            CURRENT_OPCODE.load(Ordering::Relaxed),
+        );
+    }
+
+    if current_time > Nanoseconds::new(100_000_000_000u64) {
+        panic!();
     }
 
     handle_tickables(current_time);

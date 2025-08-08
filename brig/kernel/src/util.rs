@@ -1,4 +1,6 @@
-use core::num::ParseIntError;
+use core::{any::Any, num::ParseIntError};
+
+use crate::host::dbt::models::ModelDevice;
 
 /// Parses `0x`-prefixed, underscore separated hexadecimal values (like a memory
 /// address)
@@ -21,4 +23,18 @@ pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe {
         core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
     }
+}
+
+/// Super hacky way of getting the currently executing `ModelDevice`
+pub fn get_current_device() -> &'static ModelDevice {
+    ((&**unsafe {
+        crate::guest::GUEST
+            .get()
+            .unwrap()
+            .devices
+            .get(&("core0".into()))
+            .unwrap()
+    }) as &dyn Any)
+        .downcast_ref::<ModelDevice>()
+        .unwrap()
 }

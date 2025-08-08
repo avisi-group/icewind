@@ -5434,3 +5434,45 @@ fn svc() {
 
     translation.execute(&register_file);
 }
+
+#[ktest]
+fn stp_stuck_loop() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // a902de74        stp     x20, x23, [x19, #40]
+
+    let opcode = emitter.constant(0xa902de74, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+    //__DecodeA64_LoadStore
+    // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
+    // execute_aarch64_instrs_memory_pair_general_post_idx
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let dst = Box::<(u64, u64)>::new((0, 0));
+
+    register_file.write("SEE", -1i64);
+    register_file.write("R20", 0xFEEDu64);
+    register_file.write("R23", 0xDEADu64);
+    register_file.write("R19", (((&*dst) as *const (u64, u64)) as u64) - 40);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
