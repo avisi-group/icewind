@@ -26,11 +26,7 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
 
     if let Some(terminator) = b.get(arena).terminator_statement() {
         match terminator.get(b.get(arena).arena()) {
-            common::rudder::statement::Statement::Branch {
-                condition,
-                true_target,
-                false_target,
-            } => {
+            common::rudder::statement::Statement::Branch { .. } => {
                 // Check target block
             }
 

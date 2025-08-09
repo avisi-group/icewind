@@ -3,7 +3,6 @@ use {
     alloc::alloc::{Global, alloc_zeroed},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
-    byte_unit::{Byte, UnitType},
     core::{
         alloc::{AllocError, Allocator, Layout},
         ops::{Deref, Range},

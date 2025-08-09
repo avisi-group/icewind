@@ -2,7 +2,7 @@ use {
     crate::rudder::{analysis::dfa::StatementUseAnalysis, opt::OptimizationContext},
     common::{
         arena::{Arena, Ref},
-        rudder::{block::Block, function::Function, statement::Statement},
+        rudder::{block::Block, function::Function},
     },
 };
 
@@ -17,9 +17,9 @@ pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
 }
 
 fn run_on_block(ctx: &OptimizationContext, arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
-    let mut changed = false;
+    let mut _changed = false;
 
-    let mut sua = StatementUseAnalysis::new(arena, b, &ctx.purity);
+    let mut _sua = StatementUseAnalysis::new(arena, b, &ctx.purity);
 
     // for stmt in b
     //     .get(sua.block_arena())
@@ -53,5 +53,5 @@ fn run_on_block(ctx: &OptimizationContext, arena: &mut Arena<Block>, b: Ref<Bloc
     //     }
     // }
 
-    changed
+    _changed
 }

@@ -1,16 +1,13 @@
 use {
     crate::{
         guest::memory::AddressSpaceRegionKind,
-        host::{
-            arch::x86::{
-                MachineContext,
-                aarch64_mmu::{TranslationType, guest_translate},
-                dbg,
-                memory::{
-                    GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
-                },
+        host::arch::x86::{
+            MachineContext,
+            aarch64_mmu::{TranslationType, guest_translate},
+            dbg,
+            memory::{
+                GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
             },
-            dbt::models::ModelDevice,
         },
         qemu_exit,
         util::get_current_device,
@@ -18,7 +15,7 @@ use {
     alloc::alloc::alloc_zeroed,
     bitset_core::BitSet,
     common::intern::InternedString,
-    core::{alloc::Layout, any::Any},
+    core::alloc::Layout,
     iced_x86::{Code, OpKind, Register},
     proc_macro_lib::irq_handler,
     spin::Once,

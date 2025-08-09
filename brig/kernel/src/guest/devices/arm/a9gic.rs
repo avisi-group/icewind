@@ -305,7 +305,7 @@ impl GlobalInterruptController {
         // if (irqid >= _gic._irq_lines.size()) {
         //  return;
         // }
-        if (irqid >= self.lines.len()) {
+        if irqid >= self.lines.len() {
             log::debug!("invalid line");
             log::debug!("--- CPU EOI DONE ---");
             return;
@@ -315,7 +315,7 @@ impl GlobalInterruptController {
         // 	return;
         // }
         let current_running_idx = self.cpu_irq_line_running.load(Ordering::Relaxed);
-        if (current_running_idx == NO_LINE) {
+        if current_running_idx == NO_LINE {
             log::debug!("nothing running");
             log::debug!("--- CPU EOI DONE ---");
             return;
@@ -346,8 +346,8 @@ impl GlobalInterruptController {
             // 		last = last->_last_active;
             // }
 
-            while (last_idx != NO_LINE) {
-                if (last_idx == irqid) {
+            while last_idx != NO_LINE {
+                if last_idx == irqid {
                     log::debug!("found ourselves - removing from chain");
 
                     self.lines[last_idx]

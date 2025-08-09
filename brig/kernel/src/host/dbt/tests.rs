@@ -319,7 +319,6 @@ fn decodea64_addsub() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
     translate(
         Global,
@@ -359,10 +358,6 @@ fn decodea64_addsub_interpret() {
     register_file.write::<u64>("R1", 5);
     register_file.write::<u64>("R2", 10);
 
-    let pc = crate::host::dbt::interpret::Value::UnsignedInteger {
-        value: 0,
-        width: 64,
-    };
     let opcode = crate::host::dbt::interpret::Value::UnsignedInteger {
         value: 0x8b020020,
         width: 32,
@@ -384,7 +379,6 @@ fn decodea64_mov() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //   aa0103e0        mov     x0, x1
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
     translate(
         Global,
@@ -461,7 +455,6 @@ fn branch_if_eq() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
     translate(
         Global,
@@ -606,7 +599,6 @@ fn cmp_csel() {
         emitter.write_register(model.reg_offset("SEE"), see_value);
 
         // cmp     x2, x0
-        let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
         translate(
             Global,
@@ -622,7 +614,7 @@ fn cmp_csel() {
         emitter.write_register(model.reg_offset("SEE"), see_value);
 
         // csel    x2, x2, x0, ls  // ls = plast
-        let pc = emitter.constant(0, Type::Unsigned(64));
+
         let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
         translate(
             Global,
@@ -695,7 +687,6 @@ fn fibonacci_instr() {
 
         {
             let opcode = emitter.constant(program[pc as usize / 4], Type::Unsigned(32));
-            let pc = emitter.constant(pc, Type::Unsigned(64));
             translate(
                 Global,
                 &*model,
@@ -739,7 +730,7 @@ fn mem() {
     register_file.write("SEE", -1i64);
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
         Global,
@@ -778,7 +769,6 @@ fn mem_store() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
         Global,
@@ -817,7 +807,7 @@ fn mem_load() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
     translate(
         Global,
@@ -901,7 +891,6 @@ fn fibonacci_block() {
 
             {
                 let opcode = emitter.constant(program[current_pc as usize / 4], Type::Unsigned(32));
-                let pc = emitter.constant(current_pc, Type::Unsigned(64));
                 let _return_value = translate(
                     Global,
                     &*model,
@@ -1449,10 +1438,6 @@ fn rbitx0_interpret() {
     register_file.write("SEE", -1i64);
 
     // rbit x0
-    let pc = Value::UnsignedInteger {
-        value: 0,
-        width: 64,
-    };
     let opcode = Value::UnsignedInteger {
         value: 0xdac00000,
         width: 32,
@@ -1473,7 +1458,7 @@ fn rbitx0() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // rbit x0
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
     translate(
         Global,
@@ -1557,7 +1542,7 @@ fn ubfx() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // ubfx x3, x3, #16, #4
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd3504c63, Type::Unsigned(32));
     translate(
         Global,
@@ -2104,7 +2089,6 @@ fn udiv() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
     translate(
         Global,
@@ -2257,7 +2241,7 @@ fn msr() {
     register_file.write("SEE", -1i64);
 
     //  d51be000        msr     cntfrq_el0, x0
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
     translate(
         Global,
@@ -2429,7 +2413,7 @@ fn sub_pc() {
     register_file.write("SEE", -1i64);
 
     //  d10043ff    sub                sp, sp, #0x10
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd10043ff, Type::Unsigned(32));
     translate(
         Global,
@@ -2465,7 +2449,7 @@ fn lsrv() {
     register_file.write("SEE", -1i64);
 
     //  lsrv              x0, x1, x0
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x9ac02420, Type::Unsigned(32));
     translate(
         Global,
@@ -2502,7 +2486,7 @@ fn mem_load_immediate() {
     register_file.write("SEE", -1i64);
 
     //  ldr                w0, 0xdc
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x180006e0, Type::Unsigned(32));
     translate(
         Global,
@@ -2541,7 +2525,7 @@ fn eret() {
     register_file.write("SEE", -1i64);
 
     //  eret
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
     translate(
         Global,
@@ -2585,7 +2569,7 @@ fn clz() {
     register_file.write("SEE", -1i64);
 
     //clz               x9, x9
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xdac01129, Type::Unsigned(32));
     translate(
         Global,
@@ -2972,7 +2956,7 @@ fn sys_movzx_investigation() {
 
     //  sys               #3, c7, c4, #1, x8
     // (dc      zva, x8)
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd50b7428, Type::Unsigned(32));
     translate(
         Global,
@@ -3087,7 +3071,7 @@ fn msr_ttbr() {
     register_file.write("SEE", -1i64);
 
     //  msr               ttbr1_el1, x1
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd5182021, Type::Unsigned(32));
     translate(
         Global,
@@ -3126,7 +3110,7 @@ fn branch_link_pc_flag() {
     register_file.write("SEE", -1i64);
 
     //  bl         0x1134
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x9400044d, Type::Unsigned(32));
     translate(
         Global,
@@ -3156,7 +3140,7 @@ fn mrs_mpidr_el1() {
     register_file.write("SEE", -1i64);
 
     // mrs     x5, mpidr_el1
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd53800a5, Type::Unsigned(32));
     translate(
         Global,
@@ -3190,7 +3174,7 @@ fn mov_300000() {
     register_file.write("SEE", -1i64);
 
     //  mov     x4, #0x300000
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd2a00604, Type::Unsigned(32));
     translate(
         Global,
@@ -3224,7 +3208,7 @@ fn mrs_ctr_el0() {
     register_file.write("SEE", -1i64);
 
     //          mrs     x3, ctr_el0
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd53b0023, Type::Unsigned(32));
     translate(
         Global,
@@ -3263,7 +3247,7 @@ fn mrs_id_aa64dfr0_el1() {
     register_file.write("SEE", -1i64);
 
     // mrs               x1, id_aa64dfr0_el1
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
     translate(
         Global,
@@ -3318,7 +3302,7 @@ fn mrs_id_aa64dfr0_el1() {
 //     }
 
 //     // mrs               x1, id_aa64pfr0_el1
-//     let pc = emitter.constant(0, Type::Unsigned(64));
+//
 //     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
 //     translate(Global,
 //         &*model,
@@ -3354,7 +3338,7 @@ fn ldaxr() {
     register_file.write("SEE", -1i64);
 
     // ldaxr            x3, [x0]
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xc85ffc03, Type::Unsigned(32));
     translate(
         Global,
@@ -3385,7 +3369,6 @@ fn _slow_benchmark() {
 
     let start = GLOBAL_CLOCK.now();
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
         Global,
@@ -3426,7 +3409,6 @@ fn slow_msr_2() {
 
     register_file.write("SEE", -1i64);
 
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5181000, Type::Unsigned(32));
     translate(
         Global,
@@ -3456,7 +3438,7 @@ fn csinc() {
     register_file.write("SEE", -1i64);
 
     // csinc		w3, wzr, wzr, ne
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x1a9f17e3, Type::Unsigned(32));
     translate(
         Global,
@@ -3492,7 +3474,7 @@ fn ldrh() {
     register_file.write("SEE", -1i64);
 
     //   78635823        ldrh    w3, [x1, w3, uxtw #1]
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x78635823, Type::Unsigned(32));
     translate(
         Global,
@@ -3535,7 +3517,7 @@ fn csneg() {
     register_file.write("SEE", -1i64);
 
     //  5a8307e3        csneg   w3, wzr, w3, eq // eq = none
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0x5a8307e3, Type::Unsigned(32));
     translate(
         Global,
@@ -3615,7 +3597,7 @@ fn mem_load_32_bit() {
     register_file.write("SEE", -1i64);
 
     //  ldr		w0, [x0]
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xb9400000, Type::Unsigned(32));
     translate(
         Global,
@@ -3653,7 +3635,7 @@ fn ccmp() {
     register_file.write("SEE", -1i64);
 
     //  ccmp x5, #0x0, #0x0, eq
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xfa4008a0, Type::Unsigned(32));
     translate(
         Global,
@@ -3695,7 +3677,7 @@ fn msr_elr_el2() {
 
     register_file.write("SEE", -1i64);
     // msr		elr_el2, x4
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd51c4024, Type::Unsigned(32));
     translate(
         Global,
@@ -3735,7 +3717,7 @@ fn eret_3() {
     register_file.write("SEE", -1i64);
 
     //  eret
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
     translate(
         Global,
@@ -4105,7 +4087,7 @@ fn _brk() {
     register_file.write("SEE", -1i64);
 
     // brk              #0x800
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd4210000, Type::Unsigned(32));
     translate(
         Global,
@@ -4138,7 +4120,7 @@ fn lsr() {
     register_file.write("SEE", -1i64);
 
     //   d360fd08        lsr     x8, x8, #32
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xd360fd08, Type::Unsigned(32));
     translate(
         Global,
@@ -4597,7 +4579,7 @@ fn cond_branch() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+    let _translation = ctx.compile(num_regs);
 
     //panic!("sausage");
 }
@@ -4656,7 +4638,7 @@ fn empty() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+    let _translation = ctx.compile(num_regs);
 }
 
 #[ktest]
@@ -4761,7 +4743,7 @@ fn sbfm() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+    let _translation = ctx.compile(num_regs);
 
     let dst = Box::<(u64, u64)>::new((0, 0));
 

@@ -138,16 +138,4 @@ fn write_callback(source: &[u8], sector: usize) {
 
     let offset = (sector * 512) / blk.block_size();
     blk.write(source, offset).unwrap();
-
-    let beep = Beep::new(write_callback);
-}
-
-struct Beep<F> {
-    f: F,
-}
-
-impl<F: Fn(&[u8], usize) + Copy> Beep<F> {
-    fn new(f: F) -> Self {
-        Self { f }
-    }
 }
