@@ -1,32 +1,21 @@
 use {
     crate::{
         guest::devices::virtio::{
-            devices::{Irq, Virtio},
+            devices::Irq,
             queue::defs::{BlkReq, BlkReqType},
         },
-        host::{
-            arch::x86::memory::{VirtAddrExt as _, VirtualMemoryArea, guest_physical_to_host_virt},
-            devices::manager::SharedDeviceManager,
-            objects::irq::IrqController,
+        host::arch::x86::memory::{
+            VirtAddrExt as _, VirtualMemoryArea, guest_physical_to_host_virt,
         },
     },
     alloc::{alloc::alloc_zeroed, vec::Vec},
-    core::{
-        alloc::Layout,
-        ptr::slice_from_raw_parts_mut,
-        slice,
-        sync::atomic::{AtomicBool, AtomicU32},
-    },
-    spin::Mutex,
-    virtio_bindings::virtio_scsi::__u32,
+    core::{alloc::Layout, sync::atomic::AtomicU32},
     x86::fence,
     x86_64::{
         VirtAddr,
         structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate as _},
     },
 };
-
-const DESTINATION_DEVICE_BLOCK_SIZE: usize = 4096;
 
 mod defs;
 //mod descriptor;
@@ -74,7 +63,6 @@ struct VirtRingUsedHeader {
 
 #[derive(Debug)]
 pub struct VirtQueue {
-    index: usize,
     ready: bool,
     queue_num: usize,
     descriptor_gpa: u64,
@@ -84,13 +72,13 @@ pub struct VirtQueue {
     available_hva: u64,
     used_hva: u64,
     prev_idx: u16,
-    lock: Mutex<()>,
+    read_callback: fn(&mut [u8], usize),
+    write_callback: fn(&[u8], usize),
 }
 
 impl VirtQueue {
-    pub fn new(index: usize) -> Self {
+    pub fn new(read_callback: fn(&mut [u8], usize), write_callback: fn(&[u8], usize)) -> Self {
         Self {
-            index,
             ready: false,
             queue_num: 0,
             descriptor_gpa: 0,
@@ -100,7 +88,8 @@ impl VirtQueue {
             available_hva: 0,
             used_hva: 0,
             prev_idx: 0,
-            lock: Mutex::new(()),
+            read_callback,
+            write_callback,
         }
     }
 
@@ -120,10 +109,6 @@ impl VirtQueue {
 
     pub fn set_num(&mut self, num: usize) {
         self.queue_num = num;
-    }
-
-    pub fn num(&self) -> usize {
-        self.queue_num
     }
 
     fn update_host_addresses(&mut self) {
@@ -312,7 +297,6 @@ impl VirtQueue {
 }
 
 struct VirtQueueEvent {
-    complete: AtomicBool,
     read_buffers: Vec<VirtQueueEventBuffer>,
     write_buffers: Vec<VirtQueueEventBuffer>,
     response_size: u32,
@@ -322,7 +306,6 @@ struct VirtQueueEvent {
 impl VirtQueueEvent {
     fn new(descriptor_index: usize) -> Self {
         Self {
-            complete: AtomicBool::new(false),
             read_buffers: Vec::new(),
             write_buffers: Vec::new(),
             response_size: 0,
@@ -338,7 +321,7 @@ impl VirtQueueEvent {
             return;
         };
 
-        // Tom had this as >= but I think it's always =
+        // Tom had this as >= but I think it's always ==
         assert_eq!(usize::try_from(first.size).unwrap(), size_of::<BlkReq>());
 
         let req = unsafe { &*(first.data as *const BlkReq) };
@@ -367,12 +350,6 @@ impl VirtQueueEvent {
 
         allocate_physical(self.write_buffers[0].data);
 
-        let dev = SharedDeviceManager::get()
-            .get_device_by_alias("disk00:04.0")
-            .unwrap();
-        let mut dev = dev.lock();
-        let blk = dev.as_block();
-
         let destination = unsafe {
             core::slice::from_raw_parts_mut(
                 self.write_buffers[0].data,
@@ -380,10 +357,7 @@ impl VirtQueueEvent {
             )
         };
 
-        log::debug!("reading {} bytes @ {sector:x}", destination.len());
-
-        let offset = (usize::try_from(sector).unwrap() * 512) / blk.block_size();
-        blk.read(destination, offset).unwrap();
+        (queue.read_callback)(destination, usize::try_from(sector).unwrap());
 
         // callback logic just inlined here
         unsafe { self.write_buffers[1].data.write(0x00) }; // success
@@ -417,12 +391,6 @@ impl VirtQueueEvent {
         // offset=" << rq->block_offset << ", count=" << rq->block_count << ",
         // buffer=" << std::hex << (uint64_t)rq->buffer;
 
-        let dev = SharedDeviceManager::get()
-            .get_device_by_alias("disk00:04.0")
-            .unwrap();
-        let mut dev = dev.lock();
-        let blk = dev.as_block();
-
         let source = unsafe {
             core::slice::from_raw_parts(
                 self.read_buffers[1].data,
@@ -430,10 +398,7 @@ impl VirtQueueEvent {
             )
         };
 
-        log::debug!("writing {} bytes @ {sector:x}", source.len());
-
-        let offset = (usize::try_from(sector).unwrap() * 512) / blk.block_size();
-        blk.write(source, offset).unwrap();
+        (queue.write_callback)(source, usize::try_from(sector).unwrap());
 
         // 	if (!_bdev.submit_request(rq, write_event_callback)) {
         // 		*(uint8_t *)evt->write_buffers.back().data = 1;
@@ -467,15 +432,6 @@ impl VirtQueueEvent {
 struct VirtQueueEventBuffer {
     data: *mut u8,
     size: u32,
-}
-
-#[derive(Default, Debug, Clone, Copy)]
-struct BlockDeviceRequest {
-    block_offset: u64,
-    block_count: u32,
-    buffer: *mut u8,
-    is_read: bool,
-    opaque: *mut (),
 }
 
 /// If the supplied pointer does not have a physical mapping, allocate a new

@@ -1,9 +1,12 @@
 use {
     crate::{
         guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
-        host::objects::{
-            Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
-            device::{Device, MemoryMappedDevice},
+        host::{
+            devices::manager::SharedDeviceManager,
+            objects::{
+                Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
+                device::{Device, MemoryMappedDevice},
+            },
         },
         util::any_as_u8_slice,
     },
@@ -42,7 +45,14 @@ impl VirtioBlock {
 
         let mut celf = Self {
             id: ObjectId::new(),
-            virtio: Mutex::new(Virtio::new(1, VIRTIO_DEV_BLK, irq_line, controller)),
+            virtio: Mutex::new(Virtio::new(
+                1,
+                VIRTIO_DEV_BLK,
+                irq_line,
+                controller,
+                read_callback,
+                write_callback,
+            )),
             config: virtio_blk_config::default(),
         };
 
@@ -101,5 +111,43 @@ impl MemoryMappedDevice for VirtioBlock {
         let register = WriteRegister::from_offset(offset);
         let value = u32::from_le_bytes(value.try_into().unwrap());
         self.virtio.lock().write_register(register, value);
+    }
+}
+
+fn read_callback(dest: &mut [u8], sector: usize) {
+    let dev = SharedDeviceManager::get()
+        .get_device_by_alias("disk00:04.0")
+        .unwrap();
+    let mut dev = dev.lock();
+    let blk = dev.as_block();
+
+    log::debug!("reading {} bytes @ {sector:x}", dest.len());
+
+    let offset = (sector * 512) / blk.block_size();
+    blk.read(dest, offset).unwrap();
+}
+
+fn write_callback(source: &[u8], sector: usize) {
+    let dev = SharedDeviceManager::get()
+        .get_device_by_alias("disk00:04.0")
+        .unwrap();
+    let mut dev = dev.lock();
+    let blk = dev.as_block();
+
+    log::debug!("writing {} bytes @ {sector:x}", source.len());
+
+    let offset = (sector * 512) / blk.block_size();
+    blk.write(source, offset).unwrap();
+
+    let beep = Beep::new(write_callback);
+}
+
+struct Beep<F> {
+    f: F,
+}
+
+impl<F: Fn(&[u8], usize) + Copy> Beep<F> {
+    fn new(f: F) -> Self {
+        Self { f }
     }
 }

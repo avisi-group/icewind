@@ -138,7 +138,9 @@ impl Virtio {
         device_id: u16,
         irq_line: usize,
         irq_controller: Arc<dyn IrqController>,
-    ) -> Self {
+        read_callback: fn(&mut [u8], usize),
+        write_callback: fn(&[u8], usize),
+    ) -> Virtio {
         assert!(num_queues > 0);
         Self {
             device_id,
@@ -148,7 +150,7 @@ impl Virtio {
             status: Status::new(),
             queues: (0..num_queues)
                 .into_iter()
-                .map(|i| VirtQueue::new(i))
+                .map(|_| VirtQueue::new(read_callback, write_callback))
                 .collect(),
             queue_select: 0,
             driver_features_select: 0,
