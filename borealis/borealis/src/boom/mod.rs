@@ -6,18 +6,16 @@
 use {
     crate::boom::{
         control_flow::ControlFlowBlock,
-        convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
     common::{hashmap::HashMap, intern::InternedString},
     kinded::Kinded,
     num_bigint::BigInt,
-    sailrs::{jib_ast, shared::Shared},
+    sailrs::shared::Shared,
     std::{fmt::Debug, ops::Add},
 };
 
 pub mod control_flow;
-pub mod convert;
 pub mod passes;
 pub mod pretty_print;
 pub mod visitor;
@@ -35,96 +33,6 @@ pub struct Ast {
     pub structs: HashMap<InternedString, Vec<NamedType>>,
     pub unions: HashMap<InternedString, Vec<NamedType>>,
     pub pragmas: HashMap<InternedString, InternedString>,
-}
-
-impl Ast {
-    /// Converts JIB AST into BOOM AST
-    pub fn from_jib<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Shared<Self> {
-        let mut emitter = BoomEmitter::new();
-        emitter.process(iter);
-
-        let mut ast = emitter.finish();
-
-        {
-            ast.registers
-                .insert("have_exception".into(), Shared::new(Type::Bool));
-            ast.registers.insert(
-                "current_exception".into(),
-                Shared::new(Type::Union {
-                    name: InternedString::from_static("exception"),
-                    fields: ast
-                        .unions
-                        .get(&InternedString::from_static("exception"))
-                        .unwrap()
-                        .clone(),
-                }),
-            );
-            ast.registers
-                .insert("throw".into(), Shared::new(Type::String));
-        }
-
-        {
-            let return_type = Shared::new(Type::Struct {
-                name: "tuple#%bv_%bv4".into(),
-                fields: ast
-                    .structs
-                    .get(&InternedString::from("tuple#%bv_%bv4"))
-                    .unwrap()
-                    .clone(),
-            });
-            let entry_block = ControlFlowBlock::new();
-            entry_block.set_statements(vec![
-                Shared::new(Statement::VariableDeclaration {
-                    name: "return".into(),
-                    typ: return_type.clone(),
-                }),
-                Shared::new(Statement::FunctionCall {
-                    expression: Some(Expression::Identifier("return".into())),
-                    name: "AddWithCarry".into(),
-                    arguments: vec![
-                        Shared::new(Value::Identifier("x".into())),
-                        Shared::new(Value::Identifier("y".into())),
-                        Shared::new(Value::Identifier("carry_in".into())),
-                    ],
-                }),
-            ]);
-            entry_block.set_terminator(control_flow::Terminator::Return(Some(Value::Identifier(
-                "return".into(),
-            ))));
-            ast.functions.insert(
-                "add_with_carry_test".into(),
-                FunctionDefinition {
-                    signature: FunctionSignature {
-                        name: "add_with_carry_test".into(),
-                        parameters: Shared::new(vec![
-                            Parameter {
-                                name: "x".into(),
-                                typ: Shared::new(Type::Bits {
-                                    size: Size::Static(64),
-                                }),
-                            },
-                            Parameter {
-                                name: "y".into(),
-                                typ: Shared::new(Type::Bits {
-                                    size: Size::Static(64),
-                                }),
-                            },
-                            Parameter {
-                                name: "carry_in".into(),
-                                typ: Shared::new(Type::Bits {
-                                    size: Size::Static(1),
-                                }),
-                            },
-                        ]),
-                        return_type: Some(return_type),
-                    },
-                    entry_block,
-                },
-            );
-        }
-
-        Shared::new(ast)
-    }
 }
 
 /// Top-level definition of a BOOM item

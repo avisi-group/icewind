@@ -13,7 +13,7 @@ use {
         Literal, Statement, Value,
         visitor::{Visitor, Walkable},
     },
-    common::{id::Id, intern::InternedString, hashmap::HashSet},
+    common::{hashmap::HashSet, id::Id, intern::InternedString},
     itertools::Itertools,
     sailrs::shared::{Shared, Weak},
     std::{
@@ -23,7 +23,6 @@ use {
     },
 };
 
-pub mod builder;
 pub mod dot;
 pub mod util;
 

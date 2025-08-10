@@ -1,7 +1,7 @@
 use {
     borealis::{
         boom::{
-            self, Ast,
+            self,
             passes::{
                 builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
                 cycle_finder::CycleFinder, destruct_composites::DestructComposites,
@@ -10,9 +10,14 @@ use {
                 remove_units::RemoveUnits,
             },
         },
-        example_fns::{example_functions, variable_corrupted_example},
-        fn_is_allowlisted, jib_wip_filter, load_model,
-        rudder::{self, opt::OptLevel, validator},
+        fn_is_allowlisted,
+        jib_legacy::{self, load_model},
+        rudder::{
+            self,
+            example_fns::{example_functions, variable_corrupted_example},
+            opt::OptLevel,
+            validator,
+        },
     },
     clap::Parser,
     color_eyre::eyre::Result,
@@ -69,7 +74,7 @@ fn main() -> Result<()> {
     }
 
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(jib_wip_filter(jib_ast));
+    let ast = jib_legacy::convert::jib_to_boom(jib_legacy::jib_wip_filter(jib_ast));
 
     // // useful for debugging
     if let Some(path) = &args.dump_ir {

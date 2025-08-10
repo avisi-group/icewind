@@ -1,10 +1,13 @@
 //! JIB to BOOM conversion
 
 use {
-    crate::boom::{
-        self, Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
-        control_flow::{ControlFlowBlock, builder::ControlFlowGraphBuilder},
-        convert::sail_ast::Identifier,
+    crate::{
+        boom::{
+            self, Bit, Expression, FunctionDefinition, FunctionSignature, NamedType, Parameter,
+            Size, Statement, Type, Value,
+            control_flow::{ControlFlowBlock, Terminator},
+        },
+        jib_legacy::{control_flow::ControlFlowGraphBuilder, convert::sail_ast::Identifier},
     },
     common::{hashmap::HashMap, intern::InternedString},
     itertools::Itertools,
@@ -18,6 +21,92 @@ use {
 
 type Parameters = Vec<Shared<boom::Type>>;
 type Return = Shared<boom::Type>;
+
+/// Converts JIB AST into BOOM AST
+pub fn jib_to_boom<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Shared<boom::Ast> {
+    let mut emitter = BoomEmitter::new();
+    emitter.process(iter);
+
+    let mut ast = emitter.finish();
+
+    {
+        ast.registers
+            .insert("have_exception".into(), Shared::new(Type::Bool));
+        ast.registers.insert(
+            "current_exception".into(),
+            Shared::new(Type::Union {
+                name: InternedString::from_static("exception"),
+                fields: ast
+                    .unions
+                    .get(&InternedString::from_static("exception"))
+                    .unwrap()
+                    .clone(),
+            }),
+        );
+        ast.registers
+            .insert("throw".into(), Shared::new(Type::String));
+    }
+
+    {
+        let return_type = Shared::new(Type::Struct {
+            name: "tuple#%bv_%bv4".into(),
+            fields: ast
+                .structs
+                .get(&InternedString::from("tuple#%bv_%bv4"))
+                .unwrap()
+                .clone(),
+        });
+        let entry_block = ControlFlowBlock::new();
+        entry_block.set_statements(vec![
+            Shared::new(Statement::VariableDeclaration {
+                name: "return".into(),
+                typ: return_type.clone(),
+            }),
+            Shared::new(Statement::FunctionCall {
+                expression: Some(Expression::Identifier("return".into())),
+                name: "AddWithCarry".into(),
+                arguments: vec![
+                    Shared::new(Value::Identifier("x".into())),
+                    Shared::new(Value::Identifier("y".into())),
+                    Shared::new(Value::Identifier("carry_in".into())),
+                ],
+            }),
+        ]);
+        entry_block.set_terminator(Terminator::Return(Some(Value::Identifier("return".into()))));
+        ast.functions.insert(
+            "add_with_carry_test".into(),
+            FunctionDefinition {
+                signature: FunctionSignature {
+                    name: "add_with_carry_test".into(),
+                    parameters: Shared::new(vec![
+                        Parameter {
+                            name: "x".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(64),
+                            }),
+                        },
+                        Parameter {
+                            name: "y".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(64),
+                            }),
+                        },
+                        Parameter {
+                            name: "carry_in".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(1),
+                            }),
+                        },
+                    ]),
+                    return_type: Some(return_type),
+                },
+                entry_block,
+            },
+        );
+    }
+
+    Shared::new(ast)
+}
 
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
