@@ -44,7 +44,7 @@ pub fn jib_to_boom<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Shar
             }),
         );
         ast.registers
-            .insert("throw".into(), Shared::new(Type::String));
+            .insert("throw_location".into(), Shared::new(Type::String));
     }
 
     {
@@ -428,7 +428,7 @@ fn convert_name(name: &jib_ast::Name) -> InternedString {
         jib_ast::Name::Name(ident, _) => ident.as_interned(),
         jib_ast::Name::HaveException(_) => InternedString::from_static("have_exception"),
         jib_ast::Name::CurrentException(_) => InternedString::from_static("current_exception"),
-        jib_ast::Name::ThrowLocation(_) => InternedString::from_static("throw"),
+        jib_ast::Name::ThrowLocation(_) => InternedString::from_static("throw_location"),
         jib_ast::Name::Return(_) => InternedString::from_static("return"),
         jib_ast::Name::Channel(_, _) => InternedString::from_static("channel"),
     }

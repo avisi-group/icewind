@@ -2,8 +2,8 @@
 
 use {
     crate::boom::{
-        self, Bit, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
-        Parameter, Size, Statement, Type, Value,
+        self, Expression, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size,
+        Statement, Type, Value,
         control_flow::{ControlFlowBlock, Terminator},
     },
     common::{hashmap::HashMap, intern::InternedString},
@@ -11,10 +11,9 @@ use {
         bitvector::{BV, b64::B64},
         ir::{Def, Exp, Instr, Loc, Ty},
     },
-    itertools::Itertools,
     num_bigint::BigInt,
     sailrs::shared::Shared,
-    std::{borrow::Borrow, collections::BTreeMap, hash::Hash},
+    std::{borrow::Borrow, collections::BTreeMap},
 };
 
 type Parameters = Vec<Shared<boom::Type>>;
@@ -24,7 +23,6 @@ type Return = Shared<boom::Type>;
 pub fn jib_to_boom<I: IntoIterator<Item = Def<InternedString, B64>>>(iter: I) -> Shared<boom::Ast> {
     let mut emitter = BoomEmitter::new();
     emitter.process(iter);
-
     let mut ast = emitter.finish();
 
     {
@@ -33,16 +31,20 @@ pub fn jib_to_boom<I: IntoIterator<Item = Def<InternedString, B64>>>(iter: I) ->
         ast.registers.insert(
             "current_exception".into(),
             Shared::new(Type::Union {
-                name: InternedString::from_static("exception"),
+                name: InternedString::from_static(
+                    "exception<Unit, Unit, String, Unit, Bool, String, Unit, Unit>",
+                ),
                 fields: ast
                     .unions
-                    .get(&InternedString::from_static("exception"))
+                    .get(&InternedString::from_static(
+                        "exception<Unit, Unit, String, Unit, Bool, String, Unit, Unit>",
+                    ))
                     .unwrap()
                     .clone(),
             }),
         );
         ast.registers
-            .insert("throw".into(), Shared::new(Type::String));
+            .insert("throw_location".into(), Shared::new(Type::String));
     }
 
     {
@@ -198,12 +200,14 @@ impl BoomEmitter {
                 self.ast.enums.insert(*name, variants.clone());
             }
             Def::Struct(name, fields) => {
-                let fields = self.convert_fields(fields.iter());
-                self.ast.structs.insert(*name, fields);
+                self.ast
+                    .structs
+                    .insert(*name, self.convert_fields(fields.iter()));
             }
             Def::Union(name, fields) => {
-                let fields = self.convert_fields(fields.iter());
-                self.ast.unions.insert(*name, fields);
+                self.ast
+                    .unions
+                    .insert(*name, self.convert_fields(fields.iter()));
             }
             Def::Let(bindings, body) => {
                 bindings.iter().for_each(|(ident, typ)| {

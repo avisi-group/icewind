@@ -23,7 +23,7 @@ pub fn parse_ir<'ir>(ir: &'ir str) -> Vec<Def<InternedString, B64>> {
         .parse(&mut symtab, new_ir_lexer(ir))
         .unwrap();
 
-    resolve_names(defs, &symtab)
+    resolve_names(defs, symtab)
 }
 
 pub fn jib_wip_filter(

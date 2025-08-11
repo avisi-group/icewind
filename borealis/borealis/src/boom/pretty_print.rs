@@ -391,14 +391,18 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Struct { name, .. } => {
                 write!(self.writer, "{name}")
             }
-            Type::Union { name, .. } => {
-                write!(self.writer, "{name}")
+            Type::Union { name, fields } => {
+                write!(self.writer, "{name}<").unwrap();
+                for field in fields {
+                    self.visit_type(field.typ.clone());
+                    write!(self.writer, ", ").unwrap();
+                }
+                write!(self.writer, ">")
             }
             Type::Vector { element_type } => {
                 write!(self.writer, "vec<").unwrap();
                 self.visit_type(element_type.clone());
-                write!(self.writer, ">").unwrap();
-                Ok(())
+                write!(self.writer, ">")
             }
             Type::FixedVector {
                 length,
@@ -406,8 +410,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             } => {
                 write!(self.writer, "[").unwrap();
                 self.visit_type(element_type.clone());
-                write!(self.writer, "; {length}]").unwrap();
-                Ok(())
+                write!(self.writer, "; {length}]")
             }
             Type::Reference(typ) => {
                 write!(self.writer, "&").unwrap();
