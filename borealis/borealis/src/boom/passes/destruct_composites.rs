@@ -114,7 +114,7 @@ impl DataLocation {
     }
 
     pub fn try_from(value: Shared<Value>) -> Option<Self> {
-        fn build_fields(value: Shared<Value>) -> (InternedString, Vec<InternedString>) {
+        fn build_fields(value: Shared<Value>) -> Option<(InternedString, Vec<InternedString>)> {
             let mut fields = vec![];
 
             let mut current_value = value.get().clone();
@@ -122,27 +122,40 @@ impl DataLocation {
                 match current_value {
                     Value::Identifier(root) => {
                         fields.reverse();
-                        return (root, fields);
+                        return Some((root, fields));
                     }
                     Value::Field { value, field_name } => {
                         fields.push(field_name);
                         current_value = value.get().clone();
                     }
+                    Value::Struct { fields: f, .. } => {
+                        let Some(last) = fields.last() else {
+                            // encountered struct with no field accesses, bailing
+                            return None;
+                        };
 
-                    v => panic!("{v:?}"),
+                        let nv = f
+                            .iter()
+                            .find(|nv| nv.name == *last)
+                            .expect("tried to access field on struct that does not exist");
+
+                        // go back up one layer to cancel out
+                        fields.pop();
+                        current_value = nv.value.get().clone();
+                    }
+
+                    _ => return None,
                 }
             }
         }
 
-        match &*value.get() {
-            Value::Identifier(ident) => Some(Self::Identifier(*ident)),
-            Value::Field { .. } => {
-                let (root, fields) = build_fields(value.clone());
-                Some(Self::Fields { root, fields })
+        build_fields(value.clone()).map(|(root, fields)| {
+            if fields.is_empty() {
+                Self::Identifier(root)
+            } else {
+                Self::Fields { root, fields }
             }
-
-            _ => None,
-        }
+        })
     }
 }
 
@@ -343,6 +356,43 @@ fn destruct_locals(
                                     .map(Shared::new)
                                     .collect();
                                 }
+                                Value::Struct { name, fields } => {
+                                    if let Some(dst_root_typ) = destructed_local_variables
+                                        .get(&destination.root())
+                                        .or_else(|| destructed_registers.get(&destination.root()))
+                                    {
+                                        let (dst_outer_ident, dst_outer_type) =
+                                            traverse_typ_from_location(
+                                                dst_root_typ.clone(),
+                                                &destination,
+                                            );
+
+                                        let source_typ = composites.get(name).unwrap();
+
+                                        return destruct_variable(dst_outer_ident, dst_outer_type)
+                                            .into_iter()
+                                            .zip(destruct_struct_value(
+                                                value,
+                                                source_typ.clone(),
+                                                composites,
+                                            ))
+                                            .map(|((dst, _), src)| {
+                                                Shared::new(Statement::Copy {
+                                                    expression: Expression::Identifier(dst),
+                                                    value: src.clone(),
+                                                })
+                                            })
+                                            .collect();
+                                    } else {
+                                        return vec![Shared::new(Statement::Copy {
+                                            expression: Expression::Identifier(
+                                                destination.to_ident(),
+                                            ),
+                                            value: value.clone(),
+                                        })];
+                                    }
+                                }
+
                                 _ => {
                                     return vec![Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(destination.to_ident()),
@@ -418,7 +468,7 @@ fn destruct_locals(
                                     traverse_typ_from_location(dst_root_typ.clone(), &destination);
 
                                 let DataLocation::Identifier(src) = source else {
-                                    panic!();
+                                    panic!("non ident source: {source:?}");
                                 };
 
                                 let mut value = Shared::new(Value::Identifier(src));
@@ -458,7 +508,11 @@ fn destruct_locals(
                                     let root_typ = destructed_local_variables
                                         .get(&destination.root())
                                         .or_else(|| destructed_registers.get(&destination.root()))
-                                        .unwrap();
+                                        .unwrap_or_else(|| {
+                                            panic!(
+                                                "failed to find type for root of {destination:?}"
+                                            )
+                                        });
                                     let (dst_outer_ident, outer_typ) =
                                         traverse_typ_from_location(root_typ.clone(), &destination);
 
@@ -619,6 +673,47 @@ fn create_union_construction_copies(
                         if let Some(src) = src {
                             // todo: handle struct literals?
                             vec![(src, dst)]
+                        } else {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, typ)| (default_value(typ), dst))
+                                .collect()
+                        }
+                    })
+                    .map(|(value, dst)| Statement::Copy {
+                        expression: Expression::Identifier(dst),
+                        value,
+                    })
+                    .map(Shared::new),
+            )
+            .collect(),
+        Value::Struct {
+            fields: struct_fields,
+            ..
+        } => iter
+            .chain(
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, nt)| {
+                        let src = if i == tag {
+                            Some(arguments[0].clone())
+                        } else {
+                            None
+                        };
+                        let dst = union_value_ident(*dst, nt.name);
+                        let typ = nt.typ.clone();
+
+                        (src, dst, typ)
+                    })
+                    .flat_map(|(src, dst, typ)| {
+                        if let Some(_) = src {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, _)| dst)
+                                .zip(struct_fields.iter())
+                                .map(|(dst, nv)| (nv.value.clone(), dst)) // todo: split nv.value if it's a composite
+                                .collect::<Vec<_>>()
                         } else {
                             destruct_variable(dst, typ)
                                 .into_iter()
@@ -1026,5 +1121,37 @@ impl Visitor for DestructorVisitor {
         }
 
         node.walk(self);
+    }
+}
+
+fn destruct_struct_value(
+    value: &Shared<Value>,
+    typ: Shared<Type>,
+    composites: &HashMap<InternedString, Shared<Type>>,
+) -> Vec<Shared<Value>> {
+    match &*value.get() {
+        Value::Identifier(ident) => destruct_variable(*ident, typ)
+            .into_iter()
+            .map(|(ident, _)| Shared::new(Value::Identifier(ident)))
+            .collect(),
+        Value::Struct {
+            fields: value_fields,
+            name,
+        } => {
+            let Type::Struct {
+                name,
+                fields: type_fields,
+            } = &*composites.get(name).unwrap().get()
+            else {
+                unreachable!()
+            };
+
+            value_fields
+                .iter()
+                .zip(type_fields.iter())
+                .flat_map(|(nv, nt)| destruct_struct_value(&nv.value, nt.typ.clone(), composites))
+                .collect()
+        }
+        _ => vec![value.clone()],
     }
 }

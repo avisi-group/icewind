@@ -69,10 +69,6 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
 #[derive(Default)]
 struct BuildContext {
-    /// Name of enum maps to the rudder type and a map of enum variants to the
-    /// integer discriminant of that variant
-    enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
-
     /// Union variant to type and tag map
     unions: HashMap<InternedString, (Option<Type>, u32)>,
 
@@ -155,6 +151,7 @@ impl BuildContext {
     fn resolve_type(&self, typ: Shared<boom::Type>) -> Type {
         match &*typ.get() {
             boom::Type::Unit => panic!("found unit"),
+            boom::Type::RoundingMode => todo!(),
             boom::Type::String => Type::String,
             // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
@@ -1938,17 +1935,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             offset,
                         },
                     );
-                }
-
-                // enum
-                if let Some(_) = self
-                    .ctx()
-                    .enums
-                    .iter()
-                    .find_map(|(_, (_, variants))| variants.get(ident))
-                    .cloned()
-                {
-                    panic!("these should be members now?");
                 }
 
                 panic!(

@@ -364,6 +364,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Bit => write!(self.writer, "bit"),
             Type::Real => write!(self.writer, "real"),
             Type::Float => write!(self.writer, "float"),
+            Type::RoundingMode => write!(self.writer, "roundingmode"),
 
             Type::Integer { size } => {
                 write!(self.writer, "i").unwrap();
@@ -468,23 +469,13 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, ".{field_name}").unwrap();
             }
-            Value::CtorKind {
-                value,
-                identifier,
-                types,
-            } => {
+            Value::CtorKind { value, identifier } => {
                 self.visit_value(value.clone());
-                write!(self.writer, " is ").unwrap();
-                write_uid(self, *identifier, types);
+                write!(self.writer, " is {identifier}").unwrap();
             }
-            Value::CtorUnwrap {
-                value,
-                identifier,
-                types,
-            } => {
+            Value::CtorUnwrap { value, identifier } => {
                 self.visit_value(value.clone());
-                write!(self.writer, " as ").unwrap();
-                write_uid(self, *identifier, types);
+                write!(self.writer, " as {identifier}").unwrap();
             }
             Value::Tuple(values) => {
                 write!(self.writer, "(").unwrap();

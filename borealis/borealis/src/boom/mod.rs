@@ -218,11 +218,14 @@ pub enum Type {
     },
 
     FixedVector {
-        length: isize,
+        length: usize,
         element_type: Shared<Self>,
     },
 
     Reference(Shared<Self>),
+
+    /// ???
+    RoundingMode,
 }
 
 impl Type {
@@ -258,16 +261,14 @@ impl Walkable for Shared<Type> {
             | Integer { .. }
             | Bits { .. }
             | Bit
-            | Union { .. } => {}
-
+            | Union { .. }
+            | RoundingMode => {}
             Struct { fields, .. } => fields
                 .iter()
                 .for_each(|field| visitor.visit_named_type(field)),
-
             Vector { element_type }
             | FixedVector { element_type, .. }
             | Reference(element_type) => visitor.visit_type(element_type.clone()),
-
             Tuple(ts) => ts.iter().for_each(|t| visitor.visit_type(t.clone())),
         }
     }
@@ -430,12 +431,10 @@ pub enum Value {
     CtorKind {
         value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Shared<Type>>,
     },
     CtorUnwrap {
         value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Shared<Type>>,
     },
     Tuple(Vec<Shared<Self>>),
     VectorAccess {
@@ -513,9 +512,8 @@ impl Walkable for Value {
                 .iter()
                 .for_each(|field| visitor.visit_named_value(field)),
             Value::Field { value, .. } => visitor.visit_value(value.clone()),
-            Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
+            Value::CtorKind { value, .. } | Value::CtorUnwrap { value, .. } => {
                 visitor.visit_value(value.clone());
-                types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
             Value::Tuple(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
             Value::VectorAccess { value, index } => {

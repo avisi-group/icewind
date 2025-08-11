@@ -11,6 +11,7 @@ use {
             },
         },
         fn_is_allowlisted,
+        jib::{self, parse_ir},
         jib_legacy::{self, load_model},
         rudder::{
             self,
@@ -21,10 +22,11 @@ use {
     },
     clap::Parser,
     color_eyre::eyre::Result,
+    errctx::PathCtx,
     log::{debug, info},
     sailrs::{bytes, create_file_buffered, init_logger},
     std::{
-        fs::{File, create_dir_all},
+        fs::{self, File, create_dir_all},
         io::Write as _,
         path::PathBuf,
     },
@@ -45,6 +47,10 @@ struct Args {
     #[arg(long)]
     ir_only: bool,
 
+    /// Use ISLA lib to load JIB
+    #[arg(long)]
+    isla: bool,
+
     /// Path to Sail model archive
     input: PathBuf,
     /// Path to brig Rust file
@@ -60,21 +66,31 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
-    let jib_ast = load_model(&args.input);
-
-    if let Some(path) = &args.dump_ir {
-        create_dir_all(path).unwrap()
-    }
-
-    if let Some(path) = &args.dump_ir {
-        sailrs::jib_ast::pretty_print::print_ast(
-            &mut create_file_buffered(path.join("ast.jib")).unwrap(),
-            jib_ast.iter(),
-        );
-    }
-
     info!("Converting JIB to BOOM");
-    let ast = jib_legacy::convert::jib_to_boom(jib_legacy::jib_wip_filter(jib_ast));
+    let ast = if args.isla {
+        let contents = fs::read_to_string(&args.input)
+            .map_err(PathCtx::f(args.input))
+            .unwrap();
+
+        let jib_ast = parse_ir(&contents);
+
+        jib::convert::jib_to_boom(jib::jib_wip_filter(jib_ast))
+    } else {
+        let jib_ast = load_model(&args.input);
+
+        if let Some(path) = &args.dump_ir {
+            create_dir_all(path).unwrap()
+        }
+
+        if let Some(path) = &args.dump_ir {
+            sailrs::jib_ast::pretty_print::print_ast(
+                &mut create_file_buffered(path.join("ast.jib")).unwrap(),
+                jib_ast.iter(),
+            );
+        }
+
+        jib_legacy::convert::jib_to_boom(jib_legacy::jib_wip_filter(jib_ast))
+    };
 
     // // useful for debugging
     if let Some(path) = &args.dump_ir {

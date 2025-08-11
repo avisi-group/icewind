@@ -331,7 +331,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
             fields: convert_fields(fields.as_ref()),
         },
         jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
-            length: *length,
+            length: usize::try_from(*length).unwrap(),
             element_type: convert_type(&**typ),
         },
         jib_ast::Type::Vector(typ) => boom::Type::Vector {
@@ -469,12 +469,10 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
         jib_ast::Value::CtorKind(value, (ctor, unifiers), _) => boom::Value::CtorKind {
             value: (convert_value(value)),
             identifier: ctor.as_interned(),
-            types: unifiers.iter().map(convert_type).collect(),
         },
         jib_ast::Value::CtorUnwrap(value, (ctor, unifiers), _) => boom::Value::CtorUnwrap {
             value: (convert_value(value)),
             identifier: ctor.as_interned(),
-            types: unifiers.iter().map(convert_type).collect(),
         },
         jib_ast::Value::TupleMember(_, _, _) => todo!(),
         jib_ast::Value::Call(op, values) => {
