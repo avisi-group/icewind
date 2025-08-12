@@ -66,6 +66,10 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
+    if let Some(path) = &args.dump_ir {
+        create_dir_all(path).unwrap()
+    }
+
     info!("Converting JIB to BOOM");
     let ast = if args.isla {
         let contents = fs::read_to_string(&args.input)
@@ -77,10 +81,6 @@ fn main() -> Result<()> {
         jib::convert::jib_to_boom(jib::jib_wip_filter(jib_ast))
     } else {
         let jib_ast = load_model(&args.input);
-
-        if let Some(path) = &args.dump_ir {
-            create_dir_all(path).unwrap()
-        }
 
         if let Some(path) = &args.dump_ir {
             sailrs::jib_ast::pretty_print::print_ast(
