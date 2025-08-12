@@ -388,16 +388,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 Ok(())
             }
             Type::Constant(i) => write!(self.writer, "constant({i})"),
-            Type::Struct { name, .. } => {
+            Type::Struct { name, .. } | Type::Union { name, .. } => {
                 write!(self.writer, "{name}")
-            }
-            Type::Union { name, fields } => {
-                write!(self.writer, "{name}<").unwrap();
-                for field in fields {
-                    self.visit_type(field.typ.clone());
-                    write!(self.writer, ", ").unwrap();
-                }
-                write!(self.writer, ">")
             }
             Type::Vector { element_type } => {
                 write!(self.writer, "vec<").unwrap();

@@ -1970,7 +1970,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // have been removed in boom")
             }
 
-            boom::Value::Field { .. } => panic!("fields should have already been flattened"),
+            boom::Value::Field { .. } => panic!(
+                "fields should have already been flattened: {:?}",
+                self.function_build_context.rudder_fn.name()
+            ),
 
             boom::Value::CtorKind {
                 value, identifier, ..

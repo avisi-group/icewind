@@ -77,7 +77,7 @@ impl Pass for DestructComposites {
 }
 
 /// Either a destination or a source location
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum DataLocation {
     Identifier(InternedString),
     Fields {
@@ -402,14 +402,14 @@ fn destruct_locals(
                             },
                         };
 
-                        match (
-                            destructed_local_variables
-                                .get(&source.root())
-                                .or_else(|| destructed_registers.get(&source.root())),
-                            destructed_local_variables
-                                .get(&destination.root())
-                                .or_else(|| destructed_registers.get(&destination.root())),
-                        ) {
+                        let source_type = destructed_local_variables
+                            .get(&source.root())
+                            .or_else(|| destructed_registers.get(&source.root()));
+                        let dest_type = destructed_local_variables
+                            .get(&destination.root())
+                            .or_else(|| destructed_registers.get(&destination.root()));
+
+                        match (source_type, dest_type) {
                             (Some(src_root_typ), Some(dst_root_typ)) => {
                                 let (src_outer_ident, src_outer_type) =
                                     traverse_typ_from_location(src_root_typ.clone(), &source);
@@ -498,14 +498,16 @@ fn destruct_locals(
                         if let Some((union_typ, tag)) = is_union_constructor(*name, composites) {
                             create_union_construction_copies(expression, arguments, union_typ, tag)
                         } else {
-                            // if we have an expression...
-                            let expression = expression.clone().map(|expr| {
-                                // turn it into a data location
-                                let destination = DataLocation::from(&expr);
+                            let expression = expression
+                                .clone()
+                                // if we have an expression...
+                                .map(|expr| {
+                                    // turn it into a data location
+                                    let destination = DataLocation::from(&expr);
 
-                                // if the function we're calling has a destructed return type
-                                if let Some(_) = destructed_return_types_by_function.get(name) {
-                                    let root_typ = destructed_local_variables
+                                    // if the function we're calling has a destructed return type
+                                    if let Some(_) = destructed_return_types_by_function.get(name) {
+                                        let root_typ = destructed_local_variables
                                         .get(&destination.root())
                                         .or_else(|| destructed_registers.get(&destination.root()))
                                         .unwrap_or_else(|| {
@@ -513,46 +515,67 @@ fn destruct_locals(
                                                 "failed to find type for root of {destination:?}"
                                             )
                                         });
-                                    let (dst_outer_ident, outer_typ) =
-                                        traverse_typ_from_location(root_typ.clone(), &destination);
+                                        let (dst_outer_ident, outer_typ) =
+                                            traverse_typ_from_location(
+                                                root_typ.clone(),
+                                                &destination,
+                                            );
 
-                                    if is_type_composite(outer_typ.clone()) {
-                                        // return a tuple assignment
-                                        Expression::Tuple(
-                                            destruct_variable(dst_outer_ident, outer_typ)
-                                                .into_iter()
-                                                .map(|(name, _)| Expression::Identifier(name))
-                                                .collect(),
-                                        )
+                                        if is_type_composite(outer_typ.clone()) {
+                                            // return a tuple assignment
+                                            Expression::Tuple(
+                                                destruct_variable(dst_outer_ident, outer_typ)
+                                                    .into_iter()
+                                                    .map(|(name, _)| Expression::Identifier(name))
+                                                    .collect(),
+                                            )
+                                        } else {
+                                            Expression::Identifier(dst_outer_ident)
+                                        }
                                     } else {
-                                        Expression::Identifier(dst_outer_ident)
+                                        // otherwise treat as a single destination
+                                        Expression::Identifier(destination.to_ident())
                                     }
-                                } else {
-                                    // otherwise treat as a single destination
-                                    Expression::Identifier(destination.to_ident())
-                                }
-                            });
+                                });
 
                             let arguments = arguments
                                 .iter()
                                 .flat_map(|arg| {
-                                    if let Value::Identifier(ident) = &*arg.get() {
-                                        if let Some(typ) =
-                                            destructed_local_variables.get(ident).or_else(|| {
-                                                // unlikely but may as well check
-                                                destructed_registers.get(ident)
-                                            })
-                                        {
-                                            destruct_variable(*ident, typ.clone())
-                                                .into_iter()
-                                                .map(|(new_ident, _)| Value::Identifier(new_ident))
-                                                .map(Shared::new)
-                                                .collect()
-                                        } else {
-                                            vec![arg.clone()]
+                                    match &*arg.get() {
+                                        Value::Identifier(ident) => {
+                                            if let Some(typ) = destructed_local_variables
+                                                .get(ident)
+                                                .or_else(|| {
+                                                    // unlikely but may as well check
+                                                    destructed_registers.get(ident)
+                                                })
+                                            {
+                                                destruct_variable(*ident, typ.clone())
+                                                    .into_iter()
+                                                    .map(|(new_ident, _)| {
+                                                        Value::Identifier(new_ident)
+                                                    })
+                                                    .map(Shared::new)
+                                                    .collect()
+                                            } else {
+                                                vec![arg.clone()]
+                                            }
                                         }
-                                    } else {
-                                        vec![arg.clone()]
+                                        Value::Field { value, field_name } => {
+                                            if let Value::Struct { fields, .. } = &*value.get() {
+                                                vec![
+                                                    fields
+                                                        .iter()
+                                                        .find(|nv| nv.name == *field_name)
+                                                        .unwrap()
+                                                        .value
+                                                        .clone(),
+                                                ]
+                                            } else {
+                                                todo!(":(");
+                                            }
+                                        }
+                                        _ => vec![arg.clone()],
                                     }
                                 })
                                 .collect();
@@ -789,6 +812,16 @@ fn destruct_variable(
                 vec![(root_name, typ.clone())]
             }
         }
+        Type::Vector { element_type } => {
+            if is_type_composite(element_type.clone()) {
+                destruct_variable(root_name, element_type.clone())
+                    .into_iter()
+                    .map(|(name, typ)| (name, Shared::new(Type::Vector { element_type: typ })))
+                    .collect()
+            } else {
+                vec![(root_name, typ.clone())]
+            }
+        }
         _ => vec![(root_name, typ.clone())],
     }
     .into_iter()
@@ -874,7 +907,9 @@ fn is_union_constructor(
 fn is_type_composite(typ: Shared<Type>) -> bool {
     match &*typ.get() {
         Type::Union { .. } | Type::Struct { .. } => true,
-        Type::FixedVector { element_type, .. } => is_type_composite(element_type.clone()),
+        Type::FixedVector { element_type, .. } | Type::Vector { element_type } => {
+            is_type_composite(element_type.clone())
+        }
         _ => false,
     }
 }
@@ -957,7 +992,7 @@ fn destruct_function_return_types(ast: Shared<Ast>) -> HashMap<InternedString, S
 }
 
 fn destruct_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>> {
-    let union_regs = ast
+    let composite_registers = ast
         .get_mut()
         .registers
         .iter()
@@ -965,7 +1000,7 @@ fn destruct_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>>
         .map(|(name, typ)| (*name, typ.clone()))
         .collect::<HashMap<_, _>>();
 
-    for (register_name, typ) in &union_regs {
+    for (register_name, typ) in &composite_registers {
         ast.get_mut().registers.remove(register_name);
 
         ast.get_mut()
@@ -973,7 +1008,7 @@ fn destruct_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>>
             .extend(destruct_variable(*register_name, typ.clone()));
     }
 
-    union_regs
+    composite_registers
 }
 
 /// Determine the identifer and type given a root typ and a data location

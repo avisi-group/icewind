@@ -1,10 +1,9 @@
 use {
-    common::{hashmap::HashMap, intern::InternedString},
+    common::intern::InternedString,
     isla_lib::{
         bitvector::b64::B64,
         ir::{Def, Exp, Instr, Loc, Name, Symtab, Ty},
     },
-    itertools::Itertools,
 };
 
 pub fn resolve_names(defs: Vec<Def<Name, B64>>, symtab: Symtab) -> Vec<Def<InternedString, B64>> {
@@ -15,17 +14,11 @@ pub fn resolve_names(defs: Vec<Def<Name, B64>>, symtab: Symtab) -> Vec<Def<Inter
 
 struct ResolverState<'ir> {
     symtab: Symtab<'ir>,
-    //isla symtab resolves many unions to the same name, we need a unique name for
-    // each
-    unions: HashMap<Name, InternedString>,
 }
 
 impl<'ir> ResolverState<'ir> {
     fn new(symtab: Symtab<'ir>) -> Self {
-        Self {
-            symtab,
-            unions: HashMap::default(),
-        }
+        Self { symtab }
     }
 
     fn def(&mut self, def: Def<Name, B64>) -> Def<InternedString, B64> {
@@ -51,22 +44,13 @@ impl<'ir> ResolverState<'ir> {
                     .map(|(name, ty)| (self.name(name), self.ty(ty)))
                     .collect(),
             ),
-            Def::Union(name, items) => {
-                let variants = items
+            Def::Union(name, items) => Def::Union(
+                self.name(name),
+                items
                     .into_iter()
                     .map(|(name, ty)| (self.name(name), self.ty(ty)))
-                    .collect::<Vec<_>>();
-
-                let resolved_name = InternedString::from(format!(
-                    "{}<{}>",
-                    self.name(name),
-                    variants.iter().map(|(_, ty)| format!("{ty:?}")).join(", ")
-                ));
-
-                self.unions.insert(name, resolved_name);
-
-                Def::Union(resolved_name, variants)
-            }
+                    .collect(),
+            ),
             Def::Val(name, types, ty) => Def::Val(
                 self.name(name),
                 types.into_iter().map(|ty| self.ty(ty)).collect(),
@@ -90,16 +74,16 @@ impl<'ir> ResolverState<'ir> {
     }
 
     fn name(&self, name: Name) -> InternedString {
-        let demangled = self.symtab.to_str_demangled(name);
+        let str = self.symtab.to_str(name);
 
-        let demangled = demangled.strip_prefix("z").unwrap_or(demangled).to_owned();
+        let str = str.strip_prefix("z").unwrap_or(str).to_owned();
 
-        let demangled = demangled.replace("z3", "#");
-        let demangled = demangled.replace("z5", "%");
-        let demangled = demangled.replace("zI", "<");
-        let demangled = demangled.replace("zK", ">");
+        let str = str.replace("z3", "#");
+        let str = str.replace("z5", "%");
+        let str = str.replace("zI", "<");
+        let str = str.replace("zK", ">");
 
-        InternedString::from(demangled)
+        InternedString::from(str)
     }
 
     fn ty(&self, ty: Ty<Name>) -> Ty<InternedString> {
@@ -121,7 +105,7 @@ impl<'ir> ResolverState<'ir> {
             Ty::Ref(ty) => Ty::Ref(Box::new(self.ty(*ty))),
             Ty::Enum(name) => Ty::Enum(self.name(name)),
             Ty::Struct(name) => Ty::Struct(self.name(name)),
-            Ty::Union(name) => Ty::Union(*self.unions.get(&name).unwrap()),
+            Ty::Union(name) => Ty::Union(self.name(name)),
         }
     }
 

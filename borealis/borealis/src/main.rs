@@ -110,6 +110,7 @@ fn main() -> Result<()> {
     ]
     .into_iter()
     .for_each(|mut pass| {
+        info!("{}", pass.name());
         pass.run(ast.clone());
     });
     boom::passes::run_fixed_point(

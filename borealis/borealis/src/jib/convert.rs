@@ -31,14 +31,10 @@ pub fn jib_to_boom<I: IntoIterator<Item = Def<InternedString, B64>>>(iter: I) ->
         ast.registers.insert(
             "current_exception".into(),
             Shared::new(Type::Union {
-                name: InternedString::from_static(
-                    "exception<Unit, Unit, String, Unit, Bool, String, Unit, Unit>",
-                ),
+                name: InternedString::from_static("exception"),
                 fields: ast
                     .unions
-                    .get(&InternedString::from_static(
-                        "exception<Unit, Unit, String, Unit, Bool, String, Unit, Unit>",
-                    ))
+                    .get(&InternedString::from_static("exception"))
                     .unwrap()
                     .clone(),
             }),
@@ -312,7 +308,7 @@ impl BoomEmitter {
             Ty::Bits(width) => boom::Type::Bits {
                 size: Size::Static(usize::try_from(*width).unwrap()),
             },
-            Ty::Float(fpty) => boom::Type::Float, // todo: properly handle floating point type
+            Ty::Float(_fpty) => boom::Type::Float, // todo: properly handle floating point type
 
             Ty::Unit => boom::Type::Unit,
             Ty::Bool => boom::Type::Bool,
@@ -465,8 +461,8 @@ impl BoomEmitter {
                     value: self.convert_expression(exp),
                 }]
             }
-            Instr::Monomorphize(_, ty, source_loc) => todo!(),
-            Instr::Call(loc, _, name, args, source_loc) => {
+
+            Instr::Call(loc, _, name, args, _) => {
                 let expression = convert_location(loc);
                 vec![boom::Statement::FunctionCall {
                     expression: Some(expression),
@@ -474,10 +470,12 @@ impl BoomEmitter {
                     arguments: args.iter().map(|a| self.convert_expression(a)).collect(),
                 }]
             }
-            Instr::PrimopUnary(loc, _, exp, source_loc) => todo!(),
-            Instr::PrimopBinary(loc, _, exp, exp1, source_loc) => todo!(),
-            Instr::PrimopVariadic(loc, _, exps, source_loc) => todo!(),
-            Instr::PrimopReset(loc, _, source_loc) => todo!(),
+
+            Instr::Monomorphize(..) => todo!(),
+            Instr::PrimopUnary(..) => todo!(),
+            Instr::PrimopBinary(..) => todo!(),
+            Instr::PrimopVariadic(..) => todo!(),
+            Instr::PrimopReset(..) => todo!(),
 
             Instr::Arbitrary => vec![boom::Statement::Undefined],
 
