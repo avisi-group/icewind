@@ -31,8 +31,11 @@ pub fn get_current_device() -> &'static ModelDevice {
 }
 
 /// Super hacky way of getting the currently executing `ModelDevice`
+///
+/// "and_then" version breaks:(
 pub fn try_get_current_device() -> Option<&'static ModelDevice> {
-    unsafe { crate::guest::GUEST.get() }
-        .and_then(|g| g.devices.get(&("core0".into())))
-        .and_then(|d| (d as &dyn Any).downcast_ref::<ModelDevice>())
+    ((&**unsafe { crate::guest::GUEST.get()? }
+        .devices
+        .get(&("core0".into()))?) as &dyn core::any::Any)
+        .downcast_ref::<crate::host::dbt::models::ModelDevice>()
 }

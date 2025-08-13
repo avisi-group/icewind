@@ -5349,6 +5349,7 @@ fn sttr() {
     assert_eq!(*data, 0x0);
 }
 
+/// needs a device set up otherwise panics in the handler
 #[ktest]
 fn at() {
     let model = models::get("aarch64").unwrap();

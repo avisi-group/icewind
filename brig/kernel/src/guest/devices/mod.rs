@@ -9,8 +9,6 @@ pub mod arm;
 pub mod primecell;
 pub mod virtio;
 
-//pub type DeviceConfig =
-
 #[distributed_slice]
 pub static DEVICE_FACTORIES: [(
     &str,

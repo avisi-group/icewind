@@ -91,7 +91,7 @@ impl BuildContext {
             },
         );
 
-        log::warn!(
+        log::debug!(
             "adding register {name} ({} bytes) @ {:#x}",
             typ.width_bytes(),
             self.next_register_offset
