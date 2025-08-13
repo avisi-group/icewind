@@ -78,10 +78,12 @@ impl<'ir> ResolverState<'ir> {
 
         let str = str.strip_prefix("z").unwrap_or(str).to_owned();
 
-        let str = str.replace("z3", "#");
-        let str = str.replace("z5", "%");
-        let str = str.replace("zI", "<");
-        let str = str.replace("zK", ">");
+        let str = str
+            .replace("z3", "#")
+            .replace("z5", "%")
+            .replace("zI", "<")
+            .replace("zK", ">")
+            .replace("zD", "-");
 
         InternedString::from(str)
     }

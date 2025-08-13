@@ -166,6 +166,16 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                                 width,
                             })
                         }
+                        UnaryOperationKind::Negate => {
+                            let Value::SignedInteger { value, width } = value else {
+                                todo!()
+                            };
+
+                            Some(Value::SignedInteger {
+                                value: -value,
+                                width,
+                            })
+                        }
                         _ => todo!("{kind:?} {value:?}"),
                     }
                 }
@@ -584,6 +594,9 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         Value::SignedInteger { value, width } => {
                             (value as u64 & mask(width), width)
                         }
+                        Value::Vector(values) => {
+                            todo!("write-reg {values:?}")
+                        }
                         t => todo!("{t:?}"),
                     };
 
@@ -712,7 +725,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 Value::Vector(
                     (0..*element_count)
                         .into_iter()
-                        .map(|i| (offset + (i * usize::try_from(element_width).unwrap())))
+                        .map(|i| offset + (i * usize::try_from(element_width).unwrap()))
                         .map(|element_offset| self.read_register(&element_type, element_offset))
                         .collect(),
                 )

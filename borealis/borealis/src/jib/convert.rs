@@ -300,7 +300,7 @@ impl BoomEmitter {
                 size: Size::Static(64),
             },
             Ty::I128 => boom::Type::Integer {
-                size: Size::Static(128),
+                size: Size::Static(64), // :(
             },
             Ty::AnyBits => boom::Type::Bits {
                 size: Size::Unknown,

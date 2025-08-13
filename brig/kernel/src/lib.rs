@@ -28,11 +28,10 @@ use {
             rand, scheduler, tasks, timer,
         },
         logger::WRITER,
-        models::ModelDevice,
-        util::get_current_device,
+        util::try_get_current_device,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    core::{any::Any, panic::PanicInfo},
+    core::panic::PanicInfo,
     x86::io::outw,
 };
 
@@ -140,15 +139,17 @@ fn panic(info: &PanicInfo) -> ! {
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
-    log::error!(
-        "Guest PC = {:#016x}",
-        get_current_device().register_file.read::<u64>("_PC")
-    );
+    if let Some(device) = try_get_current_device() {
+        log::error!(
+            "Guest PC = {:#016x}",
+            device.register_file.read::<u64>("_PC")
+        );
 
-    log::error!(
-        "Opcode = {:#x}",
-        models::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
-    );
+        log::error!(
+            "Opcode = {:#x}",
+            models::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
+        );
+    };
 
     backtrace();
 
