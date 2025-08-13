@@ -575,6 +575,35 @@ fn destruct_locals(
                                                 todo!(":(");
                                             }
                                         }
+                                        Value::Struct { fields, .. } => {
+                                            fields
+                                                .iter()
+                                                .flat_map(|nv| {
+                                                    let Value::Identifier(ident) = &*nv.value.get()
+                                                    else {
+                                                        todo!()
+                                                    };
+
+                                                    if let Some(typ) = destructed_local_variables
+                                                        .get(ident)
+                                                        .or_else(|| {
+                                                            // unlikely but may as well check
+                                                            destructed_registers.get(ident)
+                                                        })
+                                                    {
+                                                        destruct_variable(*ident, typ.clone())
+                                                            .into_iter()
+                                                            .map(|(new_ident, _)| {
+                                                                Value::Identifier(new_ident)
+                                                            })
+                                                            .map(Shared::new)
+                                                            .collect()
+                                                    } else {
+                                                        vec![nv.value.clone()]
+                                                    }
+                                                })
+                                                .collect()
+                                        }
                                         _ => vec![arg.clone()],
                                     }
                                 })
