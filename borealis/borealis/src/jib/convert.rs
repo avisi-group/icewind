@@ -68,11 +68,7 @@ pub fn jib_to_boom<I: IntoIterator<Item = Def<InternedString, B64>>>(iter: I) ->
                 ],
             }),
         ]);
-        entry_block.set_terminator(Terminator::Return(Some(Value::Identifier(
-            "
-    return"
-                .into(),
-        ))));
+        entry_block.set_terminator(Terminator::Return(Some(Value::Identifier("return".into()))));
         ast.functions.insert(
             "add_with_carry_test".into(),
             FunctionDefinition {

@@ -1324,7 +1324,7 @@ pub fn cast_at(
                 ]
             {
                 let Statement::Constant(value) = source.get(s_arena) else {
-                    panic!()
+                    panic!("{:?}", source.get(s_arena).to_string(s_arena))
                 };
 
                 let Constant::String(s) = value else { panic!() };

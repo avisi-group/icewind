@@ -25,6 +25,8 @@ pub trait Visitor: Sized {
         node.walk(self);
     }
 
+    /// WARNING: does not correctly handle cycles, use
+    /// `visit_function_definition`!
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
         block.walk(self);
     }

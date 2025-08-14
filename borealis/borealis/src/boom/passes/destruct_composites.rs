@@ -1,16 +1,13 @@
 use {
     crate::boom::{
-        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
-        Visitor,
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
-        visitor::Walkable,
+        Ast, Expression, FunctionDefinition, Literal, NamedType, Operation, Parameter, Size,
+        Statement, Type, Value, Visitor, control_flow::Terminator, passes::Pass, visitor::Walkable,
     },
     common::{hashmap::HashMap, intern::InternedString},
     itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     sailrs::shared::Shared,
-    std::{fmt, fmt::Display},
+    std::fmt::{self, Display},
 };
 
 #[derive(Debug, Default)]
@@ -68,7 +65,7 @@ impl Pass for DestructComposites {
                 &destructed_registers,
                 &destructed_return_type_by_function,
                 &destructed_parameters_by_function,
-                def.entry_block.clone(),
+                def,
             );
         });
 
@@ -202,14 +199,14 @@ fn destruct_locals(
         InternedString,
         HashMap<InternedString, Shared<Type>>,
     >,
-    entry_block: ControlFlowBlock,
+    def: &FunctionDefinition,
 ) {
     let mut destructed_local_variables = destructed_parameters_by_function
         .get(&function_name)
         .cloned()
         .unwrap_or_default();
 
-    entry_block.iter().for_each(|block| {
+    def.entry_block.iter().for_each(|block| {
         let destructed = block
             .statements()
             .into_iter()
@@ -356,7 +353,7 @@ fn destruct_locals(
                                     .map(Shared::new)
                                     .collect();
                                 }
-                                Value::Struct { name, fields } => {
+                                Value::Struct { name, .. } => {
                                     if let Some(dst_root_typ) = destructed_local_variables
                                         .get(&destination.root())
                                         .or_else(|| destructed_registers.get(&destination.root()))
@@ -640,7 +637,9 @@ fn destruct_locals(
         }
     });
 
-    DestructorVisitor::new(destructed_local_variables).visit_control_flow_block(&entry_block);
+    DestructorVisitor::new(destructed_local_variables).visit_function_definition(def);
+
+    FieldSimplifier.visit_function_definition(def);
 }
 
 fn create_union_construction_copies(
@@ -1203,8 +1202,8 @@ fn destruct_struct_value(
             name,
         } => {
             let Type::Struct {
-                name,
                 fields: type_fields,
+                ..
             } = &*composites.get(name).unwrap().get()
             else {
                 unreachable!()
@@ -1217,5 +1216,29 @@ fn destruct_struct_value(
                 .collect()
         }
         _ => vec![value.clone()],
+    }
+}
+
+struct FieldSimplifier;
+
+impl Visitor for FieldSimplifier {
+    fn visit_value(&mut self, node: Shared<Value>) {
+        let node = &mut *node.get_mut();
+
+        if let Value::Field { value, field_name } = node.clone() {
+            if let Value::Struct { fields, .. } = &*value.get() {
+                let new_value = fields
+                    .iter()
+                    .find(|nv| nv.name == field_name)
+                    .unwrap()
+                    .value
+                    .get()
+                    .clone();
+
+                *node = new_value;
+            }
+        }
+
+        node.walk(self);
     }
 }
