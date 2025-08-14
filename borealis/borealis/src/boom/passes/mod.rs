@@ -67,7 +67,9 @@ pub fn run(ast: Shared<Ast>) {
         &mut [
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
-            ConstantPropogation::new_boxed(),
+            // constant propogation works, just breaks some assumptions in rudder conversion, todo:
+            // revisit and re-enable, it shouldnt be too hard
+            // ConstantPropogation::new_boxed(),
             // MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],

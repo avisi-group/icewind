@@ -247,7 +247,7 @@ fn cast_integer(value: Constant, typ: Type) -> Constant {
     match &typ {
         Type::Primitive(primitive) => match (value, primitive) {
             (Constant::UnsignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
-                Constant::new_signed(i64::try_from(value).unwrap(), *width)
+                Constant::new_signed(value as i64, *width)
             }
             (Constant::SignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
                 Constant::new_signed(value, *width)
