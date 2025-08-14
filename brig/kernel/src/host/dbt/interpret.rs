@@ -589,40 +589,9 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     None
                 }
                 Statement::WriteRegister { offset, value } => {
-                    let (value, width) = match self.resolve(value) {
-                        Value::UnsignedInteger { value, width } => (value, width),
-                        Value::SignedInteger { value, width } => {
-                            (value as u64 & mask(width), width)
-                        }
-                        Value::Vector(values) => {
-                            todo!("write-reg {values:?}")
-                        }
-                        t => todo!("{t:?}"),
-                    };
-
                     let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
 
-                    match width {
-                        1..=8 => self
-                            .register_file
-                            .write_raw(offset, u8::try_from(value).unwrap()),
-                        9..=16 => self
-                            .register_file
-                            .write_raw(offset, u16::try_from(value).unwrap()),
-                        17..=32 => self
-                            .register_file
-                            .write_raw(offset, u32::try_from(value).unwrap()),
-                        33..=64 => self.register_file.write_raw(offset, value),
-                        65..=128 => {
-                            self.register_file.write_raw(offset, value);
-                            self.register_file.write_raw(offset + 8, 0u64); // todo: hack
-                        }
-                        w => {
-                            log::trace!(
-                                "tried to write {value} to a {w} bit register offset {offset}, did nothing"
-                            );
-                        }
-                    }
+                    self.write_register(self.resolve(value), offset);
 
                     None
                 }
@@ -684,6 +653,54 @@ impl<'f, 'r> Interpreter<'f, 'r> {
         }
 
         unreachable!("block must end in a panic, jump, return, or branch")
+    }
+
+    fn write_register(&mut self, value: Value, offset: usize) {
+        let (value, width) = match value {
+            Value::UnsignedInteger { value, width } => (value, width),
+            Value::SignedInteger { value, width } => (value as u64 & mask(width), width),
+            Value::Vector(values) => {
+                // assumes all vector values have the same width
+                let Some(Value::UnsignedInteger { width, .. } | Value::SignedInteger { width, .. }) =
+                    values.first()
+                else {
+                    todo!()
+                };
+                let width = usize::try_from(*width).unwrap();
+
+                values
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, value)| (i * width, value))
+                    .for_each(|(offset, value)| {
+                        self.write_register(value, offset);
+                    });
+                return;
+            }
+            t => todo!("{t:?}"),
+        };
+
+        match width {
+            1..=8 => self
+                .register_file
+                .write_raw(offset, u8::try_from(value).unwrap()),
+            9..=16 => self
+                .register_file
+                .write_raw(offset, u16::try_from(value).unwrap()),
+            17..=32 => self
+                .register_file
+                .write_raw(offset, u32::try_from(value).unwrap()),
+            33..=64 => self.register_file.write_raw(offset, value),
+            65..=128 => {
+                self.register_file.write_raw(offset, value);
+                self.register_file.write_raw(offset + 8, 0u64); // todo: hack
+            }
+            w => {
+                log::trace!(
+                    "tried to write {value} to a {w} bit register offset {offset}, did nothing"
+                );
+            }
+        }
     }
 
     fn read_register(&self, typ: &Type, offset: usize) -> Value {
