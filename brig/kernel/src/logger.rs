@@ -26,7 +26,7 @@ static LOGGER: &Logger = &Logger {
         ),
         ("kernel::host::dbt::x86", LevelFilter::Info),
         ("kernel::host::dbt::translate", LevelFilter::Info),
-        ("kernel::host::dbt::interpret", LevelFilter::Info),
+        ("kernel::host::dbt::interpret", LevelFilter::Debug),
         ("kernel::host::arch::x86::irq", LevelFilter::Trace),
         ("kernel::host::arch::x86::aarch64_mmu", LevelFilter::Trace),
         ("kernel::guest::devices::arm::a9gic", LevelFilter::Debug),

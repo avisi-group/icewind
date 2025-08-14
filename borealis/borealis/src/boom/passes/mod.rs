@@ -6,7 +6,16 @@
 //! * Builtin function handling
 
 use {
-    crate::boom::Ast,
+    crate::boom::{
+        Ast,
+        passes::{
+            builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
+            cycle_finder::CycleFinder, destruct_composites::DestructComposites,
+            fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
+            remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
+            remove_units::RemoveUnits,
+        },
+    },
     common::intern::InternedString,
     log::info,
     sailrs::shared::Shared,
@@ -27,6 +36,7 @@ pub mod monomorphize_vectors;
 pub mod remove_const_branch;
 pub mod remove_constant_type;
 pub mod remove_units;
+
 /// Pass that performs an operation on an AST
 pub trait Pass {
     /// Gets the name of the pass
@@ -39,9 +49,34 @@ pub trait Pass {
     fn reset(&mut self);
 }
 
+pub fn run(ast: Shared<Ast>) {
+    [
+        LowerReals::new_boxed(),
+        HandleBuiltinFunctions::new_boxed(),
+        RemoveConstantType::new_boxed(),
+        DestructComposites::new_boxed(),
+        RemoveUnits::new_boxed(),
+    ]
+    .into_iter()
+    .for_each(|mut pass| {
+        info!("{}", pass.name());
+        pass.run(ast.clone());
+    });
+    run_fixed_point(
+        ast.clone(),
+        &mut [
+            FoldUnconditionals::new_boxed(),
+            RemoveConstBranch::new_boxed(),
+            ConstantPropogation::new_boxed(),
+            // MonomorphizeVectors::new_boxed(),
+            CycleFinder::new_boxed(),
+        ],
+    );
+}
+
 /// Run each pass until it does not mutate the AST, and run the whole sequence
 /// of passes until no pass mutates the AST
-pub fn run_fixed_point(ast: Shared<Ast>, passes: &mut [Box<dyn Pass>]) {
+fn run_fixed_point(ast: Shared<Ast>, passes: &mut [Box<dyn Pass>]) {
     // ironically, we *do* want to short-circuit here
     // behaviour is "keep running the passes in order until none change"
     loop {

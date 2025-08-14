@@ -1,16 +1,6 @@
 use {
     borealis::{
-        boom::{
-            self,
-            passes::{
-                builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
-                cycle_finder::CycleFinder, destruct_composites::DestructComposites,
-                fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_units::RemoveUnits,
-            },
-        },
-        fn_is_allowlisted,
+        boom, fn_is_allowlisted,
         jib::{self, parse_ir},
         jib_legacy::{self, load_model},
         rudder::{
@@ -92,37 +82,30 @@ fn main() -> Result<()> {
         jib_legacy::convert::jib_to_boom(jib_legacy::jib_wip_filter(jib_ast))
     };
 
-    // // useful for debugging
+    // useful for debugging
     if let Some(path) = &args.dump_ir {
         boom::pretty_print::print_ast(
             &mut create_file_buffered(path.join("ast.boom")).unwrap(),
             ast.clone(),
         );
+
+        // boom::control_flow::dot::render(
+        //     &mut create_file_buffered(path.join("
+        // decode_aarch32_instrs_UMULL_A1enc_A_txt.dot"))
+        //         .unwrap(),
+        //     &ast.get()
+        //         .functions
+        //         .get(&InternedString::from(
+        //             "decode_aarch32_instrs_UMULL_A1enc_A_txt",
+        //         ))
+        //         .unwrap()
+        //         .entry_block,
+        // )
+        // .unwrap();
     }
 
     info!("Running passes on BOOM");
-    [
-        LowerReals::new_boxed(),
-        HandleBuiltinFunctions::new_boxed(),
-        RemoveConstantType::new_boxed(),
-        DestructComposites::new_boxed(),
-        RemoveUnits::new_boxed(),
-    ]
-    .into_iter()
-    .for_each(|mut pass| {
-        info!("{}", pass.name());
-        pass.run(ast.clone());
-    });
-    boom::passes::run_fixed_point(
-        ast.clone(),
-        &mut [
-            FoldUnconditionals::new_boxed(),
-            RemoveConstBranch::new_boxed(),
-            ConstantPropogation::new_boxed(),
-            // MonomorphizeVectors::new_boxed(),
-            CycleFinder::new_boxed(),
-        ],
-    );
+    boom::passes::run(ast.clone());
 
     if let Some(path) = &args.dump_ir {
         boom::pretty_print::print_ast(

@@ -1254,6 +1254,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 },
             )),
 
+            //| "Zeros"
             "sail_zeros" => {
                 let length = args[0].clone();
 
