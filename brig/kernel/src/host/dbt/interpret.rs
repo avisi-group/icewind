@@ -405,7 +405,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                                     width: *width,
                                 })
                             } else {
-                                todo!()
+                                todo!("{target_width} != {width}")
                             }
                         }
                         (
@@ -427,7 +427,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         (CastOperationKind::Convert, Type::Bits, Value::UnsignedInteger { .. }) => {
                             Some(value)
                         }
-                        (k, t, v) => todo!("{k:?} {t:?} {v:?}"),
+                        (k, t, v) => todo!("cast type: {k:?}, to: {t:?}, from: {v:?}"),
                     }
                 }
                 Statement::BitsCast {

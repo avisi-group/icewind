@@ -422,29 +422,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     }
 
     fn visit_value(&mut self, node: Shared<Value>) {
-        fn write_uid<W: Write>(
-            printer: &mut PrettyPrinter<'_, W>,
-            id: InternedString,
-            typs: &[Shared<Type>],
-        ) {
-            write!(printer.writer, "{id}").unwrap();
-
-            if !typs.is_empty() {
-                write!(printer.writer, "<").unwrap();
-
-                let mut typs = typs.iter();
-                if let Some(typ) = typs.next() {
-                    printer.visit_type(typ.clone());
-                }
-                for typ in typs {
-                    write!(printer.writer, ", ").unwrap();
-                    printer.visit_type(typ.clone());
-                }
-
-                write!(printer.writer, ">").unwrap();
-            }
-        }
-
         match &*node.get() {
             Value::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
             Value::Literal(literal) => self.visit_literal(literal.clone()),

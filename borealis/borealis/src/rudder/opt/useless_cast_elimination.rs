@@ -2,7 +2,12 @@ use {
     crate::rudder::{analysis::dfa::StatementUseAnalysis, opt::OptimizationContext},
     common::{
         arena::{Arena, Ref},
-        rudder::{block::Block, function::Function},
+        rudder::{
+            block::Block,
+            function::Function,
+            statement::{CastOperationKind, Statement},
+            types::Type,
+        },
     },
 };
 
@@ -17,41 +22,74 @@ pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
 }
 
 fn run_on_block(ctx: &OptimizationContext, arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
-    let mut _changed = false;
+    let mut sua = StatementUseAnalysis::new(arena, b, &ctx.purity);
 
-    let mut _sua = StatementUseAnalysis::new(arena, b, &ctx.purity);
+    for stmt in b
+        .get(sua.block_arena())
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
+        match stmt.get(b.get(sua.block_arena()).arena()).clone() {
+            Statement::Cast {
+                kind: CastOperationKind::Convert,
+                typ,
+                value,
+            } => {
+                let source_type = value
+                    .get(b.get(sua.block_arena()).arena())
+                    .clone()
+                    .typ(b.get(sua.block_arena()).arena())
+                    .clone()
+                    .unwrap();
 
-    // for stmt in b
-    //     .get(sua.block_arena())
-    //     .statements()
-    //     .iter()
-    //     .copied()
-    //     .collect::<Vec<_>>()
-    // {
-    //     match stmt.get(b.get(sua.block_arena()).arena()).clone() {
-    //         Statement::Cast { typ, value, .. } => {
-    //             // If the cast is to the same type then it is probably useless
-    //             if value
-    //                 .get(b.get(sua.block_arena()).arena())
-    //                 .clone()
-    //                 .typ(b.get(sua.block_arena()).arena())
-    //                 .as_ref()
-    //                 == Some(&typ)
-    //             {
-    //                 // replace uses
-    //                 if let Some(uses) = sua.get_uses(stmt) {
-    //                     uses.iter().for_each(|s| {
-    //                         s.get_mut(b.get(sua.block_arena()).arena_mut())
-    //                             .replace_use(stmt, value);
-    //                     });
-    //                 }
+                // no-op, remove
+                if source_type == typ {
+                    // remove the cast
+                    if let Some(uses) = sua.get_uses(stmt).cloned() {
+                        uses.iter().for_each(|s| {
+                            s.get_mut(b.get_mut(sua.block_arena()).arena_mut())
+                                .replace_use(stmt, value);
+                        });
 
-    //                 changed = true;
-    //             }
-    //         }
-    //         _ => {}
-    //     }
-    // }
+                        // need to recompute SUA
+                        return true;
+                    }
+                }
 
-    _changed
+                // if we're casting to a vector of length 0
+                if let Type::Vector {
+                    element_count: 0,
+                    element_type: target_element_type,
+                } = typ
+                {
+                    // from a vector
+                    if let Type::Vector {
+                        element_count,
+                        element_type: source_element_type,
+                    } = source_type
+                    {
+                        // with a >0 element count
+                        // and the types are the same
+                        if element_count > 0 && *target_element_type == *source_element_type {
+                            // remove the cast
+                            if let Some(uses) = sua.get_uses(stmt).cloned() {
+                                uses.iter().for_each(|s| {
+                                    s.get_mut(b.get_mut(sua.block_arena()).arena_mut())
+                                        .replace_use(stmt, value);
+                                });
+
+                                // need to recompute SUA
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    false
 }

@@ -1,7 +1,7 @@
 use {
     crate::rudder::analysis::pure::PurityAnalysis,
     common::rudder::{Model, function::Function},
-    log::trace,
+    log::{debug, trace},
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };
 
@@ -105,12 +105,12 @@ fn run_function_passes(ctx: &OptimizationContext, model: &mut Model) -> bool {
         .for_each(|(name, function)| {
             let mut changed = true;
 
-            trace!("optimising function {name:?}");
+            debug!("optimising function {name:?}");
 
             while changed {
                 changed = false;
                 for pass in &passes {
-                    trace!("running function pass {}", pass.0);
+                    debug!("running function pass {}", pass.0);
 
                     while pass.1(ctx, function) {
                         changed = true;
