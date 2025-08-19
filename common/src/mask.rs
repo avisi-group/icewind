@@ -4,7 +4,7 @@ pub fn mask<I: Into<u32>>(width: I) -> u64 {
 
     if overflowed {
         if n > u64::BITS {
-            log::warn!("overflowed while generating mask of {n} 1s")
+            log::debug!("overflowed while generating mask of {n} 1s")
         }
 
         u64::MAX

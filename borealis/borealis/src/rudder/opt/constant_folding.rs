@@ -145,6 +145,41 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 _ => false,
             }
         }
+        Statement::CreateBits { value, width } => {
+            let width = width.get(arena).clone();
+            let value = value.get_mut(arena);
+
+            match (value, width) {
+                (Statement::Constant(value), Statement::Constant(width)) => {
+                    let Constant::SignedInteger {
+                        value: target_width,
+                        ..
+                    } = width
+                    else {
+                        panic!()
+                    };
+                    let target_width = u32::try_from(target_width).unwrap();
+
+                    let Constant::UnsignedInteger { value, .. } = value else {
+                        panic!()
+                    };
+
+                    let constant = Constant::UnsignedInteger {
+                        value: *value & mask(target_width),
+                        width: target_width,
+                    };
+
+                    stmt.get_mut(arena).replace(Statement::Constant(constant));
+
+                    true
+                }
+                (_, Statement::Constant(width)) => {
+                    // todo: replace with cast
+                    false
+                }
+                _ => false,
+            }
+        }
         Statement::SizeOf { value } => {
             let target = value.get(arena);
             match target.typ(&arena) {
