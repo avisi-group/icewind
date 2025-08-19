@@ -8,14 +8,14 @@
 /dts-v1/;
 
 / {
-	model = "Sail v8.5-A";
+	model = "Sail v8.5-A FERDIA";
 	compatible = "arm,sail";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
 	#size-cells = <2>;
 
 	chosen {
-	       bootargs = "earlycon=pl011,0x3c000000 console=tty0 loglevel=9 debug acpi=off sched_debug keep_bootcon nohlt root=/dev/vda";
+	    bootargs = "earlycon=pl011,0x3c000000 console=ttyAMA0 loglevel=9 debug acpi=off sched_debug keep_bootcon nohlt root=/dev/vda";
 	};
 
 	cpus {
@@ -37,7 +37,9 @@
 	serial0: uart@3c000000 {
 		compatible = "arm,pl011", "arm,primecell";
 		reg = <0x0 0x3c000000 0 0x1000>;
-		interrupts = <1 5 0xf08>;
+		interrupts = <0x00 0x22 0x04>;
+		clocks = <0x02 0x02>;
+		clock-names = "uartclk\0apb_pclk";
 	};
 
 	timer {
@@ -62,5 +64,13 @@
 		compatible = "virtio,mmio";
 		reg = <0x00 0x3d000000 0x00 0x1000>;
 		interrupts = <0x00 0x20 0x04>;
+	};
+
+	apb-pclk {
+		compatible = "fixed-clock";
+		#clock-cells = <0x00>;
+		clock-frequency = <0x16e3600>;
+		clock-output-names = "clk24mhz";
+		phandle = <0x02>;
 	};
 };

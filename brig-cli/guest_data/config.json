@@ -42,22 +42,23 @@
             "initial_pc": "0x8000_0000"
         },
         {
-            "name": "serial",
-            "kind": "pl011",
-            "attach": {
-                "memory": {
-                    "address_space": "as0",
-                    "base": "0x3c00_0000"
-                }
-            }
-        },
-        {
             "name": "gic",
             "kind": "a9gic",
             "attach": {
                 "memory": {
                     "address_space": "as0",
                     "base": "0x2c00_0000"
+                }
+            }
+        },
+        {
+            "name": "serial",
+            "kind": "pl011",
+            "irq_controller": "gic",
+            "attach": {
+                "memory": {
+                    "address_space": "as0",
+                    "base": "0x3c00_0000"
                 }
             }
         },

@@ -12,6 +12,7 @@ pub const fn encode_sysreg_id(op0: u64, op1: u64, crn: u64, crm: u64, op2: u64) 
     (op0 << 19) | (op1 << 16) | (crn << 12) | (crm << 8) | (op2 << 5)
 }
 
+#[derive(Clone)]
 enum Handler {
     Device(Arc<dyn RegisterMappedDevice>),
     Fn(fn(u64)),
@@ -33,8 +34,10 @@ pub fn handler_exists(reg: u64) -> bool {
 }
 
 pub fn sys_reg_read(reg: u64) -> u64 {
-    let guard = SYSREG_HANDLERS.lock();
-    let handler = guard.get(&reg).unwrap();
+    let handler = {
+        let guard = SYSREG_HANDLERS.lock();
+        guard.get(&reg).unwrap().clone()
+    };
 
     let mut result = [0u8; 8];
 
@@ -47,8 +50,10 @@ pub fn sys_reg_read(reg: u64) -> u64 {
 }
 
 pub fn sys_reg_write(reg: u64, value: u64, len: u8) {
-    let guard = SYSREG_HANDLERS.lock();
-    let handler = guard.get(&reg).unwrap();
+    let handler = {
+        let guard = SYSREG_HANDLERS.lock();
+        guard.get(&reg).unwrap().clone()
+    };
 
     // TODO: 'len'
     match handler {

@@ -268,6 +268,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                 let (value, size) = match faulting_instruction.op1_kind() {
                                     OpKind::Register => match faulting_instruction.op1_register() {
                                         Register::CL => (machine_context.rcx, 1),
+                                        Register::CX => (machine_context.rcx, 2),
                                         Register::ECX => (machine_context.rcx, 4),
                                         reg => {
                                             exit_with_message!("todo write src reg {reg:?}")
@@ -336,8 +337,26 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                 device.write(offset, bytes);
                             } else {
                                 // read
+                                // todo: refactor me
                                 let (dest, size) = match faulting_instruction.code() {
                                     Code::Mov_r32_rm32 => {
+                                        let dest = faulting_instruction.op0_register();
+
+                                        let size = if dest.is_gpr8() {
+                                            1
+                                        } else if dest.is_gpr16() {
+                                            2
+                                        } else if dest.is_gpr32() {
+                                            4
+                                        } else if dest.is_gpr64() {
+                                            8
+                                        } else {
+                                            panic!()
+                                        };
+
+                                        (dest, size)
+                                    }
+                                    Code::Mov_r16_rm16 => {
                                         let dest = faulting_instruction.op0_register();
 
                                         let size = if dest.is_gpr8() {
@@ -373,9 +392,16 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     Register::EAX => {
                                         let data =
                                             u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-                                        // mask
-                                        machine_context.rax &= 0xFFFF_FFFF_0000_0000;
-                                        // or in data
+
+                                        // set data (will zero top half of rax when we cast data to
+                                        // a u64)
+                                        machine_context.rax = data as u64;
+                                    }
+                                    Register::AX => {
+                                        let data =
+                                            u16::from_le_bytes(bytes[0..2].try_into().unwrap());
+
+                                        machine_context.rax &= 0xFFFF_FFFF_FFFF_0000;
                                         machine_context.rax |= data as u64;
                                     }
                                     register => {

@@ -1,7 +1,9 @@
 use {
     crate::{
         host::{
-            arch::x86::irq::assign_irq, dbt::models::CURRENT_OPCODE, objects::tickable::Tickable,
+            arch::x86::{MachineContext, irq::assign_irq},
+            dbt::models::CURRENT_OPCODE,
+            objects::tickable::Tickable,
         },
         println,
         scheduler::{self, TIMER_FREQUENCY},
@@ -46,7 +48,7 @@ impl GlobalClock {
 }
 
 #[irq_handler(with_code = false)]
-fn timer_interrupt() {
+fn timer_interrupt(machine_context: *mut MachineContext) {
     // Our hacked in timer frequency is 1000 Hz, a period of 1ms -> so, that's
     // 1,000,000 nanoseconds in a 1ms period
     GLOBAL_CLOCK.increment(Hertz::new(TIMER_FREQUENCY).to_duration().unwrap());
@@ -55,9 +57,9 @@ fn timer_interrupt() {
 
     if current_time > Nanoseconds::new(90_000_000_000u64) {
         log::error!(
-            "{:#016x} ({:08x})",
+            "PC: {:#016x}, RIP: {:#016x}",
             get_current_device().register_file.read::<u64>("_PC"),
-            CURRENT_OPCODE.load(Ordering::Relaxed),
+            unsafe { (*machine_context).rip }
         );
     }
 
