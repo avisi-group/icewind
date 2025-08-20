@@ -559,12 +559,19 @@ impl<A: Alloc> Instruction<A> {
         Ok(Self(Opcode::MOV(src, dst)))
     }
 
-    pub fn movzx(src: Operand<A>, dst: Operand<A>) -> Self {
+    pub fn movzx(src: Operand<A>, dst: Operand<A>) -> Result<Self, Error<A>> {
         assert!(
             src.width() < dst.width(),
             "can't zero extend {src} to {dst}"
         );
-        Self(Opcode::MOVZX(src, dst))
+
+        if let OperandKind::Immediate(_) = src.kind()
+            && dst.width() == Width::_128
+        {
+            return Err(Error::MovImmediateSSE { src, dst });
+        }
+
+        Ok(Self(Opcode::MOVZX(src, dst)))
     }
 
     pub fn movsx(src: Operand<A>, dst: Operand<A>) -> Self {

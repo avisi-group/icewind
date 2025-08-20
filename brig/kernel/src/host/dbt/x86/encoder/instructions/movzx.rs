@@ -68,7 +68,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
                     .unwrap();
             }
-            (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),
+            (_, _) => todo!("{src} ({src_width}) -> {dst} zero extend mov not implemented"),
         },
         // MOVZX R -> R
         (

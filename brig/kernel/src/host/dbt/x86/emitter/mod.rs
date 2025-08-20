@@ -1201,7 +1201,12 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         })
     }
 
-    fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef) {
+    fn write_memory(
+        &mut self,
+        address: Self::NodeRef,
+        value: Self::NodeRef,
+        is_unprivileged: bool,
+    ) {
         let address = self.to_operand(&address);
         let OperandKind::Register(address_reg) = address.kind() else {
             panic!()
@@ -1246,9 +1251,29 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             self.push_instruction(Instruction::and(mask, address));
         }
 
+        if is_unprivileged {
+            self.push_instruction(
+                Instruction::mov(
+                    Operand::imm(Width::_32, 1),
+                    Operand::mem_seg_displ(32, SegmentRegister::FS, 16),
+                )
+                .unwrap(),
+            );
+        };
+
         self.push_instruction(
             Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
         );
+
+        if is_unprivileged {
+            self.push_instruction(
+                Instruction::mov(
+                    Operand::imm(Width::_32, 0),
+                    Operand::mem_seg_displ(32, SegmentRegister::FS, 16),
+                )
+                .unwrap(),
+            );
+        }
     }
 
     fn branch(
@@ -1388,10 +1413,14 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
         assert_eq!(CHAIN_CACHE_ENTRY_COUNT, (1 << 16));
         let masked_vreg = Operand::vreg(Width::_32, self.next_vreg());
-        self.push_instruction(Instruction::movzx(
-            Operand::vreg(Width::_16, shifted_pc_vreg), // bottom 16 bits = 65536 entries, check
-            masked_vreg,
-        ));
+        self.push_instruction(
+            Instruction::movzx(
+                Operand::vreg(Width::_16, shifted_pc_vreg), /* bottom 16 bits = 65536 entries,
+                                                             * check */
+                masked_vreg,
+            )
+            .unwrap(),
+        );
 
         self.push_instruction(Instruction::shl(Operand::imm(Width::_64, 4), masked_vreg));
 

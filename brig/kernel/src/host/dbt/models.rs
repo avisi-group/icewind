@@ -229,6 +229,14 @@ impl ModelDevice {
 
         let _status = record_safepoint();
 
+        log::error!(
+            "after record safepoint: status: {}, guest PC: {:#016x}, ELR_EL1: {:#016x}, FAR_EL1: {:#016x}",
+            _status,
+            self.well_known_registers.pc().read(),
+            self.register_file.read::<u64>("ELR_EL1"),
+            self.register_file.read::<u64>("FAR_EL1"),
+        );
+
         // block translation/execution loop
         loop {
             let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
@@ -468,6 +476,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref().starts_with("SPE")
         || name.as_ref() == "_MPAM3_EL3_bits"
         || name.as_ref() == "MPAM2_EL2_bits"
+    // todo: misisng leading underscore
     //     || name.as_ref() == "SCR_EL3_bits" // todo: re-enable me
     {
         RegisterCacheType::Read

@@ -70,7 +70,7 @@ pub trait Emitter<A: Alloc> {
     fn write_register(&mut self, offset: u64, value: Self::NodeRef);
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
-    fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef);
+    fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef, is_unprivileged: bool);
 
     fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef;
     fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef);

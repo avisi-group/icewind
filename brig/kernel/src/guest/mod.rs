@@ -39,6 +39,7 @@ impl Guest {
 pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,
     pub interrupt_pending: AtomicU64,
+    pub unprivileged_access: u64,
 }
 
 impl GuestExecutionContext {
@@ -50,6 +51,10 @@ impl GuestExecutionContext {
 
     pub fn current() -> &'static Self {
         unsafe { &*(rdfsbase() as *const Self) }
+    }
+
+    pub fn current_mut() -> &'static mut Self {
+        unsafe { &mut *(rdfsbase() as *mut Self) }
     }
 }
 
@@ -142,6 +147,7 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
             .unwrap()
             .as_mut() as *mut AddressSpace,
         interrupt_pending: AtomicU64::new(0),
+        unprivileged_access: 0,
     });
 
     log::debug!("activating guest execution context");

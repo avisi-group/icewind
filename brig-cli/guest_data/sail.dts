@@ -8,7 +8,7 @@
 /dts-v1/;
 
 / {
-	model = "Sail v8.5-A FERDIA";
+	model = "Sail v8.5-A BURDIA";
 	compatible = "arm,sail";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;

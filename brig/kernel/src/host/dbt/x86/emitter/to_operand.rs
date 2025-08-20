@@ -15,7 +15,7 @@ use {
             },
         },
     },
-    core::cmp::Ordering,
+    core::cmp::{Ordering, min},
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -37,25 +37,22 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     pub fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         let op = self.to_operand_inner(node);
 
+        // can't move immediates into XMM registers, so promote to reg
         if let OperandKind::Immediate(value) = op.kind() {
-            // can't move immediates into XMM registers, but we're only storing 64 bits for
-            // immediates anyway
-            let shrunk_op = if op.width() == Width::_128 {
-                Operand::imm(Width::_64, *value)
-            } else {
-                op
-            };
+            if op.width() > Width::_64 || (*value > u64::try_from(i32::MAX).unwrap()) {
+                // limit width to 64
+                // we only use 64 bits to store immediates so this truncation is fine for >64
+                // bit widthss
+                let target_width = min(Width::_64, op.width());
 
-            if *value > (i32::MAX as u64) {
-                let tmp = Operand::vreg(shrunk_op.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(shrunk_op, tmp).unwrap());
-                tmp
-            } else {
-                shrunk_op
+                let truncated_op = Operand::imm(target_width, *value);
+                let tmp = Operand::vreg(target_width, self.next_vreg());
+                self.push_instruction(Instruction::mov(truncated_op, tmp).unwrap());
+                return tmp;
             }
-        } else {
-            op
         }
+
+        op
     }
 
     fn to_operand_inner(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
@@ -152,7 +149,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 if value.width() < Width::_64 {
                     let tmp = Operand::vreg(Width::_64, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(value, tmp));
+                    self.push_instruction(Instruction::movzx(value, tmp).unwrap());
                     value = tmp;
                 }
 
@@ -196,7 +193,12 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             NodeKind::Cast { value, kind } => {
                 let target_width = Width::from_uncanonicalized(node.typ().width()).unwrap();
                 let dst = Operand::vreg(target_width, self.next_vreg());
-                let mut src = self.to_operand(value);
+
+                let mut src = if target_width > Width::_64 {
+                    self.to_operand_reg_promote(value)
+                } else {
+                    self.to_operand(value)
+                };
 
                 if node.typ() == value.typ() {
                     self.push_instruction(Instruction::mov(src, dst).unwrap());
@@ -206,7 +208,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             if src.width() == dst.width() {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());
                             } else {
-                                self.push_instruction(Instruction::movzx(src, dst));
+                                self.push_instruction(Instruction::movzx(src, dst).unwrap());
                             }
                         }
                         CastOperationKind::SignExtend => {
@@ -237,7 +239,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             Ordering::Equal => {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap())
                             }
-                            Ordering::Less => self.push_instruction(Instruction::movzx(src, dst)),
+                            Ordering::Less => {
+                                self.push_instruction(Instruction::movzx(src, dst).unwrap())
+                            }
                             Ordering::Greater => {
                                 src.set_width(dst.width());
 
@@ -326,7 +330,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     }
                     Ordering::Less => {
                         let new_source = Operand::vreg(target.width(), self.next_vreg());
-                        self.push_instruction(Instruction::movzx(source, new_source));
+                        self.push_instruction(Instruction::movzx(source, new_source).unwrap());
                         new_source
                     }
                 };
@@ -389,7 +393,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 // zero extend pattern if necessary
                 let pattern = if pattern.width() != destination_width {
                     let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(pattern, pattern_zx));
+                    self.push_instruction(Instruction::movzx(pattern, pattern_zx).unwrap());
                     pattern_zx
                 } else {
                     pattern
@@ -599,7 +603,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::setg(g));
                 self.push_instruction(Instruction::and(g, nz));
                 let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::movzx(nz, mask));
+                self.push_instruction(Instruction::movzx(nz, mask).unwrap());
 
                 self.push_instruction(Instruction::add(mask, quotient));
 
@@ -643,7 +647,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::sets(s));
                 self.push_instruction(Instruction::and(s, nz));
                 let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::movzx(nz, mask));
+                self.push_instruction(Instruction::movzx(nz, mask).unwrap());
 
                 self.push_instruction(Instruction::sub(mask, quotient));
 
@@ -692,13 +696,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 match left.width().cmp(&right.width()) {
                     Ordering::Less => {
                         let tmp = Operand::vreg(right.width(), self.next_vreg());
-                        self.push_instruction(Instruction::movzx(left, tmp));
+                        self.push_instruction(Instruction::movzx(left, tmp).unwrap());
                         (right, tmp)
                     }
                     Ordering::Equal => (left, right),
                     Ordering::Greater => {
                         let tmp = Operand::vreg(left.width(), self.next_vreg());
-                        self.push_instruction(Instruction::movzx(right, tmp));
+                        self.push_instruction(Instruction::movzx(right, tmp).unwrap());
 
                         (left, tmp)
                     }

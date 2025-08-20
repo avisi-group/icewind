@@ -2340,6 +2340,8 @@ fn ldrsw() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
+    log::error!("{translation:?}");
+
     // verified with this program:
     // let input: u64 = 0x8001_0000;
     // let input_ptr: u64 = (&input as *const u64) as u64;
@@ -5090,7 +5092,7 @@ fn simd_128_reg_to_mem() {
     .unwrap();
 
     let addr = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
-    emitter.write_memory(addr, result);
+    emitter.write_memory(addr, result, false);
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
@@ -5448,6 +5450,8 @@ fn stp_stuck_loop() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
+    log::error!("{translation:?}");
+
     let dst = Box::<(u64, u64)>::new((0, 0));
 
     register_file.write("SEE", -1i64);
@@ -5458,4 +5462,43 @@ fn stp_stuck_loop() {
     translation.execute(&register_file);
 
     assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
+
+#[ktest]
+fn sttr_2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //    f80008c3        sttr    x3, [x6]
+    // decode_sttr_aarch64_instrs_memory_single_general_immediate_signed_offset_unpriv
+    // execute_aarch64_instrs_memory_single_general_immediate_signed_offset_unpriv
+    let opcode = emitter.constant(0xf80008c3, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    log::warn!("{translation:?}");
+
+    let mut data = Box::new(0xffff_aaaa_ffff_aaaau64);
+
+    register_file.write::<u64>("R3", 0xbee5_abcd_0123_9876);
+    register_file.write::<u64>("R6", (&mut *data as *mut u64) as u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*data, 0xbee5_abcd_0123_9876);
 }

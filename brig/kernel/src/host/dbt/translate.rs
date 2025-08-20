@@ -23,7 +23,7 @@ use {
     core::{
         hash::{Hash, Hasher},
         panic,
-        sync::atomic::{AtomicU32, AtomicUsize, Ordering},
+        sync::atomic::{AtomicUsize, Ordering},
     },
     derive_where::derive_where,
     itertools::Itertools,
@@ -576,7 +576,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     variables,
                 } => {
                     self.emitter.set_current_block(x86_block);
-                    log::debug!(
+                    log::trace!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
                     let res = self.translate_block(rudder_block, false, variables)?;
@@ -993,9 +993,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
             Statement::WriteMemory { address, value } => {
+                let is_unprivileged = self.function.name().as_ref()
+                    == "execute_aarch64_instrs_memory_single_general_immediate_signed_offset_unpriv";
+
                 let address = value_store.get(*address);
                 let value = value_store.get(*value);
-                self.emitter.write_memory(address, value);
+                self.emitter.write_memory(address, value, is_unprivileged);
                 StatementResult::Data(None)
             }
             Statement::ReadPc => todo!(),
