@@ -27,7 +27,12 @@ pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
 
 /// Super hacky way of getting the currently executing `ModelDevice`
 pub fn get_current_device() -> &'static ModelDevice {
-    try_get_current_device().unwrap()
+    ((&**unsafe { crate::guest::GUEST.get().unwrap() }
+        .devices
+        .get(&("core0".into()))
+        .unwrap()) as &dyn core::any::Any)
+        .downcast_ref::<crate::host::dbt::models::ModelDevice>()
+        .unwrap()
 }
 
 /// Super hacky way of getting the currently executing `ModelDevice`
