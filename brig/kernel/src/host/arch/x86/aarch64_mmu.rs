@@ -6,27 +6,35 @@ use {
                 irq::exit_with_message, memory::guest_physical_to_host_virt,
                 safepoint::interrupt_restore_safepoint,
             },
-            dbt::{models::ModelDevice, sysreg_helpers::encode_sysreg_id},
+            dbt::{
+                models::{ModelDevice, write_to_el},
+                sysreg_helpers::encode_sysreg_id,
+            },
         },
         qemu_exit,
-        timer::GLOBAL_CLOCK,
         util::get_current_device,
     },
     aarch64_paging::paging::{Attributes, Descriptor},
-    core::any::Any,
-    embedded_time::duration::Nanoseconds,
 };
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);
+pub const DC_ZVA: u64 = encode_sysreg_id(0b01, 0b011, 0b0111, 0b0100, 0b001);
 
 pub fn at_s1e1r_handler(addr: u64) {
     let device = get_current_device();
 
-    let translated_address = guest_translate(device, addr, TranslationType::Translate);
+    let _translated_address = guest_translate(device, addr, TranslationType::Translate);
+}
 
-    device
-        .register_file
-        .write("_PAR_EL1_bits", translated_address);
+pub fn dc_zva_handler(addr: u64) {
+    let device = get_current_device();
+
+    //let _translated_address = guest_translate(device, addr,
+    // TranslationType::Translate);
+    //panic!("ZVA {addr:#016x}");
+
+    let dczid = device.register_file.read::<u64>("DCZID_EL0_bits");
+    unsafe { ((addr & 0xff_ffff_ffff) as *mut u8).write_bytes(0x00, (1 << (dczid & 0xf)) * 4) };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,7 +101,7 @@ pub fn guest_translate(
     };
 
     let effective_execution_level = if GuestExecutionContext::current().unprivileged_access != 0 {
-        log::error!(
+        log::debug!(
             "UNPRIVILEGED ACCESS PC={:x} FA={:x}",
             device.well_known_registers.pc().read(),
             guest_virtual_address
@@ -113,15 +121,30 @@ pub fn guest_translate(
     };
 
     match translate_l1(table, &mmu_txl_ctx, typ) {
-        Ok(addr) => addr,
+        Ok(addr) => {
+            if typ == TranslationType::Translate {
+                device
+                    .register_file
+                    .write("_PAR_EL1_bits", addr & 0x0000_ffff_ffff_f000);
+            }
+
+            addr
+        }
         Err(error) => {
             if typ == TranslationType::Fetch {
-                log::error!(
-                    "INSTRUCTION FETCH PC={:x} FA={:x}",
+                log::debug!(
+                    "INSTRUCTION FETCH FAULT PC={:x} FA={:x}",
                     device.well_known_registers.pc().read(),
                     guest_virtual_address
                 );
+            } else if typ == TranslationType::Translate {
+                device
+                    .register_file
+                    .write::<u64>("_PAR_EL1_bits", (error.to_syndrome() << 1) | 1);
+
+                return 0;
             }
+
             guest_page_fault(device, &mmu_txl_ctx, error);
             unreachable!();
         }

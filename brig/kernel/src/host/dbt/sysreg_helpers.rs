@@ -1,6 +1,6 @@
 use {
     crate::host::{
-        arch::x86::aarch64_mmu::{AT_S1E1R, at_s1e1r_handler},
+        arch::x86::aarch64_mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
         objects::device::RegisterMappedDevice,
     },
     alloc::sync::Arc,
@@ -21,7 +21,10 @@ enum Handler {
 
 static SYSREG_HANDLERS: Lazy<Mutex<HashMap<u64, Handler>>> = Lazy::new(|| {
     let mut map = HashMap::default();
+
     map.insert(AT_S1E1R, Handler::Fn(at_s1e1r_handler));
+    map.insert(DC_ZVA, Handler::Fn(dc_zva_handler));
+
     Mutex::new(map)
 });
 
@@ -33,7 +36,7 @@ pub fn handler_exists(reg: u64) -> bool {
     SYSREG_HANDLERS.lock().contains_key(&reg)
 }
 
-pub fn sys_reg_read(reg: u64) -> u64 {
+pub extern "C" fn sys_reg_read(reg: u64) -> u64 {
     let handler = {
         let guard = SYSREG_HANDLERS.lock();
         guard.get(&reg).unwrap().clone()
@@ -49,7 +52,7 @@ pub fn sys_reg_read(reg: u64) -> u64 {
     u64::from_le_bytes(result)
 }
 
-pub fn sys_reg_write(reg: u64, value: u64, len: u8) {
+pub extern "C" fn sys_reg_write(reg: u64, value: u64, len: u8) {
     let handler = {
         let guard = SYSREG_HANDLERS.lock();
         guard.get(&reg).unwrap().clone()

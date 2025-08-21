@@ -2340,8 +2340,6 @@ fn ldrsw() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::error!("{translation:?}");
-
     // verified with this program:
     // let input: u64 = 0x8001_0000;
     // let input_ptr: u64 = (&input as *const u64) as u64;
@@ -2550,9 +2548,6 @@ fn eret() {
     assert_eq!(register_file.read::<u8>("PSTATE_EL"), 3);
 
     register_file.write::<u64>("ELR_EL3", 0x8000_0020);
-
-    // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
-    // log::info!("{translation:?}");
 
     translation.execute(&register_file);
 
@@ -3700,7 +3695,6 @@ fn msr_elr_el2() {
     register_file.write::<u64>("R4", 0x82080000);
 
     // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
-    //log::info!("{translation:?}");
 
     translation.execute(&register_file);
 
@@ -3741,8 +3735,6 @@ fn eret_3() {
     register_file.write("SCR_EL3_bits", 0b1); // SCR_EL3.NS = 0
     assert_eq!(register_file.read::<u8>("PSTATE_EL"), 3);
     register_file.write::<u64>("ELR_EL3", 0x80000004);
-
-    // log::info!("{translation:?}");
 
     translation.execute(&register_file);
 
@@ -5016,8 +5008,6 @@ fn ldp_128() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    //  log::warn!("{translation:?}");
-
     let mem = alloc::boxed::Box::new((
         u128::from_ne_bytes([0xABu8; 16]),
         u128::from_ne_bytes([0xBAu8; 16]),
@@ -5450,8 +5440,6 @@ fn stp_stuck_loop() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::error!("{translation:?}");
-
     let dst = Box::<(u64, u64)>::new((0, 0));
 
     register_file.write("SEE", -1i64);
@@ -5491,7 +5479,6 @@ fn sttr_2() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    log::warn!("{translation:?}");
 
     let mut data = Box::new(0xffff_aaaa_ffff_aaaau64);
 

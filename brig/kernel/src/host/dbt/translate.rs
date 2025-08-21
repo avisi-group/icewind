@@ -1119,6 +1119,16 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.emitter.execution_result.set_need_tlb_invalidate(true);
                 }
 
+                // if target.as_ref() == "AArch64_CallSupervisor" {
+                //     let function = self.emitter.function_ptr(svc_debug as u64);
+                //     let value = self
+                //         .emitter
+                //         .read_register(self.model.reg_offset("R8"), Type::Unsigned(64));
+                //     let mut args = Vec::new_in(self.allocator);
+                //     args.push(value);
+                //     self.emitter.call(function, args);
+                // }
+
                 let res = StatementResult::Data(translate_with_variable_ids(
                     self.allocator.clone(),
                     self.model,
@@ -1131,6 +1141,16 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                                        * called functions' variables
                                                        * don't corrupt this function's */
                 )?);
+
+                // if target.as_ref() == "AArch64_CallSupervisor" {
+                //     let function = self.emitter.function_ptr(svc_debug as u64);
+                //     let value = self
+                //         .emitter
+                //         .read_register(self.model.reg_offset("R0"), Type::Unsigned(64));
+                //     let mut args = Vec::new_in(self.allocator);
+                //     args.push(value);
+                //     self.emitter.call(function, args);
+                // }
 
                 log::debug!(
                     "finished translating {:?}, now in {:?}",
@@ -1410,7 +1430,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     fn allocate_variable_id(&self) -> usize {
         let id = self.current_variable_id.fetch_add(1, Ordering::Relaxed);
 
-        if id == GLOBAL_REGISTER_SIZE / 8 {
+        // todo: be better about this
+        if id >= GLOBAL_REGISTER_SIZE / 8 {
             panic!("variable number {id:#x} exceeded MAX_STACK_SIZE ({GLOBAL_REGISTER_SIZE:#x})")
         }
 

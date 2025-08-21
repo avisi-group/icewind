@@ -215,10 +215,9 @@ impl ModelDevice {
     fn block_exec(&self, single_step_mode: bool) {
         let mut instructions_executed = 0usize;
 
-        // guest PC to translated block cache
-        // todo: should be guest physical address not virtual so we dont need to
-        // invalidate
+        // guest physical PC to translated block cache
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
+
         // guest virtual address
         let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
 
@@ -229,7 +228,7 @@ impl ModelDevice {
 
         let _status = record_safepoint();
 
-        log::error!(
+        log::debug!(
             "after record safepoint: status: {}, guest PC: {:#016x}, ELR_EL1: {:#016x}, FAR_EL1: {:#016x}",
             _status,
             self.well_known_registers.pc().read(),
