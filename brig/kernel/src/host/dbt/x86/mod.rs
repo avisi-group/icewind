@@ -43,6 +43,7 @@ pub struct X86TranslationContext<A: Alloc> {
     function_cache: HashMapA<InternedString, CachedFunction<A>, A>,
 
     pc_offset: u64,
+    el_offset: u64,
     sctlr_el1_offset: u64,
     ttbr0_el1_offset: u64,
     ttbr1_el1_offset: u64,
@@ -113,6 +114,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             function_cache: hashmap_in(allocator),
 
             pc_offset: model.reg_offset("_PC"),
+            el_offset: model.reg_offset("PSTATE_EL"),
             sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),
             ttbr0_el1_offset: model.reg_offset("_TTBR0_EL1_bits"),
             ttbr1_el1_offset: model.reg_offset("_TTBR1_EL1_bits"),

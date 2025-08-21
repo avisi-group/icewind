@@ -316,6 +316,7 @@ pub fn take_arm_exception(
     log::trace!("voff: {voff:x}");
 
     // Update the execution level
+    write_to_el(current_el, target_el);
     device.register_file.write::<u8>("PSTATE_EL", target_el);
 
     // Update spsel

@@ -4,7 +4,7 @@ use {
         host::dbt::{
             Alloc, bit_extract, bit_insert,
             emitter::Type,
-            models::CHAIN_CACHE_ENTRY_COUNT,
+            models::{CHAIN_CACHE_ENTRY_COUNT, write_to_el},
             trampoline::ExecutionResult,
             x86::{
                 Emitter, X86TranslationContext,
@@ -1165,24 +1165,37 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         //     false
         // };
 
-        let optimised = false;
+        if offset == self.ctx().el_offset {
+            let function = self.function_ptr(write_to_el as u64);
 
-        if !optimised {
-            let value = self.to_operand(&value);
-            let width = value.width();
-
-            self.push_instruction(
-                Instruction::mov(
-                    value,
-                    Operand::mem_base_displ(
-                        width,
-                        Register::Physical(PhysicalRegister::RBP),
-                        offset.try_into().unwrap(),
-                    ),
-                )
-                .unwrap(),
+            let old = self.read_register(self.ctx().el_offset, Type::Unsigned(64));
+            let new = self.cast(
+                value.clone(),
+                Type::Unsigned(64),
+                CastOperationKind::ZeroExtend,
             );
+
+            let mut args = Vec::new_in(self.ctx().allocator());
+            args.push(old);
+            args.push(new);
+
+            self.call(function, args);
         }
+
+        let value = self.to_operand(&value);
+        let width = value.width();
+
+        self.push_instruction(
+            Instruction::mov(
+                value,
+                Operand::mem_base_displ(
+                    width,
+                    Register::Physical(PhysicalRegister::RBP),
+                    offset.try_into().unwrap(),
+                ),
+            )
+            .unwrap(),
+        );
 
         // TODO: Arch-specific hack
         if offset == self.ctx().sctlr_el1_offset
