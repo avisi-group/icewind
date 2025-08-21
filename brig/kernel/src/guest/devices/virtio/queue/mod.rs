@@ -253,11 +253,7 @@ impl VirtQueue {
 
             loop {
                 log::debug!("start of loop: {descr:?}");
-                // 			void *descr_host_addr;
-                // 			if (!guest().resolve_gpa((gpa_t)descr->addr, descr_host_addr))
-                // { 				ERROR << "Unable to resolve VirtIO descriptor
-                // physical address to host address"; 				abort();
-                // 			}
+
                 let descr_host_addr = guest_physical_to_host_virt(descr.addr).as_mut_ptr();
 
                 assert!(!descr.is_indirect());
@@ -348,7 +344,13 @@ impl VirtQueueEvent {
         log::debug!("read event: {sector:x}");
         assert_eq!(self.write_buffers.len(), 2);
 
-        allocate_physical(self.write_buffers[0].data);
+        // Fill the buffer with zeroes, to make sure the underlying storage has been
+        // allocated.
+        unsafe {
+            self.write_buffers[0]
+                .data
+                .write_bytes(0x00, self.write_buffers[0].size as usize)
+        };
 
         let destination = unsafe {
             core::slice::from_raw_parts_mut(
@@ -432,41 +434,4 @@ impl VirtQueueEvent {
 struct VirtQueueEventBuffer {
     data: *mut u8,
     size: u32,
-}
-
-/// If the supplied pointer does not have a physical mapping, allocate a new
-/// backing page and map it
-fn allocate_physical(ptr: *mut u8) {
-    let address = VirtAddr::from_ptr(ptr);
-
-    let physical = VirtualMemoryArea::current().opt.translate_addr(address);
-
-    if physical.is_some() {
-        return;
-    }
-
-    // Physical address lies within a RAM-backed region, so allocate a
-    // backing page.
-    let backing_page = VirtAddr::from_ptr(unsafe {
-        alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
-    })
-    .to_phys();
-
-    // Map the allocated backing page into the 1-1 guest phyical memory area
-    VirtualMemoryArea::current().map_page(
-        Page::<Size4KiB>::from_start_address(address.align_down(0x1000u64)).unwrap(),
-        PhysFrame::from_start_address(backing_page).unwrap(),
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-    );
-
-    log::debug!(
-        "allocated backing page {backing_page:x?} -> {:x?}",
-        address.align_down(0x1000u64)
-    );
-
-    VirtualMemoryArea::current().map_page_propagate_invalidation(
-        Page::<Size4KiB>::from_start_address(address.align_down(0x1000u64)).unwrap(),
-        PhysFrame::from_start_address(backing_page).unwrap(),
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-    );
 }

@@ -141,7 +141,7 @@ fn panic(info: &PanicInfo) -> ! {
 
     if let Some(device) = try_get_current_device() {
         log::error!(
-            "Guest PC = {:#016x}",
+            "Guest PC = {:#018x}",
             device.register_file.read::<u64>("_PC")
         );
 

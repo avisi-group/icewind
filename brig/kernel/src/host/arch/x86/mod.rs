@@ -118,7 +118,9 @@ impl Bus<X86SystemBusProbeData> for X86SystemBus {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct MachineContext {
+    pub previous_context: u64,
     pub r15: u64,
     pub r14: u64,
     pub r13: u64,
@@ -166,6 +168,7 @@ impl MachineContext {
             cs: 0,
             ss: 0,
             error_code: 0,
+            previous_context: 0,
         }
     }
 }

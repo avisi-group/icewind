@@ -63,6 +63,7 @@ pub fn local_run() -> ! {
         core::arch::asm!(
             "
             mov %gs:0, %rsp
+            pop %gs:0
             pop %r15
             pop %r14
             pop %r13

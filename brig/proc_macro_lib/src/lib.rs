@@ -177,10 +177,15 @@ fn generate_asm(inner_fn_ident: &str, with_code: bool) -> String {
    push %r13
    push %r14
    push %r15
+
+   push %gs:0
    mov %rsp, %gs:0
+
    mov %rsp, %rdi
    call {inner_fn_ident}
    mov %gs:0, %rsp
+   pop %gs:0
+
    pop %r15
    pop %r14
    pop %r13

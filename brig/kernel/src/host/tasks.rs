@@ -123,6 +123,7 @@ impl Task {
         context.cs = 0x8; // TODO: Less magic
         context.ss = 0x10;
         context.rbp = 0x0;
+        context.previous_context = 0;
 
         let inner = Arc::new_cyclic(|weak| InnerTask {
             tcb: TaskControlBlock {

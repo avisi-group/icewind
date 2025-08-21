@@ -229,7 +229,7 @@ impl ModelDevice {
         let _status = record_safepoint();
 
         log::debug!(
-            "after record safepoint: status: {}, guest PC: {:#016x}, ELR_EL1: {:#016x}, FAR_EL1: {:#016x}",
+            "after record safepoint: status: {}, guest PC: {:#018x}, ELR_EL1: {:#018x}, FAR_EL1: {:#018x}",
             _status,
             self.well_known_registers.pc().read(),
             self.register_file.read::<u64>("ELR_EL1"),

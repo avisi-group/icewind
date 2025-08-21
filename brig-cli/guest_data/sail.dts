@@ -8,7 +8,7 @@
 /dts-v1/;
 
 / {
-	model = "Sail v8.5-A BURDIA";
+	model = "Sail v9.4-A ICEWIND";
 	compatible = "arm,sail";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
@@ -16,7 +16,7 @@
 
 	chosen {
 		stdout-path = "/uart@3c000000";
-	    bootargs = "console=ttyAMA0 earlyprintk=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug nohlt root=/dev/vda";
+	    bootargs = "console=ttyAMA0 earlycon=pl011,0x3c000000 earlyprintk=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug nohlt root=/dev/vda";
 	};
 
 	cpus {

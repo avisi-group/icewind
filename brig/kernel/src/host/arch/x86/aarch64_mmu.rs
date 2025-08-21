@@ -31,7 +31,7 @@ pub fn dc_zva_handler(addr: u64) {
 
     //let _translated_address = guest_translate(device, addr,
     // TranslationType::Translate);
-    //panic!("ZVA {addr:#016x}");
+    //panic!("ZVA {addr:#018x}");
 
     let dczid = device.register_file.read::<u64>("DCZID_EL0_bits");
     unsafe { ((addr & 0xff_ffff_ffff) as *mut u8).write_bytes(0x00, (1 << (dczid & 0xf)) * 4) };
