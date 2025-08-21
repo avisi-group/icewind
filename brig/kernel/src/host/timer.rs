@@ -48,24 +48,12 @@ impl GlobalClock {
 }
 
 #[irq_handler(with_code = false)]
-fn timer_interrupt(machine_context: *mut MachineContext) {
+fn timer_interrupt() {
     // Our hacked in timer frequency is 1000 Hz, a period of 1ms -> so, that's
     // 1,000,000 nanoseconds in a 1ms period
     GLOBAL_CLOCK.increment(Hertz::new(TIMER_FREQUENCY).to_duration().unwrap());
 
     let current_time = GLOBAL_CLOCK.now(); // TODO: compute this period from timer interrupt frequency
-
-    if current_time > Nanoseconds::new(90_000_000_000u64) {
-        log::error!(
-            "PC: {:#016x}, RIP: {:#016x}",
-            get_current_device().register_file.read::<u64>("_PC"),
-            unsafe { (*machine_context).rip }
-        );
-    }
-
-    if current_time > Nanoseconds::new(100_000_000_000u64) {
-        panic!();
-    }
 
     handle_tickables(current_time);
 
