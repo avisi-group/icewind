@@ -174,6 +174,18 @@ fn translate_with_variable_ids<A: Alloc>(
     register_file: &RegisterFile,
     variable_ids: Rc<AtomicUsize, A>,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
+    if function == "__DecodeA64_Reserved" {
+        return translate_with_variable_ids(
+            allocator,
+            model,
+            "AArch64_UndefinedFault",
+            &[],
+            emitter,
+            register_file,
+            variable_ids,
+        );
+    }
+
     let (is_sysreg, is_read) = match function {
         "AArch64_SysRegRead" => (true, true),
         "AArch64_SysRegWrite" => (true, false),

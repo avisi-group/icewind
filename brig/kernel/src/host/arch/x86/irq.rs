@@ -34,20 +34,6 @@ use {
     },
 };
 
-/// Print supplied message at `error` level, then exit QEMU
-///
-/// Panicking inside IRQ handler results in infinite loop and clutters log
-/// output
-macro_rules! exit_with_message {
-    ($($arg:tt)*) => {
-        (|| {
-            log::error!($($arg)*);
-            qemu_exit()
-        })()
-    }
-}
-pub(crate) use exit_with_message;
-
 static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
 
 pub fn init() {
@@ -285,7 +271,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                                 Register::CX => (machine_context.rcx, 2),
                                                 Register::ECX => (machine_context.rcx, 4),
                                                 reg => {
-                                                    exit_with_message!("todo write src reg {reg:?}")
+                                                    panic!("todo write src reg {reg:?}")
                                                 }
                                             }
                                         }
@@ -319,7 +305,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                         }
 
                                         kind => {
-                                            exit_with_message!(
+                                            panic!(
                                                 "device write todo op1 kind {kind:?}  {faulting_instruction:?}"
                                             )
                                         }
@@ -329,7 +315,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     //     Code::Mov_rm8_r8 => match src {
                                     //         Register::CL => (machine_context.rcx, 1),
                                     //         reg => {
-                                    //             exit_with_message!("todo write src reg {reg:?}")
+                                    //             panic!("todo write src reg {reg:?}")
                                     //         }
                                     //     },
                                     //    => {
@@ -340,7 +326,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     //     }
 
                                     //     code => {
-                                    //         exit_with_message!(
+                                    //         panic!(
                                     //             "write code: {code:?}, instr:
                                     // {faulting_instruction:?}"
                                     //         )
@@ -391,7 +377,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                             (dest, size)
                                         }
                                         code => {
-                                            exit_with_message!(
+                                            panic!(
                                                 "read code: {code:?}, instr: {faulting_instruction:?}"
                                             )
                                         }
@@ -422,7 +408,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                             machine_context.rax |= data as u64;
                                         }
                                         register => {
-                                            exit_with_message!(
+                                            panic!(
                                                 "register: {register:?}, data: {bytes:?}, instr: {faulting_instruction:?}"
                                             )
                                         }
@@ -446,7 +432,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                         }
                     } else {
                         // Physical address not in valid guest region -- real fault.
-                        exit_with_message!(
+                        panic!(
                             "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
                         )
                     }
@@ -500,32 +486,32 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                         );
                     }
                     _ => {
-                        exit_with_message!(
+                        panic!(
                             "PAGE FAULT IN NON-RAM-BACKED GUEST PHYSICAL REGION code {error_code:?} @ {faulting_address:?}"
                         );
                     }
                 }
             } else {
-                exit_with_message!(
+                panic!(
                     "PAGE FAULT IN GUEST PHYSICAL REGION code {error_code:?} @ {faulting_address:?}"
                 );
             }
         }
 
         _ => {
-            exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
+            panic!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
         }
     }
 }
 
 #[irq_handler(with_code = false)]
 fn div0_exception() {
-    exit_with_message!("EXCEPTION: DIVIDE BY 0");
+    panic!("EXCEPTION: DIVIDE BY 0");
 }
 
 #[irq_handler(with_code = false)]
 fn breakpoint_exception() {
-    exit_with_message!("EXCEPTION: BREAKPOINT");
+    panic!("EXCEPTION: BREAKPOINT");
 }
 
 #[irq_handler(with_code = false)]
@@ -535,24 +521,24 @@ fn debug_exception() {
 
 #[irq_handler(with_code = true)]
 fn double_fault_exception() {
-    exit_with_message!("EXCEPTION: DOUBLE-FAULT");
+    panic!("EXCEPTION: DOUBLE-FAULT");
 }
 
 #[irq_handler(with_code = true)]
 fn gpf_exception(machine_context: *mut MachineContext) {
-    exit_with_message!("EXCEPTION: GENERAL PROTECTION FAULT\n{:#x?}", unsafe {
+    panic!("EXCEPTION: GENERAL PROTECTION FAULT\n{:#x?}", unsafe {
         &*machine_context
     });
 }
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_undefined_terminator(_machine_context: *mut MachineContext) {
-    exit_with_message!("DBT interrupt: undefined terminator")
+    panic!("DBT interrupt: undefined terminator")
 }
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_default_terminator(_machine_context: *mut MachineContext) {
-    exit_with_message!("DBT interrupt: default terminator")
+    panic!("DBT interrupt: default terminator")
 }
 
 #[irq_handler(with_code = true)]
@@ -570,7 +556,7 @@ fn dbt_handler_panic(machine_context: *mut MachineContext) {
     let block = (meta >> 16) as u16;
     let statement = meta as u16;
 
-    exit_with_message!(
+    panic!(
         "DBT interrupt: statement {statement:x} failed assert in block {block:x} of {function_name:?}"
     )
 }

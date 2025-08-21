@@ -4266,23 +4266,23 @@ fn udf() {
 
     register_file.write("SEE", -1i64);
 
-    //   00000000        udf
+    //   00000115        udf     #277
     translate_instruction(
         Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
         &register_file,
-        0x0,
+        00000115,
     )
     .unwrap();
 
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let _translation = ctx.compile(num_regs);
+    let translation = ctx.compile(num_regs);
 
-    //  translation.execute(&register_file); // todo
+    translation.execute(&register_file);
 }
 
 #[ktest]

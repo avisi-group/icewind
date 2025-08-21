@@ -107,6 +107,4 @@ pub fn backtrace() {
         log::error!("    {:x} : {}", pc, symbol);
         unsafe { stk = (*stk).rbp };
     }
-
-    qemu_exit();
 }

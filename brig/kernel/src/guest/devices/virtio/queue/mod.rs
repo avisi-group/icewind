@@ -4,17 +4,11 @@ use {
             devices::Irq,
             queue::defs::{BlkReq, BlkReqType},
         },
-        host::arch::x86::memory::{
-            VirtAddrExt as _, VirtualMemoryArea, guest_physical_to_host_virt,
-        },
+        host::arch::x86::memory::guest_physical_to_host_virt,
     },
-    alloc::{alloc::alloc_zeroed, vec::Vec},
-    core::{alloc::Layout, sync::atomic::AtomicU32},
+    alloc::vec::Vec,
+    core::sync::atomic::AtomicU32,
     x86::fence,
-    x86_64::{
-        VirtAddr,
-        structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate as _},
-    },
 };
 
 mod defs;

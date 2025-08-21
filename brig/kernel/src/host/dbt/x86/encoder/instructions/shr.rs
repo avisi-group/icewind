@@ -10,7 +10,7 @@ use {
         },
     },
     iced_x86::code_asm::{
-        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
 };
 
@@ -106,6 +106,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                     value_reg.into(),
                     PhysicalRegisterGeneral::RCX.into(),
                 )
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: I(amount), ..
+            },
+            Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_128,
+            },
+        ) => {
+            assert!(amount % 8 == 0);
+            assembler
+                .psrldq::<AsmRegisterXmm, u32>(value.into(), (amount / 8).try_into().unwrap())
                 .unwrap();
         }
         _ => todo!("shr {amount} {value}"),

@@ -3,15 +3,13 @@ use {
         guest::GuestExecutionContext,
         host::{
             arch::x86::{
-                irq::exit_with_message, memory::guest_physical_to_host_virt,
-                safepoint::interrupt_restore_safepoint,
+                memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
             },
             dbt::{
                 models::{ModelDevice, write_to_el},
                 sysreg_helpers::encode_sysreg_id,
             },
         },
-        qemu_exit,
         util::get_current_device,
     },
     aarch64_paging::paging::{Attributes, Descriptor},
@@ -63,7 +61,7 @@ pub fn guest_translate(
     // let ttbcr = device.register_file.read::<u32>("TTBCR_S_bits");
     // log::trace!("{ttbcr:032b}");
     // let ttbcr_n = ttbcr & 0b111;
-    // exit_with_message!("{ttbcr_n:03b}");
+    // panic!("{ttbcr_n:03b}");
 
     let ttbr0_el1 = device.register_file.read::<u64>("_TTBR0_EL1_bits");
     let ttbr1_el1 = device.register_file.read::<u64>("_TTBR1_EL1_bits");
@@ -75,7 +73,7 @@ pub fn guest_translate(
     let translation_table_base_guest_phys = match top_bit {
         0 => ttbr0_el1,
         1 => ttbr1_el1,
-        _ => exit_with_message!(""),
+        _ => unreachable!(),
     };
 
     let ttbgp_masked = translation_table_base_guest_phys & !0xffff000000000fff;
@@ -362,7 +360,7 @@ pub fn take_arm_exception(
             }
         }
     } else {
-        exit_with_message!("trap");
+        panic!("trap");
     }
 
     device.register_file.write::<u8>("PSTATE_D", 1);
@@ -374,7 +372,7 @@ pub fn take_arm_exception(
         1 => "VBAR_EL1",
         2 => "VBAR_EL2",
         3 => "VBAR_EL3",
-        _ => exit_with_message!("invalid EL \"{target_el}\""),
+        _ => panic!("invalid EL \"{target_el}\""),
     });
     log::trace!("vbar: {:x}", vbar);
 
@@ -429,7 +427,7 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u64 {
             0x32
         }
         _ => {
-            exit_with_message!("trap")
+            panic!("trap")
         }
     }
 }

@@ -146,7 +146,7 @@ fn panic(info: &PanicInfo) -> ! {
         );
 
         log::error!(
-            "Opcode = {:#x}",
+            "Opcode = {:#010x}",
             models::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
         );
     };

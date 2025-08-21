@@ -1,13 +1,8 @@
 use {
     crate::{
-        host::{
-            arch::x86::{MachineContext, irq::assign_irq},
-            dbt::models::CURRENT_OPCODE,
-            objects::tickable::Tickable,
-        },
+        host::{arch::x86::irq::assign_irq, objects::tickable::Tickable},
         println,
         scheduler::{self, TIMER_FREQUENCY},
-        util::get_current_device,
     },
     alloc::{sync::Arc, vec::Vec},
     core::sync::atomic::{AtomicU64, Ordering},
