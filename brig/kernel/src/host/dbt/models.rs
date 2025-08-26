@@ -16,6 +16,7 @@ use {
                     emitter::{BinaryOperationKind, X86Emitter},
                 },
             },
+            devices::manager::SharedDeviceManager,
             fs::Filesystem,
             memory::bump::{BumpAllocator, BumpAllocatorRef},
             objects::{
@@ -40,8 +41,8 @@ use {
     },
     core::{
         alloc::Layout,
-        fmt::{self, Debug},
-        sync::atomic::{AtomicU32, Ordering},
+        fmt::{self, Debug, Write},
+        sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
@@ -58,13 +59,15 @@ const SINGLE_STEP: bool = false;
 const PRINT_REGISTERS: bool = false;
 
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = true;
+const CHAIN_CACHE_ENABLED: bool = false;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
+static HIT_USERSPACE: AtomicBool = AtomicBool::new(false);
+
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
-pub static CURRENT_OPCODE: AtomicU32 = AtomicU32::new(0);
+pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
 
 pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -213,6 +216,13 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
+        let shared = SharedDeviceManager::get()
+            .get_device_by_alias("transport00:05.0")
+            .unwrap();
+        let crate::host::devices::Device::Transport(transport) = &mut *shared.lock() else {
+            panic!();
+        };
+
         let mut instructions_executed = 0usize;
 
         // guest physical PC to translated block cache
@@ -263,7 +273,7 @@ impl ModelDevice {
                             BumpAllocatorRef::new(&allocator),
                             chain_cache.table as u64,
                             block_start_virtual_pc,
-                            single_step_mode,
+                            HIT_USERSPACE.load(Ordering::Relaxed),
                         )
                     });
 
@@ -291,10 +301,17 @@ impl ModelDevice {
 
             instructions_executed += translated_block.opcodes.len();
 
-            CURRENT_OPCODE.store(
-                *translated_block.opcodes.first().unwrap(),
-                Ordering::Relaxed,
-            );
+            if block_start_virtual_pc < 0x50_0000 {
+                HIT_USERSPACE.store(true, Ordering::Relaxed);
+                // for opcode in &translated_block.opcodes {
+                //     log::error!("    {opcode:08x}");
+                // }
+                // log::error!("");
+            }
+
+            if HIT_USERSPACE.load(Ordering::Relaxed) {
+                writeln!(transport, "{block_start_virtual_pc:#018x}").unwrap();
+            }
 
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
@@ -361,6 +378,8 @@ impl ModelDevice {
 
             //#[cfg(feature = "debug_translation")]
             opcodes.push(opcode);
+
+            LAST_TRANSLATED_OPCODE.store(opcode, Ordering::Relaxed);
 
             let _return_value = translate_instruction(
                 allocator,

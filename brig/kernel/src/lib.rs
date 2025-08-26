@@ -146,8 +146,8 @@ fn panic(info: &PanicInfo) -> ! {
         );
 
         log::error!(
-            "Opcode = {:#010x}",
-            models::CURRENT_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
+            "Last translated opcode = {:#010x}",
+            models::LAST_TRANSLATED_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
         );
     };
 
