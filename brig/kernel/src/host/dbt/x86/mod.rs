@@ -199,41 +199,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 ));
         });
 
-        // temporary search for >64 bit general registers
-        // todo: deleteme
-        all_blocks.iter().for_each(|block| {
-            block
-                .get_mut(self.arena_mut())
-                .instructions()
-                .iter()
-                .for_each(|i| {
-                    assert!(!matches!(
-                        i,
-                        Instruction(Opcode::MOV(
-                            Operand {
-                                kind: OperandKind::Register(Register::Physical(
-                                    PhysicalRegister::General(_)
-                                )),
-                                width_in_bits: Width::_128
-                            },
-                            _
-                        ))
-                    ));
-                    assert!(!matches!(
-                        i,
-                        Instruction(Opcode::MOV(
-                            _,
-                            Operand {
-                                kind: OperandKind::Register(Register::Physical(
-                                    PhysicalRegister::General(_)
-                                )),
-                                width_in_bits: Width::_128
-                            }
-                        ))
-                    ));
-                });
-        });
-
         log::trace!("encoding all blocks");
 
         log::debug!("{}", dot::render(self.arena(), self.initial_block()));
