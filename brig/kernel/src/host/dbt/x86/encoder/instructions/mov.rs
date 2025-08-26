@@ -6,7 +6,7 @@ use {
             OperandKind::{Immediate as I, Memory as M, Register as R},
             Width, memory_operand_to_iced,
             registers::{
-                PhysicalRegister::{General as G, Xmm as X},
+                PhysicalRegister::{self, General as G, Xmm as X},
                 Register::Physical as PHYS,
             },
             segment_memory_operand_to_iced,
@@ -20,6 +20,26 @@ use {
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
     match (src, dst) {
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(PhysicalRegister::Xmm(xmm))),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            //assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+            assembler
+                .movq::<AsmRegister64, AsmRegisterXmm>(
+                    dst.into(),
+                    PhysicalRegister::Xmm(*xmm).into(),
+                )
+                .unwrap();
+        }
         // MOV R -> R
         (
             Operand {

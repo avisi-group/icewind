@@ -107,6 +107,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
                 .unwrap(),
 
+            // todo: hack
+            (Width::_16, Width::_128) => assembler
+                .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
+                .unwrap(),
             (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),
         },
 

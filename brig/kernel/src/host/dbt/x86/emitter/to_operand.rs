@@ -230,9 +230,19 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                                 );
                             }
 
-                            src.set_width(dst.width());
+                            // workaround because you can't mov xmm0:8 :(
+                            if src.width() > Width::_64 && dst.width() < Width::_32 {
+                                let mut intermediate = Operand::vreg(Width::_64, self.next_vreg());
 
-                            self.push_instruction(Instruction::mov(src, dst).unwrap());
+                                src.set_width(Width::_64);
+                                self.push_instruction(Instruction::mov(src, intermediate).unwrap());
+
+                                intermediate.set_width(dst.width());
+                                self.push_instruction(Instruction::mov(intermediate, dst).unwrap());
+                            } else {
+                                src.set_width(dst.width());
+                                self.push_instruction(Instruction::mov(src, dst).unwrap());
+                            }
                         }
 
                         CastOperationKind::Reinterpret => match src.width().cmp(&dst.width()) {
@@ -696,14 +706,37 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 match left.width().cmp(&right.width()) {
                     Ordering::Less => {
                         let tmp = Operand::vreg(right.width(), self.next_vreg());
+
+                        // todo: fix this and also general solution to needing to reg promote 128
+                        // bit stuff
+                        let left = if tmp.width() > Width::_64
+                            && matches!(left.kind(), OperandKind::Immediate(_))
+                        {
+                            let promoted = Operand::vreg(left.width(), self.next_vreg());
+                            self.push_instruction(Instruction::mov(left, promoted).unwrap());
+                            promoted
+                        } else {
+                            left
+                        };
+
                         self.push_instruction(Instruction::movzx(left, tmp).unwrap());
                         (right, tmp)
                     }
                     Ordering::Equal => (left, right),
                     Ordering::Greater => {
                         let tmp = Operand::vreg(left.width(), self.next_vreg());
-                        self.push_instruction(Instruction::movzx(right, tmp).unwrap());
 
+                        let right = if tmp.width() > Width::_64
+                            && matches!(right.kind(), OperandKind::Immediate(_))
+                        {
+                            let promoted = Operand::vreg(right.width(), self.next_vreg());
+                            self.push_instruction(Instruction::mov(right, promoted).unwrap());
+                            promoted
+                        } else {
+                            right
+                        };
+
+                        self.push_instruction(Instruction::movzx(right, tmp).unwrap());
                         (left, tmp)
                     }
                 }

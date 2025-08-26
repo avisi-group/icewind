@@ -5489,3 +5489,31 @@ fn sttr_2() {
 
     assert_eq!(*data, 0xbee5_abcd_0123_9876);
 }
+
+#[ktest]
+fn cmeq_v116b() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 4e209801        cmeq    v1.16b, v0.16b, #0
+    // execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd
+    let opcode = emitter.constant(0x4e209801, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let _translation = ctx.compile(num_regs);
+}
