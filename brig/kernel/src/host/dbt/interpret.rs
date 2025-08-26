@@ -417,6 +417,14 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             width: *width,
                         }),
                         (
+                            CastOperationKind::ZeroExtend,
+                            Type::Primitive(PrimitiveType::UnsignedInteger(width)),
+                            Value::SignedInteger { value, .. },
+                        ) => Some(Value::UnsignedInteger {
+                            value: u64::try_from(*value).unwrap(),
+                            width: *width,
+                        }),
+                        (
                             CastOperationKind::Truncate,
                             Type::Primitive(PrimitiveType::UnsignedInteger(width)),
                             Value::SignedInteger { value, .. },
@@ -427,6 +435,15 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         (CastOperationKind::Convert, Type::Bits, Value::UnsignedInteger { .. }) => {
                             Some(value)
                         }
+                        (
+                            CastOperationKind::Reinterpret,
+                            Type::Primitive(PrimitiveType::UnsignedInteger(dst_width)),
+                            Value::SignedInteger { value, .. },
+                        ) => Some(Value::UnsignedInteger {
+                            value: (*value as u64) & mask(*dst_width),
+                            width: *dst_width,
+                        }),
+
                         (k, t, v) => todo!("cast type: {k:?}, to: {t:?}, from: {v:?}"),
                     }
                 }

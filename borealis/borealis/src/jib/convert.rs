@@ -536,7 +536,7 @@ impl BoomEmitter {
             Exp::Unit => boom::Value::Literal(Shared::new(boom::Literal::Unit)),
             Exp::I64(i) => boom::Value::Literal(Shared::new(boom::Literal::Int(BigInt::from(*i)))),
             Exp::I128(i) => boom::Value::Literal(Shared::new(boom::Literal::Int(BigInt::from(*i)))),
-            Exp::Undefined(ty) => boom::Value::Literal(Shared::new(boom::Literal::Undefined)), /* todo: use type somehow? */
+            Exp::Undefined(_ty) => boom::Value::Literal(Shared::new(boom::Literal::Undefined)), /* todo: use type somehow? */
             Exp::Struct(name, fields) => boom::Value::Struct {
                 name: *name,
                 fields: fields

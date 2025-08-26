@@ -87,6 +87,32 @@ fn run_on_block(ctx: &OptimizationContext, arena: &mut Arena<Block>, b: Ref<Bloc
                     }
                 }
             }
+            Statement::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ,
+                value,
+            } => {
+                let arena = b.get_mut(sua.block_arena()).arena_mut();
+                if Some(typ) == value.get(arena).typ(arena) {
+                    let value_cloned = value.get(arena).clone();
+                    stmt.get_mut(arena).replace(value_cloned);
+                }
+            }
+
+            // too powerful
+            // but for real, something breaks if you add a pass that removes all casts if src type
+            // == dst type probably zero/sign extension stuff?
+            // todo
+            // Statement::Cast {
+            //     kind: _,
+            //     typ,
+            //     value,
+            // } => {
+            //     let arena = b.get_mut(sua.block_arena()).arena_mut();
+            //     if Some(typ) == value.get(arena).typ(arena) {
+            //         stmt.get_mut(arena).replace_use(stmt, value);
+            //     }
+            // }
             _ => {}
         }
     }

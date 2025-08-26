@@ -1117,7 +1117,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             // val ZeroExtend0 : (%bv, %i) -> %bv
             // val sail_zero_extend : (%bv, %i) -> %bv
-            "ZeroExtend0" | "sail_zero_extend" => {
+            "ZeroExtend0" | "sail_zero_extend" | "sail_zzero_extend" => {
                 let width = args[1].get(self.statement_arena());
                 if let Statement::Constant(width) = width {
                     let width = match width {

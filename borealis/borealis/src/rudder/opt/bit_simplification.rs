@@ -2,8 +2,16 @@ use {
     crate::rudder::opt::OptimizationContext,
     common::{
         arena::{Arena, Ref},
-        rudder::{block::Block, constant::Constant, function::Function, statement::Statement},
+        mask::mask,
+        rudder::{
+            block::Block,
+            constant::Constant,
+            function::Function,
+            statement::{CastOperationKind, Statement},
+            types::{PrimitiveType, Type},
+        },
     },
+    std::cmp::Ordering,
 };
 
 pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
@@ -47,6 +55,8 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             bit_extract_entire_value(arena, stmt, value, start, width)
                 || bit_extract_of_bit_insert(arena, stmt, value, start, width)
         }
+
+        Statement::CreateBits { value, width } => create_bits(arena, stmt, value, width),
 
         _ => {
             //trace!("candidate for folding not implemented: {}", stmt);
@@ -138,6 +148,64 @@ fn bit_extract_of_bit_insert(
 
     let insert_source = insert_source.get(arena).clone();
     stmt.get_mut(arena).replace(insert_source);
+
+    true
+}
+
+fn create_bits(
+    arena: &mut Arena<Statement>,
+    stmt: Ref<Statement>,
+    source_ref: Ref<Statement>,
+    width: Ref<Statement>,
+) -> bool {
+    // if the bits has a constant width
+    let width = match width.get(arena) {
+        Statement::Constant(Constant::UnsignedInteger { value, .. }) => {
+            u32::try_from(*value).unwrap()
+        }
+        Statement::Constant(Constant::SignedInteger { value, .. }) => {
+            u32::try_from(*value).unwrap()
+        }
+        _ => return false,
+    };
+
+    let source = source_ref.get(arena).clone();
+    let source_type = source.typ(arena).unwrap();
+
+    // if the source value is a constant, just change it's width
+    if let Statement::Constant(constant) = source {
+        let new_const = match constant {
+            Constant::UnsignedInteger { value, .. } => Constant::UnsignedInteger {
+                value: value & mask(width),
+                width,
+            },
+            _ => todo!(),
+        };
+
+        stmt.get_mut(arena).replace(Statement::Constant(new_const));
+
+        return true;
+    }
+
+    // destination type of cast
+    let typ = Type::Primitive(PrimitiveType::UnsignedInteger(width));
+
+    stmt.get_mut(arena)
+        .replace(match source_type.width_bits().cmp(&width) {
+            // zero extend if destination has more bits than source
+            Ordering::Less => Statement::Cast {
+                kind: CastOperationKind::ZeroExtend,
+                typ,
+                value: source_ref,
+            },
+            Ordering::Equal => source,
+            // truncate if destination has fewer bits than source
+            Ordering::Greater => Statement::Cast {
+                kind: CastOperationKind::Truncate,
+                typ,
+                value: source_ref,
+            },
+        });
 
     true
 }
