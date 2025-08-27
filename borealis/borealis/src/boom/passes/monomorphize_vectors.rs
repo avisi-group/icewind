@@ -41,99 +41,70 @@ impl Pass for MonomorphizeVectors {
     }
 }
 
-fn monomorphize_vectors(_: Shared<Ast>, entry_block: ControlFlowBlock) -> bool {
-    let mut type_declarations = HashMap::default();
+fn monomorphize_vectors(ast: Shared<Ast>, entry_block: ControlFlowBlock) -> bool {
+    let mut did_change = false;
+
+    let mut fixed_vectors = ast
+        .get()
+        .registers
+        .iter()
+        .filter(|(_, typ)| matches!(&*typ.get(), Type::FixedVector { .. }))
+        .map(|(name, typ)| (*name, typ.get().clone()))
+        .collect::<HashMap<_, _>>();
+
+    let mut local_dynamic_vectors = HashMap::default();
 
     for s in entry_block.iter().flat_map(|b| b.statements()) {
         match &*s.get() {
-            Statement::VariableDeclaration { name, typ } => {
-                if let Type::Vector { .. } = &*typ.get() {
-                    type_declarations.insert(*name, s.clone());
-                } else if let Type::FixedVector { .. } = &*typ.get() {
-                    type_declarations.insert(*name, s.clone());
+            Statement::VariableDeclaration { name, typ } => match &*typ.get() {
+                Type::FixedVector { .. } => {
+                    fixed_vectors.insert(*name, typ.get().clone());
                 }
-            }
+                Type::Vector { .. } => {
+                    local_dynamic_vectors.insert(*name, s.clone());
+                }
+                _ => (),
+            },
+
             // only consider copies into identifiers
             Statement::Copy {
                 expression: Expression::Identifier(destination),
                 value,
             } => {
-                // If there is a destination type declaration...
-                let Some(destination_type_decl) = type_declarations.get(destination) else {
-                    continue;
-                };
-
-                // And, the source is an identifier..
-                let Value::Identifier(source) = &*value.get() else {
-                    continue;
-                };
-
-                // And, the source has a type declaration...
-                let Some(source_type_decl) = type_declarations.get(source) else {
-                    continue;
-                };
-
-                // And, if the destination has a type declaration that is a vector...
-                let Statement::VariableDeclaration {
-                    typ: destination_type,
-                    ..
-                } = &*destination_type_decl.get_mut()
-                else {
-                    continue;
-                };
-
-                let Type::Vector { .. } = &*destination_type.get() else {
-                    continue;
-                };
-
-                // And, if the source has a type declaration that is a fixed vector...
-                let Statement::VariableDeclaration {
-                    typ: source_type, ..
-                } = &*source_type_decl.get()
-                else {
-                    continue;
-                };
-
-                let Type::FixedVector { .. } = &*source_type.get() else {
-                    continue;
-                };
-
-                // Then maybe, just maybe, we can do something.
-
-                // Replace the destination type declaration with the source type declaration
-                //*destination_type_decl.get_mut() = source_type_decl.get().clone();
-                //return true;
-
-                // if let Some(destination_type_decl) = type_declarations.get(destination) {
-                //
-                //     if let Value::Identifier(source) = &*value.get() {
-
-                //
-                //     if let Statement::TypeDeclaration { typ: Type::Vector { .. }, .. } = &*destination_type_decl.get() {
-                //         // And, if the source has a type declaration that is a fixed vector...
-                //         if let Statement::TypeDeclaration { typ: Type::FixedVector { .. }, .. } = &*
-
-                //     }
-                // }
-
-                /*if let Type::Vector { .. } = &*original_type.get() {
-                    // get type of value
-                    if let Value::Identifier(source) = &*value.get() {
-                        if let Some(source_type) = types.get(source) {
-                            if let Type::FixedVector { length, .. } = &*source_type.get() {
-                                *original_type.get_mut() = source_type.get().clone();
-                                changed = true;
-                                return;
-                            }
-                        } else if let Some(reg_type) = ast.get().registers.get(source) {
-                            // assert element_types are the same
-                            // replace original type with that type
-                            *original_type.get_mut() = reg_type.0.get().clone();
-                            changed = true;
-                            return;
-                        }
+                // if the source is an identifier or a vector mutate
+                let source = match &*value.get() {
+                    Value::Identifier(source) => *source,
+                    Value::VectorMutate { vector, .. } => {
+                        let Value::Identifier(source) = &*vector.get() else {
+                            continue;
+                        };
+                        *source
                     }
-                }*/
+                    _ => continue,
+                };
+
+                // and the source is a fixed vector
+                let Some(source_type) = fixed_vectors.get(&source) else {
+                    continue;
+                };
+
+                // and if the destination is a dynamic vector
+                let Some(destination_decl) = local_dynamic_vectors.get(destination) else {
+                    continue;
+                };
+
+                // replace the destination declaration type with the more concrete source type
+                let Statement::VariableDeclaration { typ, .. } = &mut *destination_decl.get_mut()
+                else {
+                    panic!()
+                };
+
+                log::debug!(
+                    "in copy from {source:?} to {destination:?}, we are changing the type of {destination:?} from {typ:?} to {source_type:?}"
+                );
+                *typ = Shared::new(source_type.clone());
+
+                did_change = true;
             }
             _ => {}
         }
@@ -142,5 +113,5 @@ fn monomorphize_vectors(_: Shared<Ast>, entry_block: ControlFlowBlock) -> bool {
     // look for copies into vectors of unknown length
     // change type declarations
 
-    false
+    did_change
 }

@@ -12,8 +12,8 @@ use {
             builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
             cycle_finder::CycleFinder, destruct_composites::DestructComposites,
             fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
-            remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-            remove_units::RemoveUnits,
+            monomorphize_vectors::MonomorphizeVectors, remove_const_branch::RemoveConstBranch,
+            remove_constant_type::RemoveConstantType, remove_units::RemoveUnits,
         },
     },
     common::intern::InternedString,
@@ -70,7 +70,7 @@ pub fn run(ast: Shared<Ast>) {
             // constant propogation works, just breaks some assumptions in rudder conversion, todo:
             // revisit and re-enable, it shouldnt be too hard
             // ConstantPropogation::new_boxed(),
-            // MonomorphizeVectors::new_boxed(),
+            MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );
