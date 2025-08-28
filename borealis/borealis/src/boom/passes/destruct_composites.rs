@@ -248,7 +248,7 @@ fn destruct_locals(
                                     element,
                                     index,
                                 } => {
-                                    let Value::Identifier(_vector) = &*vector.get() else {
+                                    let Value::Identifier(vector) = &*vector.get() else {
                                         todo!()
                                     };
                                     let Value::Identifier(element) = &*element.get() else {
@@ -268,30 +268,38 @@ fn destruct_locals(
                                         .get(element)
                                         .or_else(|| destructed_registers.get(element))
                                     {
-                                        // foo = (foo[0] = bar)
+                                        // foo = (baz[0] = bar)
                                         // =>
-                                        // foo_a = (foo_a[0] = bar_a)
-                                        // foo_b = (foo_b[0] = bar_b)
+                                        // foo_a = (baz_a[0] = bar_a)
+                                        // foo_b = (baz_b[0] = bar_b)
                                         return destruct_variable(*element, typ.clone())
                                             .into_iter()
                                             .zip(destruct_variable(
                                                 destination.to_ident(),
                                                 typ.clone(),
                                             ))
-                                            .map(|((element_part, _), (vector_part, _))| {
-                                                Statement::Copy {
-                                                    expression: Expression::Identifier(vector_part),
-                                                    value: Shared::new(Value::VectorMutate {
-                                                        vector: Shared::new(Value::Identifier(
-                                                            vector_part,
-                                                        )),
-                                                        element: Shared::new(Value::Identifier(
-                                                            element_part,
-                                                        )),
-                                                        index: index.clone(),
-                                                    }),
-                                                }
-                                            })
+                                            .zip(destruct_variable(*vector, typ.clone()))
+                                            .map(
+                                                |(
+                                                    ((element_part, _), (destination_part, _)),
+                                                    (vector_part, _),
+                                                )| {
+                                                    Statement::Copy {
+                                                        expression: Expression::Identifier(
+                                                            destination_part,
+                                                        ),
+                                                        value: Shared::new(Value::VectorMutate {
+                                                            vector: Shared::new(Value::Identifier(
+                                                                vector_part,
+                                                            )),
+                                                            element: Shared::new(
+                                                                Value::Identifier(element_part),
+                                                            ),
+                                                            index: index.clone(),
+                                                        }),
+                                                    }
+                                                },
+                                            )
                                             .map(Shared::new)
                                             .collect();
                                     } else {
