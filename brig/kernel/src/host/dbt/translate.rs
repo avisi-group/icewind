@@ -509,8 +509,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             .get(&function_name)
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
 
-        // allow some differences in parameter/argument types
-        assert_eq!(function.parameters().len(), arguments.len());
+        // require same length (allow some differences in parameter/argument types)
+        if function.parameters().len() != arguments.len() {
+            panic!(
+                "function {function_name} expected paramters {:?} but got arguments {arguments:?}",
+                function.parameters()
+            )
+        }
 
         let mut celf = Self {
             allocator,

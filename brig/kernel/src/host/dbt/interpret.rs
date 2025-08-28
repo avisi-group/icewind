@@ -322,12 +322,16 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         self.function_name
                     );
 
-                    interpret(
+                    let res = interpret(
                         &self.model,
                         target.as_ref(),
                         &args.iter().map(|a| self.resolve(a)).collect::<Vec<_>>(),
                         self.register_file,
-                    )
+                    );
+
+                    log::debug!("returned from {target} to {}", self.function_name);
+
+                    res
                 }
                 Statement::Cast {
                     kind,

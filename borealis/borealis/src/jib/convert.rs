@@ -341,15 +341,31 @@ impl BoomEmitter {
         })
     }
     fn convert_body(&self, instructions: &[Instr<InternedString, B64>]) -> ControlFlowBlock {
+        // pre-scan for jumps and gotos to allow for out-of-order jumping
+        let block_locations = instructions
+            .iter()
+            .enumerate()
+            .flat_map(|(index, instruction)| match instruction {
+                Instr::Goto(target) | Instr::Jump(_, target, _) => [
+                    Some((*target, ControlFlowBlock::new())),
+                    Some((index + 1, ControlFlowBlock::new())),
+                ],
+                Instr::End | Instr::Exit(_, _) => {
+                    [Some((index + 1, ControlFlowBlock::new())), None]
+                }
+                _ => [None, None],
+            })
+            .filter_map(|a| a)
+            .collect::<BTreeMap<_, _>>();
+
         let entry = ControlFlowBlock::new();
 
         let mut current_block = entry.clone();
-        let mut iter = instructions.iter().enumerate();
-        let mut block_locations = BTreeMap::<usize, ControlFlowBlock>::new();
-
         let mut current_statements = vec![];
 
         // for every instruction in the body
+        // todo: rewrite this as a for each
+        let mut iter = instructions.iter().enumerate();
         while let Some((idx, instr)) = iter.next() {
             // if the current index was the target of a jump, start a new block
             if let Some(next_block) = block_locations.get(&idx) {
@@ -363,19 +379,14 @@ impl BoomEmitter {
                     });
                     next_block.add_parent(&current_block);
 
-                    current_block = block_locations
-                        .entry(idx)
-                        .or_insert_with(ControlFlowBlock::new)
-                        .clone();
+                    current_block = block_locations.get(&idx).unwrap().clone();
                 }
             }
 
             match instr {
                 // unconditional jump
                 Instr::Goto(target) => {
-                    let target_block = block_locations
-                        .entry(*target)
-                        .or_insert_with(ControlFlowBlock::new);
+                    let target_block = block_locations.get(target).unwrap().clone();
 
                     current_block.set_statements(current_statements.clone());
                     current_statements.clear();
@@ -385,22 +396,14 @@ impl BoomEmitter {
                     });
                     target_block.add_parent(&current_block);
 
-                    current_block = block_locations
-                        .entry(idx + 1)
-                        .or_insert_with(ControlFlowBlock::new)
-                        .clone();
+                    current_block = block_locations.get(&(idx + 1)).unwrap().clone();
                 }
 
                 // conditional jump
                 Instr::Jump(condition, target, _) => {
-                    let fallthrough_block = block_locations
-                        .entry(idx + 1)
-                        .or_insert_with(ControlFlowBlock::new)
-                        .clone();
+                    let fallthrough_block = block_locations.get(&(idx + 1)).unwrap().clone();
 
-                    let target_block = block_locations
-                        .entry(*target)
-                        .or_insert_with(ControlFlowBlock::new);
+                    let target_block = block_locations.get(target).unwrap().clone();
 
                     current_block.set_statements(current_statements.clone());
                     current_statements.clear();
@@ -423,10 +426,7 @@ impl BoomEmitter {
                         boom::Value::Identifier("return".into()),
                     )));
 
-                    current_block = block_locations
-                        .entry(idx + 1)
-                        .or_insert_with(ControlFlowBlock::new)
-                        .clone();
+                    current_block = block_locations.get(&(idx + 1)).unwrap().clone();
                 }
                 // panic
                 Instr::Exit(cause, _) => {
@@ -439,10 +439,7 @@ impl BoomEmitter {
                         ))),
                     ));
 
-                    current_block = block_locations
-                        .entry(idx + 1)
-                        .or_insert_with(ControlFlowBlock::new)
-                        .clone();
+                    current_block = block_locations.get(&(idx + 1)).unwrap().clone();
                 }
                 _ => current_statements.extend_from_slice(&self.convert_instruction(instr)),
             }

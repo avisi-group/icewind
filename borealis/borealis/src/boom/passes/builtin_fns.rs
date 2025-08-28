@@ -169,6 +169,20 @@ impl Pass for HandleBuiltinFunctions {
                                             Literal::Unit,
                                         ))),
                                     })
+                                } else if name.as_ref() == "undefined_bool" {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            Literal::Bool(false),
+                                        ))),
+                                    })
+                                } else if name.as_ref() == "undefined_int" {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            Literal::Int(0.into()),
+                                        ))),
+                                    })
                                 } else {
                                     s.clone()
                                 }

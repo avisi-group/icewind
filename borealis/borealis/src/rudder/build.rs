@@ -1254,7 +1254,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 },
             )),
 
-            "sail_zeros" | "Zeros" => {
+            "sail_zeros" | "Zeros" | "sail_zzeros" => {
                 let length = args[0].clone();
 
                 let const_0 = build(

@@ -289,10 +289,22 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 }
             }
 
-            Negate(value) => self.node(X86Node {
-                typ: value.typ().clone(),
-                kind: NodeKind::UnaryOperation(op),
-            }),
+            Negate(value) => match value.kind() {
+                NodeKind::Constant {
+                    value: const_value,
+                    width: _const_width,
+                } => match value.typ() {
+                    Type::Signed(type_width) => {
+                        let negated = (-(*const_value as i64)) as u64;
+                        self.constant(negated, Type::Signed(type_width))
+                    }
+                    _ => todo!(),
+                },
+                _ => self.node(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::UnaryOperation(op),
+                }),
+            },
 
             _ => {
                 todo!("{op:?}")
