@@ -5517,3 +5517,232 @@ fn cmeq_v116b() {
     let num_regs = emitter.next_vreg();
     let _translation = ctx.compile(num_regs);
 }
+
+#[ktest]
+fn simbench_eret() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //  eret
+
+    let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u8>("PSTATE_EL", 1);
+    register_file.write::<u64>("SCR_EL3_bits", 0x430);
+    register_file.write::<u64>("ELR_EL1", 0x1000);
+    register_file.write::<u64>("SPSR_EL1_bits", 0x0);
+    register_file.write::<u64>("_PC", 0x40000000);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u8>("PSTATE_IL"), 0);
+    assert_eq!(register_file.read::<u8>("PSTATE_EL"), 0);
+    assert_eq!(register_file.read::<u64>("_PC"), 0x1000);
+}
+
+#[ktest]
+fn simbench_el_from_spsr() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let spsr = emitter.constant(0x0, Type::Unsigned(64));
+    let valid_target_tuple = translate(
+        Global,
+        &*model,
+        "ELFromSPSR",
+        &[spsr],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    let valid = emitter.access_tuple(valid_target_tuple.clone(), 0);
+    let target = emitter.access_tuple(valid_target_tuple, 1);
+    emitter.write_register(model.reg_offset("R0"), valid);
+    emitter.write_register(model.reg_offset("R1"), target);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    // log::error!("{translation:?}");
+
+    register_file.write::<u8>("PSTATE_EL", 1);
+    assert_eq!(register_file.read::<u64>("R0"), 0x0);
+
+    translation.execute(&register_file);
+
+    // valid = true
+    assert_eq!(register_file.read::<u64>("R0"), 0x1);
+
+    // EL should be 0 afterwards
+    assert_eq!(register_file.read::<u64>("R1"), 0x0);
+}
+
+#[ktest]
+fn simbench_illegal_exception_return() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write::<u8>("PSTATE_EL", 1);
+
+    let spsr = emitter.read_register(model.reg_offset("SPSR_EL1_bits"), Type::Unsigned(64));
+    let illegal_psr_state = translate(
+        Global,
+        &*model,
+        "IllegalExceptionReturn",
+        &[spsr],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R0"), illegal_psr_state);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    log::error!("{translation:?}");
+
+    assert_eq!(register_file.read::<u64>("SPSR_EL1_bits"), 0x0);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R0"), 0x0);
+}
+
+#[ktest]
+fn is_secure_below_el3() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let is_secure_below_el3 = translate(
+        Global,
+        &*model,
+        "IsSecureBelowEL3",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R0"), is_secure_below_el3);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R0"), 1);
+}
+
+#[ktest]
+fn simbench_elusingaarch32k() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("PSTATE_EL", 1u8);
+
+    let target = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(2));
+    let is_secure_below_el3 = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(1));
+
+    let tuple = translate(
+        Global,
+        &*model,
+        "ELStateUsingAArch32K",
+        &[target, is_secure_below_el3],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    let known = emitter.access_tuple(tuple.clone(), 0);
+    emitter.write_register(model.reg_offset("R3"), known);
+
+    let aarch32 = emitter.access_tuple(tuple, 1);
+    emitter.write_register(model.reg_offset("R4"), aarch32);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    // EL0 target
+    register_file.write::<u64>("R0", 0);
+    // is_secure_below_el3
+    register_file.write::<u64>("R1", 1);
+
+    translation.execute(&register_file);
+
+    // known
+    assert_eq!(register_file.read::<u64>("R3"), 1);
+    // target_el_is_aarch32
+    assert_eq!(register_file.read::<u64>("R4"), 0);
+}
+
+#[ktest]
+fn cbnz() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // nop
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x35000080,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    log::error!("{translation:?}");
+
+    translation.execute(&register_file);
+}

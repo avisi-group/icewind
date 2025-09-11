@@ -60,8 +60,13 @@ pub struct Memory {
 #[derive(Debug, Deserialize)]
 pub struct Load {
     pub path: InternedString,
-    #[serde(deserialize_with = "hex_address")]
-    pub address: u64,
+    pub kind: LoadKind,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LoadKind {
+    Elf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,4 +98,16 @@ fn hex_address<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Err
     Ok(parse_hex_prefix(&s).map_err(|e| {
         D::Error::custom(format!("Failed to parse u64 from hex string {s:?}: {e:?}"))
     })?)
+}
+
+/// Function to be passed in `deserialize_with` serde attribute for parsing JSON
+/// strings containing hex memory addresses into u64s.
+fn hex_address_opt<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    Option::<String>::deserialize(deserializer)?
+        .map(|s| {
+            parse_hex_prefix(&s).map_err(|e| {
+                D::Error::custom(format!("Failed to parse u64 from hex string {s:?}: {e:?}"))
+            })
+        })
+        .map_or(Ok(None), |v| v.map(Some))
 }

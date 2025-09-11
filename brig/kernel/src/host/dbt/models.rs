@@ -24,7 +24,7 @@ use {
                 ToRegisterMappedDevice, ToTickable, device::Device,
             },
         },
-        util::parse_hex_prefix,
+        util::{get_current_device, parse_hex_prefix},
     },
     alloc::{
         alloc::alloc_zeroed,
@@ -55,11 +55,8 @@ const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 /// Limit blocks to contain only 1 instruction
 const SINGLE_STEP: bool = false;
 
-/// Write register trace to file
-const PRINT_REGISTERS: bool = false;
-
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = false;
+const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
@@ -206,6 +203,9 @@ impl ModelDevice {
 
         register_file.write("_PC", initial_pc);
 
+        register_file.write::<u8>("PSTATE_EL", 1);
+        register_file.write::<u64>("SCR_EL3_bits", 0x430);
+
         Self {
             id: ObjectId::new(),
             name,
@@ -273,7 +273,7 @@ impl ModelDevice {
                             BumpAllocatorRef::new(&allocator),
                             chain_cache.table as u64,
                             block_start_virtual_pc,
-                            HIT_USERSPACE.load(Ordering::Relaxed),
+                            single_step_mode,
                         )
                     });
 
@@ -572,4 +572,19 @@ pub extern "C" fn write_to_el(old: u8, new: u8) {
 
 pub extern "C" fn svc_debug(value: u64) {
     log::error!("SVC: {value}");
+}
+
+pub extern "C" fn prelude_debug(pc: u64, opcode: u64) {
+    static ENABLED: AtomicBool = AtomicBool::new(false);
+
+    if pc == 0x400008d0 {
+        ENABLED.store(true, Ordering::Relaxed);
+    }
+
+    if ENABLED.load(Ordering::Relaxed) {
+        log::error!(
+            "{pc:#x}: opcode: {opcode:x}, EL: {}",
+            get_current_device().register_file.read::<u8>("PSTATE_EL")
+        )
+    }
 }

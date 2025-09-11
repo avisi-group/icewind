@@ -109,6 +109,19 @@ pub fn translate_instruction<A: Alloc>(
 
         register_file.write("have_exception", 0u8);
 
+        // {
+        //     let mut args = Vec::new_in(allocator);
+
+        //     let pc = emitter.read_register(model.reg_offset("_PC"),
+        // Type::Unsigned(64));     args.push(pc);
+
+        //     let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(64));
+        //     args.push(opcode);
+
+        //     let fn_ptr = emitter.function_ptr(crate::models::prelude_debug as u64);
+        //     emitter.call(fn_ptr, args);
+        // }
+
         let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
 
         let res = translate(

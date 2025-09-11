@@ -99,7 +99,7 @@ pub fn guest_translate(
     };
 
     let effective_execution_level = if GuestExecutionContext::current().unprivileged_access != 0 {
-        log::debug!(
+        log::trace!(
             "UNPRIVILEGED ACCESS PC={:x} FA={:x}",
             device.well_known_registers.pc().read(),
             guest_virtual_address
@@ -130,7 +130,7 @@ pub fn guest_translate(
         }
         Err(error) => {
             if typ == TranslationType::Fetch {
-                log::debug!(
+                log::trace!(
                     "INSTRUCTION FETCH FAULT PC={:x} FA={:x}",
                     device.well_known_registers.pc().read(),
                     guest_virtual_address

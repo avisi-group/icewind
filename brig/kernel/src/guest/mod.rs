@@ -1,7 +1,7 @@
 use {
     crate::{
         guest::{
-            config::DeviceAttachment,
+            config::{DeviceAttachment, LoadKind},
             memory::{AddressSpace, AddressSpaceRegion},
         },
         host::{
@@ -13,6 +13,7 @@ use {
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
     common::{TestConfig, intern::InternedString},
     core::{panic, ptr, sync::atomic::AtomicU64},
+    elfloader::{ElfBinary, ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     spin::Once,
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -158,12 +159,32 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     {
         for load in config.load {
             let data = guest_data.read_to_vec(&load.path).unwrap();
-            let pointer = load.address as *mut u8;
 
-            log::warn!("loading {:?} @ {:p}", load.path, pointer);
+            match load.kind {
+                LoadKind::Elf => {
+                    log::warn!("loading ELF {:?}", load.path);
+                    let elf = ElfBinary::new(&data).unwrap();
+                    elf.load(&mut DirectElfLoader).unwrap();
+                } /*       let offset = load.offset.unwrap_or(0);
+                   * let len = load
+                   *     .size
+                   *     .map(|s| usize::try_from(s).unwrap())
+                   *     .unwrap_or(data.len()); */
 
-            unsafe {
-                ptr::copy(data.as_ptr(), pointer, data.len());
+                  /* log::warn!(
+                   *     "loading {len} bytes of {:?} (+{offset:x}) to {:p}",
+                   *     load.path,
+                   *     pointer
+                   * ); */
+
+                  /* unsafe {
+                   *     ptr::copy(
+                   *         data.as_ptr().add(usize::try_from(offset).unwrap()),
+                   *         pointer,
+                   *         len,
+                   *     );
+                   * }
+                   * } */
             }
         }
     }
@@ -178,9 +199,33 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     {
         device.start();
     }
+
     guest
         .devices
         .get(&InternedString::from_static("core0"))
         .unwrap()
         .start();
+}
+
+struct DirectElfLoader;
+
+impl ElfLoader for DirectElfLoader {
+    fn allocate(&mut self, _header: ProgramHeader) -> Result<(), ElfLoaderErr> {
+        Ok(())
+    }
+
+    fn load(
+        &mut self,
+        _flags: elfloader::Flags,
+        base: elfloader::VAddr,
+        region: &[u8],
+    ) -> Result<(), ElfLoaderErr> {
+        let base_ptr = base as *mut u8;
+        unsafe { ptr::copy(region.as_ptr(), base_ptr, region.len()) };
+        Ok(())
+    }
+
+    fn relocate(&mut self, entry: RelocationEntry) -> Result<(), ElfLoaderErr> {
+        todo!()
+    }
 }

@@ -2,35 +2,19 @@
     "memory": {
         "as0": {
             "ram0": {
-                "start": "0x8000_0000",
+                "start": "0x4000_0000",
                 "end": "0xc000_0000"
             },
             "ram1": {
-                "start": "0xdead_b000",
-                "end": "0xdead_c000"
-            },
-            "ram2": {
-                "start": "0x1300_0000",
-                "end": "0x1310_0000"
-            },
-            "ram4": {
-                "start": "0x10ffff8180",
-                "end": "0x10ffff9000"
+                "start": "0x8000_0000",
+                "end": "0xa000_0000"
             }
         }
     },
     "load": [
         {
-            "path": "/bootloader.bin",
-            "address": "0x8000_0000"
-        },
-        {
-            "path": "/sail.dtb",
-            "address": "0x8100_0000"
-        },
-        {
-            "path": "/Image",
-            "address": "0x8208_0000"
+            "path": "/simbench",
+            "kind": "elf"
         }
     ],
     "devices": [
@@ -39,7 +23,7 @@
             "kind": "core",
             "model": "aarch64",
             "address_space": "as0",
-            "initial_pc": "0x8000_0000"
+            "initial_pc": "0x4000_06b0"
         },
         {
             "name": "gic",
@@ -47,7 +31,7 @@
             "attach": {
                 "memory": {
                     "address_space": "as0",
-                    "base": "0x2c00_0000"
+                    "base": "0x0800_0000"
                 }
             }
         },
@@ -58,125 +42,7 @@
             "attach": {
                 "memory": {
                     "address_space": "as0",
-                    "base": "0x3c00_0000"
-                }
-            }
-        },
-        {
-            "name": "block",
-            "kind": "virtio_block",
-            "irq_controller": "gic",
-            "attach": {
-                "memory": {
-                    "address_space": "as0",
-                    "base": "0x3d00_0000"
-                }
-            }
-        },
-        {
-            "name": "timer",
-            "kind": "generic_timer",
-            "irq_controller": "gic",
-            "attach": {
-                "sysreg": {
-                    "cntkctl_el1": [
-                        3,
-                        0,
-                        14,
-                        1,
-                        0
-                    ],
-                    "cntfrq_el0": [
-                        3,
-                        3,
-                        14,
-                        0,
-                        0
-                    ],
-                    "cntpct_el0": [
-                        3,
-                        3,
-                        14,
-                        0,
-                        1
-                    ],
-                    "cntvct_el0": [
-                        3,
-                        3,
-                        14,
-                        0,
-                        2
-                    ],
-                    "cntp_tval_el0": [
-                        3,
-                        3,
-                        14,
-                        2,
-                        0
-                    ],
-                    "cntp_ctl_el0": [
-                        3,
-                        3,
-                        14,
-                        2,
-                        1
-                    ],
-                    "cntp_cval_el0": [
-                        3,
-                        3,
-                        14,
-                        2,
-                        2
-                    ],
-                    "cntvoff_el2": [
-                        3,
-                        4,
-                        14,
-                        0,
-                        3
-                    ],
-                    "cntps_tval_el1": [
-                        3,
-                        7,
-                        14,
-                        2,
-                        0
-                    ],
-                    "cntps_ctl_el1": [
-                        3,
-                        7,
-                        14,
-                        2,
-                        1
-                    ],
-                    "cntps_cval_el1": [
-                        3,
-                        7,
-                        14,
-                        2,
-                        2
-                    ],
-                    "cntv_tval_el0": [
-                        3,
-                        3,
-                        14,
-                        3,
-                        0
-                    ],
-                    "cntv_ctl_el0": [
-                        3,
-                        3,
-                        14,
-                        3,
-                        1
-                    ],
-                    "cntv_cval_el0": [
-                        3,
-                        3,
-                        14,
-                        3,
-                        2
-                    ]
+                    "base": "0x0900_0000"
                 }
             }
         }
