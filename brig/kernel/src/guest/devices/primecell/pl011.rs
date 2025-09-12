@@ -225,10 +225,13 @@ impl MemoryMappedDevice for Pl011 {
             }
 
             0x044 => {
-                self.irq_status.fetch_and(
-                    !u32::from(u16::from_le_bytes(src.try_into().unwrap())),
-                    Ordering::Relaxed,
-                );
+                let status = match src.len() {
+                    2 => u32::from(u16::from_le_bytes(src.try_into().unwrap())),
+                    4 => u32::from_le_bytes(src.try_into().unwrap()),
+                    l => todo!("src len {l}"),
+                };
+
+                self.irq_status.fetch_and(!status, Ordering::Relaxed);
                 self.update_irq();
             }
 

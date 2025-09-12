@@ -513,7 +513,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
 
-        assert!(!FN_DENYLIST.contains(&function));
+        if FN_DENYLIST.contains(&function) {
+            panic!("attempted to translate denylisted function: {function:?}")
+        }
 
         let function_name = InternedString::from(function);
 
