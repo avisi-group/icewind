@@ -1,2 +1,2 @@
-mod devices;
+pub mod devices;
 mod queue;

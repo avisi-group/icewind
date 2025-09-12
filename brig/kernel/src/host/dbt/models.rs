@@ -204,9 +204,6 @@ impl ModelDevice {
 
         register_file.write("_PC", initial_pc);
 
-        register_file.write::<u8>("PSTATE_EL", 1);
-        register_file.write::<u64>("SCR_EL3_bits", 0x430);
-
         Self {
             id: ObjectId::new(),
             name,

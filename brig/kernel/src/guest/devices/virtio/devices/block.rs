@@ -6,6 +6,7 @@ use {
             objects::{
                 Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
                 device::{Device, MemoryMappedDevice},
+                irq::IrqController,
             },
         },
         util::any_as_u8_slice,
@@ -17,32 +18,14 @@ use {
     virtio_bindings::virtio_blk::virtio_blk_config,
 };
 
-#[guest_device_factory(virtio_block)]
-fn create_virtio_block(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    let dev = Arc::new(VirtioBlock::new(
-        64,
-        *config
-            .get(&InternedString::from_static("irq_controller"))
-            .unwrap(),
-    ));
-
-    dev
-}
-
-struct VirtioBlock {
+pub struct VirtioBlock {
     id: ObjectId,
     virtio: Mutex<Virtio>,
     config: virtio_blk_config,
 }
 
 impl VirtioBlock {
-    fn new(irq_line: usize, controller_name: InternedString) -> Self {
-        // Lookup GIC
-        let gic_id = ObjectStore::global()
-            .lookup_by_alias(controller_name)
-            .unwrap();
-        let controller = ObjectStore::global().get_irq_controller(gic_id).unwrap();
-
+    pub fn new(irq_line: usize, controller: Arc<dyn IrqController>) -> Self {
         let mut celf = Self {
             id: ObjectId::new(),
             virtio: Mutex::new(Virtio::new(

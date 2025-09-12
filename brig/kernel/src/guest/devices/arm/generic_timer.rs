@@ -17,17 +17,6 @@ use {
     proc_macro_lib::guest_device_factory,
 };
 
-#[guest_device_factory(generic_timer)]
-fn create_generic_timer(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    Arc::new(GenericTimer::new(
-        *config
-            .get(&InternedString::from_static("irq_controller"))
-            .unwrap(),
-        27,
-        Nanoseconds::new(1_000),
-    ))
-}
-
 const CNTKCTL_EL1: u64 = encode_sysreg_id(3, 0, 14, 1, 0);
 
 /// This register is provided so that software can discover the frequency of the
@@ -47,7 +36,7 @@ const CNTV_TVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 0);
 const CNTV_CTL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 1);
 const CNTV_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 2);
 
-struct GenericTimer {
+pub struct GenericTimer {
     id: ObjectId,
 
     irq_controller: Arc<dyn IrqController>,
@@ -70,17 +59,11 @@ struct GenericTimer {
 }
 
 impl GenericTimer {
-    fn new(
-        controller_name: InternedString,
+    pub fn new(
+        controller: Arc<dyn IrqController>,
         irq_line: usize,
         tick_interval: Nanoseconds<u64>,
     ) -> Self {
-        // Lookup GIC
-        let gic_id = ObjectStore::global()
-            .lookup_by_alias(controller_name)
-            .unwrap();
-        let controller = ObjectStore::global().get_irq_controller(gic_id).unwrap();
-
         Self {
             id: ObjectId::new(),
             irq_line,

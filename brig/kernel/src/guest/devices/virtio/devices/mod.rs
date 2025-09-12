@@ -6,7 +6,7 @@ use {
     virtio_drivers::transport::pci::VIRTIO_VENDOR_ID,
 };
 
-mod block;
+pub mod block;
 
 const VIRTIO_MAGIC: u32 = u32::from_le_bytes([b'v', b'i', b'r', b't']);
 const VIRTIO_VERSION: u32 = 0x2;
