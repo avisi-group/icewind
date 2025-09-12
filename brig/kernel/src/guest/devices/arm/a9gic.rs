@@ -2,7 +2,8 @@ use {
     crate::{
         guest::GuestExecutionContext,
         host::objects::{
-            Object, ObjectId, ObjectStore, ToRegisterMappedDevice, ToTickable,
+            Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
+            ToRegisterMappedDevice, ToTickable,
             device::{Device, MemoryMappedDevice},
             irq::IrqController,
         },
@@ -65,7 +66,7 @@ impl InterruptId {
 }
 
 #[derive(Debug)]
-struct GlobalInterruptController {
+pub struct GlobalInterruptController {
     id: ObjectId,
     lines: [IrqLine; 1020],
     distributor_enabled: AtomicBool,
@@ -111,7 +112,7 @@ impl IrqLine {
 }
 
 impl GlobalInterruptController {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let lines = core::array::from_fn(|i| {
             let mut config = 0u8;
             let mut cpu_mask = 0u8;
@@ -136,6 +137,19 @@ impl GlobalInterruptController {
             cpu_irq_line_pending: AtomicUsize::new(NO_LINE), // NO_LINE (usize::MAX) means None
             cpu_irq_line_running: AtomicUsize::new(NO_LINE),
         }
+    }
+
+    pub fn as_interfaces(celf: Arc<Self>) -> (Arc<CpuInterface>, Arc<DistributorInterface>) {
+        (
+            Arc::new(CpuInterface {
+                id: ObjectId::new(),
+                irq: celf.clone(),
+            }),
+            Arc::new(DistributorInterface {
+                id: ObjectId::new(),
+                irq: celf,
+            }),
+        )
     }
 
     fn lines_for_bitvector(&self, base: u64, len: u64, bits: u64) -> &[IrqLine] {
@@ -395,170 +409,7 @@ impl Device for GlobalInterruptController {
 
 impl ToTickable for GlobalInterruptController {}
 impl ToRegisterMappedDevice for GlobalInterruptController {}
-
-impl MemoryMappedDevice for GlobalInterruptController {
-    fn address_space_size(&self) -> u64 {
-        0x3000
-    }
-
-    /// Read `value.len()` bytes from the device starting at `offset`
-    fn read(&self, offset: u64, value: &mut [u8]) {
-        log::debug!("read GIC @ {offset:x}");
-
-        let response = match offset {
-            0x1000 => {
-                // GICD_CTLR
-                self.distributor_enabled.load(Ordering::Relaxed) as u32
-            }
-            0x1004 => 0x81f,
-            0x1008 => 0x200143b,
-            0x1100..=0x117c | 0x1300..=0x137c => 0,
-            0x1800..=0x1bfb => {
-                // GICD_ITARGETS
-                self.lines_for_bitvector(offset - 0x1800, 4, 8)
-                    .iter()
-                    .enumerate()
-                    .fold(0, |acc, (index, line)| {
-                        acc | ((line.cpu_mask.load(Ordering::Relaxed) as u32) << (index * 8))
-                    })
-            }
-            0x1c00..=0x1dff => {
-                // GICD_ICFG
-                self.lines_for_bitvector(offset - 0x1c00, 4, 2)
-                    .iter()
-                    .enumerate()
-                    .fold(0u32, |acc, (index, line)| {
-                        acc | ((line.config.load(Ordering::Relaxed) as u32) << (index * 2)) as u32
-                    })
-            }
-            0x2000 => {
-                // GICC_CTLR
-                self.cpu_enabled.load(Ordering::Relaxed) as u32
-            }
-            0x200c => {
-                // GICC_IAR
-                self.acknowledge()
-            }
-            0x20fc => 0,
-            _ => {
-                panic!("[GIC] Unhandled read offset: {offset:x}");
-                // 0u32
-            }
-        };
-
-        log::debug!("read GIC @ {offset:x}, got {response:x}");
-
-        value.copy_from_slice(&response.to_le_bytes());
-    }
-
-    /// Write `value` bytes into the device starting at `offset`
-    fn write(&self, offset: u64, value: &[u8]) {
-        let value = match *value {
-            [x] => u32::from(x),
-            [a, b, c, d] => u32::from_ne_bytes([a, b, c, d]),
-            _ => todo!("{offset:x} <= {value:?}"),
-        };
-
-        log::debug!("write GIC @ {offset:x} = {value:x}");
-
-        match offset {
-            0x1000 => {
-                self.distributor_enabled
-                    .store((value & 1) == 1, Ordering::Relaxed);
-            }
-            0x1100..=0x117f => {
-                // GICD_ISENABLE
-                self.lines_for_bitvector(offset - 0x1100, 4, 1)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        let enable = ((value >> index) & 1) == 1;
-                        line.enabled.fetch_or(enable, Ordering::Relaxed);
-                    })
-            }
-            0x1180..=0x11ff => {
-                // GICD_ICENABLE
-                self.lines_for_bitvector(offset - 0x1180, 4, 1)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        let clear_enable = ((value >> index) & 1) == 1;
-                        line.enabled.fetch_nand(clear_enable, Ordering::Relaxed);
-                    })
-            }
-            0x1380..=0x13ff => {
-                // GICD_ICACTIVE
-                self.lines_for_bitvector(offset - 0x1380, 4, 1)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        let clear_active = ((value >> index) & 1) == 1;
-                        line.active.fetch_nand(clear_active, Ordering::Relaxed);
-                    })
-            }
-            0x1400..=0x17fb => {
-                // GICD_IPRIORITY
-                self.lines_for_bitvector(offset - 0x1400, 4, 8)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        line.priority
-                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
-                    })
-            }
-            0x1800..=0x1bfb => {
-                // GICD_ITARGETS
-                self.lines_for_bitvector(offset - 0x1800, 4, 8)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        line.cpu_mask
-                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
-                    })
-            }
-            0x1c00..=0x1dff => {
-                // GICD_ICFG
-                self.lines_for_bitvector(offset - 0x1c00, 4, 2)
-                    .iter()
-                    .enumerate()
-                    .for_each(|(index, line)| {
-                        let cfg_val = ((value >> (index * 2)) & 0x3) as u8;
-
-                        log::debug!("updating config for line offset={} to {:x}", index, cfg_val);
-
-                        line.config.store(cfg_val, Ordering::Relaxed)
-                    })
-            }
-            0x1f00 => {
-                todo!("sgir");
-            }
-            0x1f10..=0x1f1f => {
-                // GICD_CPENDSGIR
-                todo!("cpendsgr")
-            }
-            0x1f20..=0x1f2f => {
-                // GICD_SPENDSGIR
-                todo!("spendsgr")
-            }
-            // GICC
-            0x2000 => {
-                // GICC_CTLR
-                self.cpu_enabled.store((value & 1) == 1, Ordering::Relaxed);
-            }
-            0x2004 => {
-                // GICC_PMR
-                self.cpu_pmr.store((value & 0xff) as u8, Ordering::Relaxed);
-            }
-            0x2010 => {
-                // GICC_EOIR
-                self.eoi(usize::try_from(value).unwrap());
-            }
-            _ => {
-                panic!("[GIC] Write offset: {offset:x} <= {value:x}");
-            }
-        }
-    }
-}
+impl ToMemoryMappedDevice for GlobalInterruptController {}
 
 impl IrqController for GlobalInterruptController {
     fn raise(&self, line: usize) {
@@ -605,4 +456,271 @@ fn cpu_irq_rescind() {
     GuestExecutionContext::current()
         .interrupt_pending
         .store(0, Ordering::Relaxed);
+}
+
+pub struct CpuInterface {
+    id: ObjectId,
+    irq: Arc<GlobalInterruptController>,
+}
+
+impl Object for CpuInterface {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl Device for CpuInterface {
+    fn start(&self) {}
+    fn stop(&self) {}
+}
+
+impl ToTickable for CpuInterface {}
+impl ToIrqController for CpuInterface {}
+impl ToRegisterMappedDevice for CpuInterface {}
+
+impl MemoryMappedDevice for CpuInterface {
+    fn address_space_size(&self) -> u64 {
+        0x1000
+    }
+
+    /// Read `value.len()` bytes from the device starting at `offset`
+    fn read(&self, offset: u64, value: &mut [u8]) {
+        log::debug!("read GIC @ {offset:x}");
+
+        let response = match offset {
+            0x0000 => {
+                // GICC_CTLR
+                self.irq.cpu_enabled.load(Ordering::Relaxed) as u32
+            }
+            0x000c => {
+                // GICC_IAR
+                self.irq.acknowledge()
+            }
+            0x00fc => 0,
+            _ => {
+                panic!("[GIC] Unhandled read offset: {offset:x}");
+                // 0u32
+            }
+        };
+
+        log::debug!("read GIC @ {offset:x}, got {response:x}");
+
+        value.copy_from_slice(&response.to_le_bytes());
+    }
+
+    /// Write `value` bytes into the device starting at `offset`
+    fn write(&self, offset: u64, value: &[u8]) {
+        let value = match *value {
+            [x] => u32::from(x),
+            [a, b, c, d] => u32::from_ne_bytes([a, b, c, d]),
+            _ => todo!("{offset:x} <= {value:?}"),
+        };
+
+        log::debug!("write GIC @ {offset:x} = {value:x}");
+
+        match offset {
+            // GICC
+            0x0000 => {
+                // GICC_CTLR
+                self.irq
+                    .cpu_enabled
+                    .store((value & 1) == 1, Ordering::Relaxed);
+            }
+            0x0004 => {
+                // GICC_PMR
+                self.irq
+                    .cpu_pmr
+                    .store((value & 0xff) as u8, Ordering::Relaxed);
+            }
+            0x0010 => {
+                // GICC_EOIR
+                self.irq.eoi(usize::try_from(value).unwrap());
+            }
+            _ => {
+                panic!("[GIC] Write offset: {offset:x} <= {value:x}");
+            }
+        }
+    }
+}
+
+pub struct DistributorInterface {
+    id: ObjectId,
+    irq: Arc<GlobalInterruptController>,
+}
+
+impl Object for DistributorInterface {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl Device for DistributorInterface {
+    fn start(&self) {}
+    fn stop(&self) {}
+}
+
+impl ToTickable for DistributorInterface {}
+impl ToIrqController for DistributorInterface {}
+impl ToRegisterMappedDevice for DistributorInterface {}
+
+impl MemoryMappedDevice for DistributorInterface {
+    fn address_space_size(&self) -> u64 {
+        0x1000
+    }
+
+    /// Read `value.len()` bytes from the device starting at `offset`
+    fn read(&self, offset: u64, value: &mut [u8]) {
+        log::debug!("read GIC @ {offset:x}");
+
+        let response = match offset {
+            0x0000 => {
+                // GICD_CTLR
+                self.irq.distributor_enabled.load(Ordering::Relaxed) as u32
+            }
+            0x0004 => 0x81f,
+            0x0008 => 0x200143b,
+            0x0100..=0x017c | 0x0300..=0x037c => 0,
+            0x0800..=0x0bfb => {
+                // GICD_ITARGETS
+                self.irq
+                    .lines_for_bitvector(offset - 0x0800, 4, 8)
+                    .iter()
+                    .enumerate()
+                    .fold(0, |acc, (index, line)| {
+                        acc | ((line.cpu_mask.load(Ordering::Relaxed) as u32) << (index * 8))
+                    })
+            }
+            0x0c00..=0x0dff => {
+                // GICD_ICFG
+                self.irq
+                    .lines_for_bitvector(offset - 0x0c00, 4, 2)
+                    .iter()
+                    .enumerate()
+                    .fold(0u32, |acc, (index, line)| {
+                        acc | ((line.config.load(Ordering::Relaxed) as u32) << (index * 2)) as u32
+                    })
+            }
+            0x0fe0 => 0x90,
+            0x0fe4 => 0xb4,
+            0x0fe8 => 0x2b,
+            0x0fec => 0x00,
+            0x0ff0 => 0x0d,
+            0x0ff4 => 0xf0,
+            0x0ff8 => 0x05,
+            0x0ffc => 0xb1,
+
+            _ => {
+                panic!("[GIC] Unhandled read offset: {offset:x}");
+                // 0u32
+            }
+        };
+
+        log::debug!("read GIC @ {offset:x}, got {response:x}");
+
+        value.copy_from_slice(&response.to_le_bytes());
+    }
+
+    /// Write `value` bytes into the device starting at `offset`
+    fn write(&self, offset: u64, value: &[u8]) {
+        let value = match *value {
+            [x] => u32::from(x),
+            [a, b, c, d] => u32::from_ne_bytes([a, b, c, d]),
+            _ => todo!("{offset:x} <= {value:?}"),
+        };
+
+        log::debug!("write GIC @ {offset:x} = {value:x}");
+
+        match offset {
+            0x0000 => {
+                self.irq
+                    .distributor_enabled
+                    .store((value & 1) == 1, Ordering::Relaxed);
+            }
+            0x0100..=0x017f => {
+                // GICD_ISENABLE
+                self.irq
+                    .lines_for_bitvector(offset - 0x0100, 4, 1)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        let enable = ((value >> index) & 1) == 1;
+                        line.enabled.fetch_or(enable, Ordering::Relaxed);
+                    })
+            }
+            0x0180..=0x01ff => {
+                // GICD_ICENABLE
+                self.irq
+                    .lines_for_bitvector(offset - 0x0180, 4, 1)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        let clear_enable = ((value >> index) & 1) == 1;
+                        line.enabled.fetch_nand(clear_enable, Ordering::Relaxed);
+                    })
+            }
+            0x0380..=0x03ff => {
+                // GICD_ICACTIVE
+                self.irq
+                    .lines_for_bitvector(offset - 0x0380, 4, 1)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        let clear_active = ((value >> index) & 1) == 1;
+                        line.active.fetch_nand(clear_active, Ordering::Relaxed);
+                    })
+            }
+            0x0400..=0x07fb => {
+                // GICD_IPRIORITY
+                self.irq
+                    .lines_for_bitvector(offset - 0x0400, 4, 8)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        line.priority
+                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
+                    })
+            }
+            0x0800..=0x0bfb => {
+                // GICD_ITARGETS
+                self.irq
+                    .lines_for_bitvector(offset - 0x0800, 4, 8)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        line.cpu_mask
+                            .store(((value >> (index * 8)) & 0xff) as u8, Ordering::Relaxed)
+                    })
+            }
+            0x0c00..=0x0dff => {
+                // GICD_ICFG
+                self.irq
+                    .lines_for_bitvector(offset - 0x0c00, 4, 2)
+                    .iter()
+                    .enumerate()
+                    .for_each(|(index, line)| {
+                        let cfg_val = ((value >> (index * 2)) & 0x3) as u8;
+
+                        log::debug!("updating config for line offset={} to {:x}", index, cfg_val);
+
+                        line.config.store(cfg_val, Ordering::Relaxed)
+                    })
+            }
+            0x0f00 => {
+                if value < 16 {
+                    self.irq.raise(usize::try_from(value).unwrap());
+                }
+            }
+            0x0f10..=0x0f1f => {
+                // GICD_CPENDSGIR
+                todo!("cpendsgr")
+            }
+            0x0f20..=0x0f2f => {
+                // GICD_SPENDSGIR
+                todo!("spendsgr")
+            }
+            _ => {
+                panic!("[GIC] Write offset: {offset:x} <= {value:x}");
+            }
+        }
+    }
 }

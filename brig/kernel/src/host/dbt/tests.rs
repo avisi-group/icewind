@@ -5727,7 +5727,7 @@ fn cbnz() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    // nop
+    // execute_aarch64_instrs_branch_conditional_compare
     translate_instruction(
         Global,
         &model,
@@ -5742,7 +5742,60 @@ fn cbnz() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::error!("{translation:?}");
+    translation.execute(&register_file);
+}
+
+#[ktest]
+fn branch_not_taken() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _res = translate(
+        Global,
+        &*model,
+        "BranchNotTaken",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+}
+
+#[ktest]
+fn mrs_current_el() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write::<u8>("PSTATE_EL", 0x0);
+
+    //      mrs     x0, currentel
+    // execute_aarch64_instrs_system_register_system
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd5384240,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
 
     translation.execute(&register_file);
 }

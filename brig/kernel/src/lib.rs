@@ -31,7 +31,7 @@ use {
         util::try_get_current_device,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    core::panic::PanicInfo,
+    core::{panic::PanicInfo, sync::atomic::Ordering},
     x86::io::outw,
 };
 
@@ -141,13 +141,18 @@ fn panic(info: &PanicInfo) -> ! {
 
     if let Some(device) = try_get_current_device() {
         log::error!(
-            "Guest PC = {:#018x}",
-            device.register_file.read::<u64>("_PC")
+            "Guest PC = {:#018x}, EL = {}",
+            device.register_file.read::<u64>("_PC"),
+            device.register_file.read::<u8>("PSTATE_EL")
         );
 
         log::error!(
+            "Last executed opcode = {:#010x}",
+            models::LAST_EXECUTED_OPCODE.load(Ordering::Relaxed)
+        );
+        log::error!(
             "Last translated opcode = {:#010x}",
-            models::LAST_TRANSLATED_OPCODE.load(core::sync::atomic::Ordering::Relaxed)
+            models::LAST_TRANSLATED_OPCODE.load(Ordering::Relaxed)
         );
     };
 

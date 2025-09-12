@@ -53,10 +53,10 @@ use {
 const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
 /// Limit blocks to contain only 1 instruction
-const SINGLE_STEP: bool = false;
+const SINGLE_STEP: bool = true;
 
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = true;
+const CHAIN_CACHE_ENABLED: bool = false;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
@@ -65,6 +65,7 @@ static HIT_USERSPACE: AtomicBool = AtomicBool::new(false);
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
+pub static LAST_EXECUTED_OPCODE: AtomicU32 = AtomicU32::new(0);
 
 pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -166,7 +167,7 @@ impl Device for ModelDevice {
 }
 
 impl ModelDevice {
-    fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
+    pub fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
         let register_file = RegisterFile::init(&*model);
         let well_known_registers = WellKnownRegisters {
             pc: register_file.as_wellknown::<u64>("_PC"),
@@ -316,6 +317,11 @@ impl ModelDevice {
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
                 translated_block.opcodes,
+            );
+
+            LAST_EXECUTED_OPCODE.store(
+                *translated_block.opcodes.first().unwrap(),
+                Ordering::Relaxed,
             );
 
             let exec_result = translated_block.translation.execute(&self.register_file);

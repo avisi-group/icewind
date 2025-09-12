@@ -1,13 +1,19 @@
 use {
     crate::{
         guest::{
-            config::{DeviceAttachment, LoadKind},
+            devices::{arm::a9gic::GlobalInterruptController, primecell::pl011::Pl011},
             memory::{AddressSpace, AddressSpaceRegion},
         },
         host::{
-            dbt::sysreg_helpers::{self, encode_sysreg_id},
+            dbt::{
+                models::{self, ModelDevice},
+                sysreg_helpers::{self, encode_sysreg_id},
+            },
             fs::Filesystem,
-            objects::{ObjectStore, device::Device},
+            objects::{
+                Object, ObjectId, ObjectStore,
+                device::{Device, MemoryMappedDevice},
+            },
         },
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
@@ -61,85 +67,57 @@ impl GuestExecutionContext {
 
 /// Start guest emulation
 pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
-    //check each connected block device for guest config
-    let config = config::load_from_fs(guest_data).unwrap();
-
-    log::debug!("got config: {:#x?}", config);
-
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
 
     // create memory
-    for (name, regions) in config.memory {
-        let mut addrspace = AddressSpace::new();
+    let mut addrspace = AddressSpace::new();
+    addrspace.add_region(AddressSpaceRegion::new(
+        "ram0".into(),
+        0x4000_0000,
+        512 * 1024 * 1024,
+        memory::AddressSpaceRegionKind::Ram,
+    ));
+    addrspace.add_region(AddressSpaceRegion::new(
+        "ram1".into(),
+        0x8000_0000,
+        1 * 1024 * 1024 * 1024,
+        memory::AddressSpaceRegionKind::Ram,
+    ));
+    guest
+        .address_spaces
+        .insert("as0".into(), Box::new(addrspace));
 
-        for (name, region) in regions {
-            addrspace.add_region(AddressSpaceRegion::new(
-                name,
-                region.start,
-                region.end - region.start,
-                memory::AddressSpaceRegionKind::Ram,
-            ));
-        }
+    // core
+    let model = models::get("aarch64").unwrap();
+    let initial_pc = 0x4000_06b0;
+    let core0 = Arc::new(ModelDevice::new("core0".into(), model, initial_pc));
+    guest.devices.insert("core0".into(), core0.clone());
+    ObjectStore::global().insert(core0.clone());
+    ObjectStore::global().insert_alias(core0.id(), "core0".into());
 
-        guest.address_spaces.insert(name, Box::new(addrspace));
-    }
+    // gic
+    let gic = Arc::new(GlobalInterruptController::new());
+    guest.devices.insert("gic0".into(), gic.clone());
+    ObjectStore::global().insert(gic.clone());
+    ObjectStore::global().insert_alias(gic.id(), "gic0".into());
 
-    // create devices, including cores
-    for device_config in config.devices {
-        let device = devices::create_device(device_config.kind, &device_config.extra)
-            .unwrap_or_else(|| {
-                panic!(
-                    "failed to create device {:?} with config {:?}",
-                    device_config.kind, device_config.extra
-                )
-            });
+    let (cpu, distributor) = GlobalInterruptController::as_interfaces(gic.clone());
+    attach_mmap_device(guest, "gic0_cpu".into(), cpu, "as0".into(), 0x0801_0000);
+    attach_mmap_device(
+        guest,
+        "gic0_distributor".into(),
+        distributor,
+        "as0".into(),
+        0x0800_0000,
+    );
 
-        guest.devices.insert(device_config.name, device.clone());
-        ObjectStore::global().insert(device.clone());
-        ObjectStore::global().insert_alias(device.id(), device_config.name);
-
-        // locate address space for attachment, if any
-        match device_config.attach {
-            Some(DeviceAttachment::Memory {
-                address_space,
-                base,
-            }) => {
-                let mem_map_device = ObjectStore::global()
-                    .get_memory_mapped_device(device.id())
-                    .unwrap();
-
-                if let Some(addrspace) = guest.address_spaces.get_mut(&address_space) {
-                    addrspace.add_region(AddressSpaceRegion::new(
-                        device_config.name,
-                        base,
-                        mem_map_device.address_space_size(),
-                        memory::AddressSpaceRegionKind::IO(mem_map_device.clone()),
-                    ));
-                } else {
-                    panic!(
-                        "address space {} not configured for attaching device {}",
-                        address_space, device_config.name
-                    );
-                }
-            }
-            Some(DeviceAttachment::SysReg(sysregs)) => {
-                let reg_map_device = ObjectStore::global()
-                    .get_register_mapped_device(device.id())
-                    .unwrap();
-
-                sysregs
-                    .iter()
-                    .map(|(_, [op0, op1, crn, crm, op2])| {
-                        encode_sysreg_id(*op0, *op1, *crn, *crm, *op2)
-                    })
-                    .for_each(|id| {
-                        sysreg_helpers::register_device(id, reg_map_device.clone());
-                    });
-            }
-            None => (),
-        }
-    }
+    // serial
+    let pl011 = Arc::new(Pl011::new(66, gic.clone()));
+    guest.devices.insert("serial".into(), pl011.clone());
+    ObjectStore::global().insert(pl011.clone());
+    ObjectStore::global().insert_alias(pl011.id(), "serial".into());
+    attach_mmap_device(guest, "serial".into(), pl011, "as0".into(), 0x0900_0000);
 
     let temp_exec_ctx = Box::new(GuestExecutionContext {
         current_address_space: guest
@@ -156,38 +134,12 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
 
     crate::tests::run(test_config);
 
-    {
-        for load in config.load {
-            let data = guest_data.read_to_vec(&load.path).unwrap();
-
-            match load.kind {
-                LoadKind::Elf => {
-                    log::warn!("loading ELF {:?}", load.path);
-                    let elf = ElfBinary::new(&data).unwrap();
-                    elf.load(&mut DirectElfLoader).unwrap();
-                } /*       let offset = load.offset.unwrap_or(0);
-                   * let len = load
-                   *     .size
-                   *     .map(|s| usize::try_from(s).unwrap())
-                   *     .unwrap_or(data.len()); */
-
-                  /* log::warn!(
-                   *     "loading {len} bytes of {:?} (+{offset:x}) to {:p}",
-                   *     load.path,
-                   *     pointer
-                   * ); */
-
-                  /* unsafe {
-                   *     ptr::copy(
-                   *         data.as_ptr().add(usize::try_from(offset).unwrap()),
-                   *         pointer,
-                   *         len,
-                   *     );
-                   * }
-                   * } */
-            }
-        }
-    }
+    // load data
+    let data = guest_data.read_to_vec("/simbench").unwrap();
+    ElfBinary::new(&data)
+        .unwrap()
+        .load(&mut DirectElfLoader)
+        .unwrap();
 
     // go go go (start all devices)
     log::warn!("starting guest");
@@ -205,6 +157,41 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
         .get(&InternedString::from_static("core0"))
         .unwrap()
         .start();
+}
+
+fn attach_sysreg_device(device: Arc<dyn Device>, sysregs: BTreeMap<InternedString, [u64; 5]>) {
+    let reg_map_device = ObjectStore::global()
+        .get_register_mapped_device(device.id())
+        .unwrap();
+
+    sysregs
+        .iter()
+        .map(|(_, [op0, op1, crn, crm, op2])| encode_sysreg_id(*op0, *op1, *crn, *crm, *op2))
+        .for_each(|id| {
+            sysreg_helpers::register_device(id, reg_map_device.clone());
+        });
+}
+
+fn attach_mmap_device(
+    guest: &mut Guest,
+    device_name: InternedString,
+    device: Arc<dyn MemoryMappedDevice>,
+    address_space: InternedString,
+    base: u64,
+) {
+    if let Some(addrspace) = guest.address_spaces.get_mut(&address_space) {
+        addrspace.add_region(AddressSpaceRegion::new(
+            device_name,
+            base,
+            device.address_space_size(),
+            memory::AddressSpaceRegionKind::IO(device),
+        ));
+    } else {
+        panic!(
+            "address space {} not configured for attaching device {}",
+            address_space, device_name
+        );
+    }
 }
 
 struct DirectElfLoader;
@@ -225,7 +212,7 @@ impl ElfLoader for DirectElfLoader {
         Ok(())
     }
 
-    fn relocate(&mut self, entry: RelocationEntry) -> Result<(), ElfLoaderErr> {
+    fn relocate(&mut self, _entry: RelocationEntry) -> Result<(), ElfLoaderErr> {
         todo!()
     }
 }

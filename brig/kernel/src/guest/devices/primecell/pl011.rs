@@ -14,19 +14,7 @@ use {
 const IRQ_TXINTR: u32 = 1 << 5;
 const IRQ_RXINTR: u32 = 1 << 4;
 
-#[guest_device_factory(pl011)]
-fn create_pl011(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    let dev = Arc::new(Pl011::new(
-        66,
-        *config
-            .get(&InternedString::from_static("irq_controller"))
-            .unwrap(),
-    ));
-
-    dev
-}
-
-struct Pl011 {
+pub struct Pl011 {
     id: ObjectId,
     control_register: AtomicU16,
     baud_rate: AtomicU16,
@@ -40,13 +28,7 @@ struct Pl011 {
 }
 
 impl Pl011 {
-    fn new(irq_line: usize, controller_name: InternedString) -> Self {
-        // Lookup GIC
-        let gic_id = ObjectStore::global()
-            .lookup_by_alias(controller_name)
-            .unwrap();
-        let controller = ObjectStore::global().get_irq_controller(gic_id).unwrap();
-
+    pub fn new(irq_line: usize, controller: Arc<dyn IrqController>) -> Self {
         Self {
             id: ObjectId::new(),
 
