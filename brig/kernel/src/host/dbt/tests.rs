@@ -5799,3 +5799,31 @@ fn mrs_current_el() {
 
     translation.execute(&register_file);
 }
+
+#[ktest]
+fn ic_ivau() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // d50b7520        ic      ivau, x0
+    // decode_sys_aarch64_instrs_system_sysops
+    // IC_IVAU_SysOpsWrite_f40d5c6453a840a5
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd50b7520,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+}

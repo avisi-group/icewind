@@ -1723,6 +1723,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             )),
 
             "AArch64_DC"
+            | "AArch64_IC__1"
             | "execute_aarch64_instrs_system_barriers_dmb"
             | "execute_aarch64_instrs_system_barriers_dsb"
             | "execute_aarch64_instrs_system_barriers_isb"
