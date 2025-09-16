@@ -152,11 +152,14 @@ impl GlobalInterruptController {
         )
     }
 
-    fn lines_for_bitvector(&self, base: u64, len: u64, bits: u64) -> &[IrqLine] {
+    fn lines_for_bitvector(&self, base: u64, len: u64, bits: u64) -> (&[IrqLine], usize) {
         let start_index = (8 * base) / bits;
         let end_index = core::cmp::min(((8 * len) / bits) + start_index, 1019);
 
-        &self.lines[start_index as usize..end_index as usize]
+        (
+            &self.lines[start_index as usize..end_index as usize],
+            start_index as usize,
+        )
     }
 
     fn acknowledge(&self) -> u32 {
@@ -584,6 +587,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ITARGETS
                 self.irq
                     .lines_for_bitvector(offset - 0x0800, 4, 8)
+                    .0
                     .iter()
                     .enumerate()
                     .fold(0, |acc, (index, line)| {
@@ -594,6 +598,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ICFG
                 self.irq
                     .lines_for_bitvector(offset - 0x0c00, 4, 2)
+                    .0
                     .iter()
                     .enumerate()
                     .fold(0u32, |acc, (index, line)| {
@@ -640,6 +645,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ISENABLE
                 self.irq
                     .lines_for_bitvector(offset - 0x0100, 4, 1)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -651,6 +657,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ICENABLE
                 self.irq
                     .lines_for_bitvector(offset - 0x0180, 4, 1)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -662,6 +669,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ICACTIVE
                 self.irq
                     .lines_for_bitvector(offset - 0x0380, 4, 1)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -673,6 +681,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_IPRIORITY
                 self.irq
                     .lines_for_bitvector(offset - 0x0400, 4, 8)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -684,6 +693,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ITARGETS
                 self.irq
                     .lines_for_bitvector(offset - 0x0800, 4, 8)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -695,6 +705,7 @@ impl MemoryMappedDevice for DistributorInterface {
                 // GICD_ICFG
                 self.irq
                     .lines_for_bitvector(offset - 0x0c00, 4, 2)
+                    .0
                     .iter()
                     .enumerate()
                     .for_each(|(index, line)| {
@@ -706,13 +717,27 @@ impl MemoryMappedDevice for DistributorInterface {
                     })
             }
             0x0f00 => {
+                // GICD_SGIR
+                let value = value as u8;
                 if value < 16 {
                     self.irq.raise(usize::try_from(value).unwrap());
                 }
             }
             0x0f10..=0x0f1f => {
                 // GICD_CPENDSGIR
-                todo!("cpendsgr")
+                let len = 4;
+                let (lines, start_index) = self.irq.lines_for_bitvector(offset - 0xf10, len, 1);
+
+                let mut value = value;
+
+                for (idx, line) in lines.into_iter().enumerate() {
+                    line.pending.store(
+                        line.pending.load(Ordering::Relaxed) && !(value & 1 == 1),
+                        Ordering::Relaxed,
+                    );
+                    self.irq.rescind(start_index + idx);
+                    value >>= 1;
+                }
             }
             0x0f20..=0x0f2f => {
                 // GICD_SPENDSGIR
