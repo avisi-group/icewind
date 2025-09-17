@@ -75,8 +75,8 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
 
-    //linux(guest);
-    simbench(guest);
+    linux(guest);
+    // simbench(guest);
 
     let temp_exec_ctx = Box::new(GuestExecutionContext {
         current_address_space: guest
@@ -94,23 +94,28 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     crate::tests::run(test_config);
 
     // load data
-    ElfBinary::new(&guest_data.read_to_vec("/simbench").unwrap())
-        .unwrap()
-        .load(&mut DirectElfLoader)
-        .unwrap();
 
+    // simbench
     // {
-    //     let data = guest_data.read_to_vec("/bootloader.bin").unwrap();
-    //     unsafe { ptr::copy(data.as_ptr(), 0x8000_0000 as *mut u8, data.len()) };
+    // ElfBinary::new(&guest_data.read_to_vec("/simbench").unwrap())
+    //     .unwrap()
+    //     .load(&mut DirectElfLoader)
+    //     .unwrap();
     // }
-    // {
-    //     let data = guest_data.read_to_vec("/sail.dtb").unwrap();
-    //     unsafe { ptr::copy(data.as_ptr(), 0x8100_0000 as *mut u8, data.len()) };
-    // }
-    // {
-    //     let data = guest_data.read_to_vec("/Image").unwrap();
-    //     unsafe { ptr::copy(data.as_ptr(), 0x8208_0000 as *mut u8, data.len()) };
-    // }
+
+    // linux
+    {
+        let data = guest_data.read_to_vec("/bootloader.bin").unwrap();
+        unsafe { ptr::copy(data.as_ptr(), 0x8000_0000 as *mut u8, data.len()) };
+    }
+    {
+        let data = guest_data.read_to_vec("/sail.dtb").unwrap();
+        unsafe { ptr::copy(data.as_ptr(), 0x8100_0000 as *mut u8, data.len()) };
+    }
+    {
+        let data = guest_data.read_to_vec("/Image").unwrap();
+        unsafe { ptr::copy(data.as_ptr(), 0x8208_0000 as *mut u8, data.len()) };
+    }
 
     // go go go (start all devices)
     log::warn!("starting guest");

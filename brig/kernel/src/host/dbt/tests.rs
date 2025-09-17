@@ -5827,3 +5827,141 @@ fn ic_ivau() {
 
     translation.execute(&register_file);
 }
+
+#[ktest]
+fn ldurb() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 385fd001 	ldurb	w1, [x0, #-3]
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x385fd001,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mem = alloc::boxed::Box::new(0xdead_c0de_a3a4_a5beu64);
+
+    register_file.write("SEE", -1i64);
+    register_file.write::<u64>("R0", (&*mem as *const u64 as u64) + 4);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 0xa5);
+}
+
+#[ktest]
+fn ldr_q0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 3cdd0d60 	ldr	q0, [x11, #-48]!
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x3cdd0d60,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mem = alloc::boxed::Box::new(0xbee5_bee5_feed_feed_dead_c0de_a3a4_a5beu128);
+
+    register_file.write("SEE", -1i64);
+    register_file.write::<u64>("R11", (&*mem as *const u128 as u64) + 48);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u128>("_Z"), *mem);
+}
+
+#[ktest]
+fn tpidr_el0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  d51bd048        msr     tpidr_el0, x8
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x3cdd0d60,
+    )
+    .unwrap();
+
+    //  d53bd048 	mrs	x8, tpidr_el0
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x3cdd0d60,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R8", 0xfeed_bee5_babe_cafe);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R8"), 0xfeed_bee5_babe_cafe);
+}
+
+#[ktest]
+fn sub_sxtw() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //cb23c083 	sub	x3, x4, w3, sxtw
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xcb23c083,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R3", 0);
+    register_file.write::<i64>("R4", -16);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R3"), 0xfffffffffffffff0);
+}

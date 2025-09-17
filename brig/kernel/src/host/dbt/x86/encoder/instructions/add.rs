@@ -9,7 +9,7 @@ use {
         },
     },
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister32, AsmRegister64, CodeAssembler, qword_ptr,
+        AsmMemoryOperand, AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler, qword_ptr,
     },
 };
 
@@ -43,6 +43,21 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .add::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .unwrap();
+        }
+        // ADD R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            assembler
+                .add::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
                 .unwrap();
         }
         // ADD IMM -> R

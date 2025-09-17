@@ -299,27 +299,25 @@ impl ModelDevice {
 
             instructions_executed += translated_block.opcodes.len();
 
-            if block_start_virtual_pc < 0x50_0000 {
-                HIT_USERSPACE.store(true, Ordering::Relaxed);
-                // for opcode in &translated_block.opcodes {
-                //     log::error!("    {opcode:08x}");
-                // }
-                // log::error!("");
-            }
+            // if block_start_virtual_pc == 0x43b670 {
+            //     log::error!("get_meta");
+            // }
 
-            if HIT_USERSPACE.load(Ordering::Relaxed) {
-                writeln!(transport, "{block_start_virtual_pc:#018x}").unwrap();
-            }
+            // if HIT_USERSPACE.load(Ordering::Relaxed) {
+
+            //     // writeln!(transport,
+            //     // "{block_start_virtual_pc:#018x}").unwrap();
+            // }
 
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
                 translated_block.opcodes,
             );
 
-            LAST_EXECUTED_OPCODE.store(
-                *translated_block.opcodes.first().unwrap(),
-                Ordering::Relaxed,
-            );
+            // LAST_EXECUTED_OPCODE.store(
+            //     *translated_block.opcodes.first().unwrap(),
+            //     Ordering::Relaxed,
+            // );
 
             let exec_result = translated_block.translation.execute(&self.register_file);
 
