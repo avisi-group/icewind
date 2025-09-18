@@ -4574,7 +4574,7 @@ fn cond_branch() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let _translation = ctx.compile(num_regs);
+    let translation = ctx.compile(num_regs);
 
     //panic!("sausage");
 }
@@ -4738,8 +4738,7 @@ fn sbfm() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let _translation = ctx.compile(num_regs);
-
+    let translation = ctx.compile(num_regs);
     let dst = Box::<(u64, u64)>::new((0, 0));
 
     register_file.write("SEE", -1i64);
@@ -4747,9 +4746,9 @@ fn sbfm() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    //translation.execute(&register_file);
+    translation.execute(&register_file);
 
-    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+    assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
 
 #[ktest]
@@ -4978,7 +4977,6 @@ fn cbz_maybe_2048() {
     register_file.write("SEE", -1i64);
 
     translation.execute(&register_file);
-
     assert_eq!(1180, register_file.read::<u64>("_PC"));
 }
 
@@ -5528,18 +5526,16 @@ fn simbench_eret() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SEE", -1i64);
+    register_file.write::<u8>("PSTATE_EL", 1);
 
     //  eret
-
-    let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
-    translate(
+    translate_instruction(
         Global,
-        &*model,
+        &model,
         "__DecodeA64",
-        &[opcode],
         &mut emitter,
         &register_file,
+        0xd69f03e0,
     )
     .unwrap();
 
@@ -5549,7 +5545,6 @@ fn simbench_eret() {
 
     let translation = ctx.compile(num_regs);
 
-    register_file.write::<u8>("PSTATE_EL", 1);
     register_file.write::<u64>("SCR_EL3_bits", 0x430);
     register_file.write::<u64>("ELR_EL1", 0x1000);
     register_file.write::<u64>("SPSR_EL1_bits", 0x0);
@@ -5898,6 +5893,8 @@ fn tpidr_el0() {
     let register_file = RegisterFile::init(&*model);
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write::<u8>("PSTATE_EL", 0x1);
 
     //  d51bd048        msr     tpidr_el0, x8
     translate_instruction(

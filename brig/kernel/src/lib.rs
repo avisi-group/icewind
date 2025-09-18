@@ -156,7 +156,7 @@ fn panic(info: &PanicInfo) -> ! {
         );
     };
 
-    backtrace();
+    // backtrace();
 
     qemu_exit();
 }

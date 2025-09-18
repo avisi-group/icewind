@@ -167,7 +167,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         let mut label_map = hashmap_in(self.allocator());
 
-        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
+        log::error!("{}", dot::render(self.arena(), self.initial_block()));
 
         log::trace!("building work queue");
 
@@ -191,6 +191,8 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 }
             }
         }
+
+        log::error!("{}", dot::render(self.arena(), self.initial_block()));
 
         log::trace!("allocating registers");
 

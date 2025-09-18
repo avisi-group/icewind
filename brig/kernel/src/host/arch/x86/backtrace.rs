@@ -1,5 +1,5 @@
 use {
-    crate::{host::arch::x86::memory::PhysAddrExt, qemu_exit},
+    crate::host::arch::x86::memory::PhysAddrExt,
     core::{arch::asm, slice},
     elf::{
         ElfBytes, endian::AnyEndian, parse::ParsingTable, string_table::StringTable, symbol::Symbol,
@@ -105,6 +105,9 @@ pub fn backtrace() {
                 .unwrap_or(UNKNOWN),
         );
         log::error!("    {:x} : {}", pc, symbol);
-        unsafe { stk = (*stk).rbp };
+
+        if pc.is_null() {
+            return;
+        }
     }
 }
