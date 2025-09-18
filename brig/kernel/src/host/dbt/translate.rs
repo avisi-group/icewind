@@ -694,7 +694,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
     fn translate_block(
         &mut self,
-
         block_ref: Ref<Block>,
         is_dynamic: bool,
         mut variables: BTreeMap<InternedString, LocalVariable<A>, A>,
@@ -1149,6 +1148,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 if target.as_ref() == "sail_tlbi" {
                     self.emitter.execution_result.set_need_tlb_invalidate(true);
+                }
+
+                if target.as_ref() == "AArch64_IC__1" {
+                    self.emitter
+                        .execution_result
+                        .set_need_code_cache_flush(true);
+                    return Ok(StatementResult::Data(None));
                 }
 
                 // if target.as_ref() == "AArch64_CallSupervisor" {

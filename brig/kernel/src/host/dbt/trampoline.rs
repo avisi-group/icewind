@@ -4,8 +4,9 @@ use {bitfields::bitfield, core::arch::asm};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionResult {
     need_tlb_invalidate: bool,
+    need_code_cache_flush: bool,
     interrupt_pending: bool,
-    #[bits(30)]
+    #[bits(29)]
     _reserved: u32,
 }
 
