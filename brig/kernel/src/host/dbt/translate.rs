@@ -165,8 +165,6 @@ pub fn translate<A: Alloc>(
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
-    // unique ID for each variable
-    let variable_ids = Rc::new_in(AtomicUsize::new(0), allocator.clone());
     translate_with_variable_ids(
         allocator,
         model,
@@ -174,7 +172,6 @@ pub fn translate<A: Alloc>(
         arguments,
         emitter,
         register_file,
-        variable_ids,
     )
 }
 
@@ -185,7 +182,6 @@ fn translate_with_variable_ids<A: Alloc>(
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
-    variable_ids: Rc<AtomicUsize, A>,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     if function == "__DecodeA64_Reserved" {
         return translate_with_variable_ids(
@@ -195,7 +191,6 @@ fn translate_with_variable_ids<A: Alloc>(
             &[],
             emitter,
             register_file,
-            variable_ids,
         );
     }
 
@@ -277,7 +272,6 @@ fn translate_with_variable_ids<A: Alloc>(
         function,
         arguments,
         emitter,
-        variable_ids,
         register_file,
     )
     .translate()
@@ -369,9 +363,6 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
 
     /// Dynamic bitvector stack lengths
     bits_stack_widths: HashMapA<usize, u32, A>,
-
-    /// Counter for allocating variable ids
-    current_variable_id: Rc<AtomicUsize, A>,
 
     /// X86 instruction emitter
     emitter: &'emitter mut X86Emitter<'context, A>,
@@ -508,7 +499,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         function: &str,
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
-        current_variable_id: Rc<AtomicUsize, A>,
+
         register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
@@ -543,7 +534,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
             cached_registers: hashmap_in(emitter.ctx().allocator()),
             return_value: ReturnValue::new(emitter, function.return_type()),
-            current_variable_id,
+
             emitter,
             register_file,
         };
@@ -1174,10 +1165,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     &args,
                     self.emitter,
                     self.register_file,
-                    self.current_variable_id.clone(), /* pass in the current variable id
-                                                       * so
-                                                       * called functions' variables
-                                                       * don't corrupt this function's */
                 )?);
 
                 // if target.as_ref() == "AArch64_CallSupervisor" {
@@ -1465,15 +1452,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
     }
 
-    fn allocate_variable_id(&self) -> usize {
-        let id = self.current_variable_id.fetch_add(1, Ordering::Relaxed);
-
-        // todo: be better about this
-        if id >= GLOBAL_REGISTER_SIZE / 8 {
-            panic!("variable number {id:#x} exceeded MAX_STACK_SIZE ({GLOBAL_REGISTER_SIZE:#x})")
-        }
-
-        id
+    fn allocate_variable_id(&mut self) -> usize {
+        self.emitter.ctx_mut().allocate_variable_id()
     }
 }
 

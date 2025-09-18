@@ -2,6 +2,7 @@ use {
     crate::host::dbt::{
         Alloc, Translation,
         emitter::Emitter,
+        register_file::GLOBAL_REGISTER_SIZE,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
             encoder::{
@@ -12,14 +13,14 @@ use {
             register_allocator::naive::FreshAllocator,
         },
     },
-    alloc::{alloc::Global, collections::VecDeque, vec::Vec},
+    alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in, hashset_in},
         intern::InternedString,
         rudder::Model,
     },
-    core::fmt::Debug,
+    core::{fmt::Debug, sync::atomic::AtomicUsize},
     iced_x86::code_asm::CodeAssembler,
 };
 
@@ -53,6 +54,10 @@ pub struct X86TranslationContext<A: Alloc> {
     v_offset: u64,
 
     global_register_offset: usize,
+
+    /// Counter for allocating variable ids
+    current_variable_id: usize,
+
     memory_mask: bool,
 }
 
@@ -124,6 +129,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             v_offset: model.reg_offset("PSTATE_V"),
             global_register_offset,
             memory_mask,
+            current_variable_id: 0,
         };
 
         // add panic to the panic block
@@ -291,6 +297,19 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
     pub fn pc_offset(&self) -> u64 {
         self.pc_offset
+    }
+
+    pub fn allocate_variable_id(&mut self) -> usize {
+        let id = self.current_variable_id;
+
+        self.current_variable_id += 1;
+
+        // todo: be better about this
+        if id >= GLOBAL_REGISTER_SIZE / 8 {
+            panic!("variable number {id:#x} exceeded MAX_STACK_SIZE ({GLOBAL_REGISTER_SIZE:#x})")
+        }
+
+        id
     }
 }
 

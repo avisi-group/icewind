@@ -60,6 +60,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             return *operand;
         }
 
+        if let Some(id) = self.sets_flags.get(node) {
+            let read = self.read_stack_variable(*id, node.typ());
+            return self.to_operand(&read);
+        }
+
         // The node is not cached -- TODO: make sure it wasn't supposed to be emitted
         // before a side-effecty node.
 
@@ -127,6 +132,33 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     let carry = self.to_operand(carry);
                     self.push_instruction(Instruction::mov(b, dst).unwrap());
                     self.push_instruction(Instruction::adc(a, dst, carry));
+
+                    if self.sets_flags.contains_key(node) {
+                        // N
+                        self.push_instruction(Instruction::sets(Operand::mem_base_displ(
+                            Width::_8,
+                            Register::Physical(PhysicalRegister::RBP),
+                            i32::try_from(self.ctx().n_offset).unwrap(),
+                        )));
+                        // Z
+                        self.push_instruction(Instruction::sete(Operand::mem_base_displ(
+                            Width::_8,
+                            Register::Physical(PhysicalRegister::RBP),
+                            i32::try_from(self.ctx().z_offset).unwrap(),
+                        )));
+                        // C
+                        self.push_instruction(Instruction::setc(Operand::mem_base_displ(
+                            Width::_8,
+                            Register::Physical(PhysicalRegister::RBP),
+                            i32::try_from(self.ctx().c_offset).unwrap(),
+                        )));
+                        // V
+                        self.push_instruction(Instruction::seto(Operand::mem_base_displ(
+                            Width::_8,
+                            Register::Physical(PhysicalRegister::RBP),
+                            i32::try_from(self.ctx().v_offset).unwrap(),
+                        )));
+                    }
 
                     dst
                 }
@@ -286,6 +318,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     self.push_instruction(Instruction::mov(b, dst_lo).unwrap());
                     self.push_instruction(Instruction::mul(src, dst_lo, dst_hi));
 
+                    // todo: bug will not cache dst_hi
                     return dst_hi;
                 }
 
@@ -423,77 +456,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 dest
             }
-            NodeKind::GetFlags { operation } => {
-                let n = Operand::vreg(Width::_8, self.next_vreg());
-                let z = Operand::vreg(Width::_8, self.next_vreg());
-                let c = Operand::vreg(Width::_8, self.next_vreg());
-                let v = Operand::vreg(Width::_8, self.next_vreg());
-                let dest = Operand::vreg(Width::_8, self.next_vreg());
-
-                let instrs = [
-                    Instruction::sets(n),
-                    Instruction::sete(z),
-                    Instruction::setc(c),
-                    Instruction::seto(v),
-                    Instruction::xor(dest, dest),
-                    Instruction::or(n, dest),
-                    Instruction::shl(Operand::imm(Width::_8, 1), dest),
-                    Instruction::or(z, dest),
-                    Instruction::shl(Operand::imm(Width::_8, 1), dest),
-                    Instruction::or(c, dest),
-                    Instruction::shl(Operand::imm(Width::_8, 1), dest),
-                    Instruction::or(v, dest),
-                ];
-
-                match self.current_block_operands.get(operation).copied() {
-                    Some(operation_operand) => {
-                        let block_instructions = &mut self
-                            .current_block
-                            .clone()
-                            .get_mut(self.ctx_mut().arena_mut())
-                            .instructions;
-
-                        let (index, adc) = block_instructions
-                            .iter()
-                            .enumerate()
-                            .rev()
-                            .find(|(_, i)| matches!(i.0, Opcode::ADC(_, _, _)))
-                            .unwrap();
-
-                        if let Opcode::ADC(_, dst, _) = &adc.0 {
-                            assert_eq!(*dst, operation_operand)
-                        } else {
-                            panic!()
-                        };
-
-                        for instr in instrs.into_iter().rev() {
-                            block_instructions.insert(index + 1, instr);
-                        }
-                    }
-                    None => {
-                        let _target = self.to_operand(operation);
-
-                        self.current_block
-                            .clone()
-                            .get_mut(self.ctx_mut().arena_mut())
-                            .instructions
-                            .extend_from_slice(&instrs);
-                    }
-                }
-                // if the last instruction wasn't an ADC, emit one? todo:
-                if !matches!(
-                    self.current_block
-                        .get(self.ctx.arena())
-                        .instructions()
-                        .last()
-                        .map(|i| &i.0),
-                    Some(Opcode::ADC(_, _, _))
-                ) {
-                    let _op = self.to_operand(operation);
-                }
-
-                // nzcv
-                dest
+            NodeKind::GetFlags { .. } => {
+                panic!("handled by addwithcarry specialization");
             }
             NodeKind::Tuple(vec) => panic!("cannot convert to operand: {vec:#?}"),
             NodeKind::Select {

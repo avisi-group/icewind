@@ -19,6 +19,7 @@ use {
                 device::{Device, MemoryMappedDevice},
             },
         },
+        util::get_current_device,
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
     common::{TestConfig, intern::InternedString},
@@ -75,8 +76,8 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
 
-    linux(guest);
-    // simbench(guest);
+    //linux(guest);
+    simbench(guest);
 
     let temp_exec_ctx = Box::new(GuestExecutionContext {
         current_address_space: guest
@@ -103,18 +104,29 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     //     .unwrap();
     // }
 
-    // linux
+    // // linux
+    // {
+    //     let data = guest_data.read_to_vec("/bootloader.bin").unwrap();
+    //     unsafe { ptr::copy(data.as_ptr(), 0x8000_0000 as *mut u8, data.len()) };
+    // }
+    // {
+    //     let data = guest_data.read_to_vec("/sail.dtb").unwrap();
+    //     unsafe { ptr::copy(data.as_ptr(), 0x8100_0000 as *mut u8, data.len()) };
+    // }
+    // {
+    //     let data = guest_data.read_to_vec("/Image").unwrap();
+    //     unsafe { ptr::copy(data.as_ptr(), 0x8208_0000 as *mut u8, data.len()) };
+    // }
+
     {
-        let data = guest_data.read_to_vec("/bootloader.bin").unwrap();
-        unsafe { ptr::copy(data.as_ptr(), 0x8000_0000 as *mut u8, data.len()) };
-    }
-    {
-        let data = guest_data.read_to_vec("/sail.dtb").unwrap();
-        unsafe { ptr::copy(data.as_ptr(), 0x8100_0000 as *mut u8, data.len()) };
-    }
-    {
-        let data = guest_data.read_to_vec("/Image").unwrap();
-        unsafe { ptr::copy(data.as_ptr(), 0x8208_0000 as *mut u8, data.len()) };
+        let data = guest_data.read_to_vec("/fuzzrs").unwrap();
+        let elf = ElfBinary::new(&data).unwrap();
+
+        get_current_device()
+            .register_file
+            .write("_PC", elf.entry_point());
+
+        elf.load(&mut DirectElfLoader).unwrap();
     }
 
     // go go go (start all devices)

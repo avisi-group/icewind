@@ -341,6 +341,7 @@ fn decodea64_addsub() {
     register_file.write::<u64>("R2", 10);
 
     translation.execute(&register_file);
+    log::error!("{translation:?}");
 
     assert_eq!(15, register_file.read::<u64>("R0"));
     //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
@@ -5590,8 +5591,6 @@ fn simbench_el_from_spsr() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    // log::error!("{translation:?}");
-
     register_file.write::<u8>("PSTATE_EL", 1);
     assert_eq!(register_file.read::<u64>("R0"), 0x0);
 
@@ -5631,8 +5630,6 @@ fn simbench_illegal_exception_return() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-
-    log::error!("{translation:?}");
 
     assert_eq!(register_file.read::<u64>("SPSR_EL1_bits"), 0x0);
 
@@ -5964,4 +5961,131 @@ fn sub_sxtw() {
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R3"), 0xfffffffffffffff0);
+}
+
+#[ktest]
+fn adcs_fuzzed_0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 3a090207        adcs    w7, w16, w9
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x3a090207,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R16", 0xcb8f8b10b055dfd5);
+    register_file.write::<i64>("R9", 0x335c1e9bbd404fb6);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R7"), 0x000000006d962f8b);
+}
+
+#[ktest]
+fn ldp_q() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // ad480400        ldp     q0, q1, [x0, #256]
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xad480400,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mem = alloc::boxed::Box::new((
+        u128::from_ne_bytes([0xABu8; 16]),
+        u128::from_ne_bytes([0xBAu8; 16]),
+    ));
+
+    register_file.write("R0", (&*mem as *const _ as u64) - 256);
+
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q0_offset = z_offset;
+    let q1_offset = z_offset + 256;
+
+    let q0 = register_file.read_raw::<u128>(q0_offset.try_into().unwrap());
+    let q1 = register_file.read_raw::<u128>(q1_offset.try_into().unwrap());
+
+    assert_eq!(q0.to_ne_bytes(), [0xAB; 16]);
+    assert_eq!(q1.to_ne_bytes(), [0xBA; 16]);
+}
+
+#[ktest]
+fn stp_q() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // ad080400        stp     q0, q1, [x0, #256]
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xad080400,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let mem = alloc::boxed::Box::new((0u128, 0u128));
+
+    register_file.write("R0", (&*mem as *const _ as u64) - 256);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q0_offset = z_offset;
+    let q1_offset = z_offset + 256;
+
+    register_file.write_raw::<u128>(
+        q0_offset.try_into().unwrap(),
+        0xdead_c0de_a3a4_a5be_a5be_a3a4_c0de_deadu128,
+    );
+    register_file.write_raw::<u128>(
+        q1_offset.try_into().unwrap(),
+        0xbeeb_c0de_b33b_beeb_a5be_a3a4_c0de_deadu128,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        *mem,
+        (
+            0xdead_c0de_a3a4_a5be_a5be_a3a4_c0de_deadu128,
+            0xbeeb_c0de_b33b_beeb_a5be_a3a4_c0de_deadu128
+        )
+    );
 }

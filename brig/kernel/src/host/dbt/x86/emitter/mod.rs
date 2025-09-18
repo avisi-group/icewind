@@ -55,6 +55,8 @@ pub struct X86Emitter<'ctx, A: Alloc> {
     next_vreg: usize,
     pub execution_result: ExecutionResult,
     ctx: &'ctx mut X86TranslationContext<A>,
+    // node to global variable ID
+    sets_flags: HashMap<X86NodeRef<A>, usize>,
 }
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -66,6 +68,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             next_vreg: 0,
             execution_result: ExecutionResult::new(),
             ctx,
+            sets_flags: HashMap::default(),
         }
     }
 
@@ -94,7 +97,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     }
 
     pub fn push_target(&mut self, target: Ref<X86Block<A>>) {
-        log::trace!("adding target {target:?} to {:?}", self.current_block);
+        log::debug!("adding target {target:?} to {:?}", self.current_block);
         self.current_block
             .get_mut(self.ctx.arena_mut())
             .push_next(target);
@@ -1080,10 +1083,22 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             || offset == self.ctx().v_offset
         {
             // look back to see if we're extracting a bit out of get_flags
-            if let Some(op) = contains_get_flags(&value) {
-                // emit the setCC to the memory location directly
+            if let Some(get_flags_target) = contains_get_flags(&value) {
+                assert!(matches!(
+                    get_flags_target.kind(),
+                    NodeKind::TernaryOperation(TernaryOperationKind::AddWithCarry(_, _, _)),
+                ));
 
-                let _value = self.to_operand(&op);
+                // generates ADC on first time, will be cached on subsequent runs
+                let operand = self.to_operand(&get_flags_target);
+
+                if !self.sets_flags.contains_key(&get_flags_target) {
+                    let id = self.ctx_mut().allocate_variable_id();
+                    self.push_instruction(
+                        Instruction::mov(operand, Operand::greg(operand.width(), id)).unwrap(),
+                    );
+                    self.sets_flags.insert(get_flags_target, id);
+                }
 
                 let dest = Operand::mem_base_displ(
                     Width::_8,
@@ -1106,76 +1121,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 return;
             }
         }
-
-        // let optimised = if let NodeKind::BinaryOperation(
-        //     BinaryOperationKind::Add(lhs, rhs) | BinaryOperationKind::And(lhs, rhs),
-        // ) = value.kind()
-        // {
-        //     if let NodeKind::Constant {
-        //         value: constant_value,
-        //         width,
-        //     } = rhs.kind()
-        //     {
-        //         if *constant_value < i32::MAX as u64 {
-        //             if let NodeKind::GuestRegister {
-        //                 offset: source_register_offset,
-        //             } = lhs.kind()
-        //             {
-        //                 if *source_register_offset == offset {
-        //                     let width = match width {
-        //                         1 | 8 => Width::_8,
-        //                         16 => Width::_16,
-        //                         32 => Width::_32,
-        //                         64 => Width::_64,
-        //                         _ => panic!("unsupported register width"),
-        //                     };
-
-        //                     let increment = Operand::imm(width, *constant_value);
-
-        //                     // This is an increment of the same register
-
-        //                     match value.kind() {
-        //                         NodeKind::BinaryOperation(BinaryOperationKind::Add(_,
-        // _)) => {
-        // self.push_instruction(Instruction::add(
-        // increment,                                 Operand::mem_base_displ(
-        //                                     increment.width(),
-        //
-        // Register::PhysicalRegister(PhysicalRegister::RBP),
-        // offset.try_into().unwrap(),                                 ),
-        //                             ));
-        //                         }
-        //                         NodeKind::BinaryOperation(BinaryOperationKind::And(_,
-        // _)) => {
-        // self.push_instruction(Instruction::and(
-        // increment,                                 Operand::mem_base_displ(
-        //                                     increment.width(),
-        //
-        // Register::PhysicalRegister(PhysicalRegister::RBP),
-        // offset.try_into().unwrap(),                                 ),
-        //                             ));
-        //                         }
-        //                         _ => {
-        //                             panic!("unsupported");
-        //                         }
-        //                     }
-
-        //                     true
-        //                 } else {
-        //                     false
-        //                 }
-        //             } else {
-        //                 false
-        //             }
-        //         } else {
-        //             false
-        //         }
-        //     } else {
-        //         false
-        //     }
-        // } else {
-        //     false
-        // };
 
         if offset == self.ctx().el_offset {
             let function = self.function_ptr(write_to_el as u64);
@@ -1366,9 +1311,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             .unwrap(),
         );
 
-        // ASSUMPTION: It will either be zero or one, so move it into bit 1 position.
+        // ASSUMPTION: It will either be zero or one, so move it into bit 2 position.
         self.push_instruction(Instruction::shl(
-            Operand::imm(Width::_32, 1),
+            Operand::imm(Width::_32, 2),
             Operand::preg(Width::_32, PhysicalRegister::RAX),
         ));
 
@@ -2235,6 +2180,78 @@ fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> 
         }
 
         _ => panic!(),
+    }
+}
+
+fn contains_addwithcarry<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> {
+    match value.kind() {
+        NodeKind::TernaryOperation(TernaryOperationKind::AddWithCarry(_, _, _)) => {
+            Some(value.clone())
+        }
+
+        NodeKind::Constant { .. }
+        | NodeKind::GuestRegister { .. }
+        | NodeKind::ReadMemory { .. }
+        | NodeKind::ReadStackVariable { .. } => None,
+
+        NodeKind::UnaryOperation(
+            UnaryOperationKind::Absolute(value)
+            | UnaryOperationKind::Ceil(value)
+            | UnaryOperationKind::Complement(value)
+            | UnaryOperationKind::Floor(value)
+            | UnaryOperationKind::Negate(value)
+            | UnaryOperationKind::Not(value)
+            | UnaryOperationKind::Power2(value)
+            | UnaryOperationKind::SquareRoot(value),
+        )
+        | NodeKind::GetFlags { operation: value }
+        | NodeKind::Cast { value, .. }
+        | NodeKind::Select {
+            condition: value, ..
+        } => contains_addwithcarry(value),
+
+        NodeKind::BinaryOperation(
+            BinaryOperationKind::Add(a, b)
+            | BinaryOperationKind::And(a, b)
+            | BinaryOperationKind::CompareEqual(a, b)
+            | BinaryOperationKind::CompareGreaterThan(a, b)
+            | BinaryOperationKind::CompareGreaterThanOrEqual(a, b)
+            | BinaryOperationKind::CompareLessThan(a, b)
+            | BinaryOperationKind::CompareLessThanOrEqual(a, b)
+            | BinaryOperationKind::CompareNotEqual(a, b)
+            | BinaryOperationKind::Divide(a, b)
+            | BinaryOperationKind::Modulo(a, b)
+            | BinaryOperationKind::Multiply(a, b)
+            | BinaryOperationKind::Or(a, b)
+            | BinaryOperationKind::PowI(a, b)
+            | BinaryOperationKind::Sub(a, b)
+            | BinaryOperationKind::Xor(a, b),
+        )
+        | NodeKind::Shift {
+            value: a,
+            amount: b,
+            ..
+        } => contains_addwithcarry(a).or_else(|| contains_addwithcarry(b)),
+        NodeKind::BitExtract {
+            value: a,
+            start: _,
+            length: _,
+        } => contains_addwithcarry(a),
+        NodeKind::BitInsert {
+            target,
+            source,
+            start,
+            length,
+        } => todo!(),
+        NodeKind::BitReplicate { pattern, count } => todo!(),
+        NodeKind::CallReturnValue => todo!(),
+
+        NodeKind::Tuple(x86_node_refs) => x86_node_refs
+            .iter()
+            .filter_map(contains_addwithcarry)
+            .next(),
+
+        NodeKind::FunctionPointer(_) => None,
     }
 }
 
