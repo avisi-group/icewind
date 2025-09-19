@@ -5950,7 +5950,7 @@ fn tpidr_el0() {
         "__DecodeA64",
         &mut emitter,
         &register_file,
-        0x3cdd0d60,
+        0xd51bd048,
     )
     .unwrap();
 
@@ -5961,7 +5961,7 @@ fn tpidr_el0() {
         "__DecodeA64",
         &mut emitter,
         &register_file,
-        0x3cdd0d60,
+        0xd53bd048,
     )
     .unwrap();
 
