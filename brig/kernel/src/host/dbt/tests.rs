@@ -341,7 +341,6 @@ fn decodea64_addsub() {
     register_file.write::<u64>("R2", 10);
 
     translation.execute(&register_file);
-    log::error!("{translation:?}");
 
     assert_eq!(15, register_file.read::<u64>("R0"));
     //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
@@ -4719,16 +4718,16 @@ fn sbfm() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    // 93407c63 sbfm               x3, x3, #0, #31
+    register_file.write("PSTATE_EL", 3u8);
 
-    let opcode = emitter.constant(0x93407c63, Type::Unsigned(32));
-    translate(
+    // 93407c63        sxtw    x3, w3
+    translate_instruction(
         Global,
         &*model,
         "__DecodeA64",
-        &[opcode],
         &mut emitter,
         &register_file,
+        0x93407c63,
     )
     .unwrap();
     //__DecodeA64_LoadStore
@@ -4739,16 +4738,14 @@ fn sbfm() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    let dst = Box::<(u64, u64)>::new((0, 0));
 
-    register_file.write("SEE", -1i64);
-    register_file.write("R29", 0xFEEDu64);
-    register_file.write("R30", 0xDEADu64);
-    register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
-
+    register_file.write("R3", (-12i32) as u64);
     translation.execute(&register_file);
+    assert_eq!(-12i64, register_file.read::<i64>("R3"));
 
-    assert_eq!(*dst, (0xFEED, 0xDEAD));
+    register_file.write("R3", i32::MAX as u64);
+    translation.execute(&register_file);
+    assert_eq!(i64::from(i32::MAX), register_file.read::<i64>("R3"));
 }
 
 #[ktest]
@@ -5771,7 +5768,7 @@ fn mrs_current_el() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write::<u8>("PSTATE_EL", 0x0);
+    register_file.write::<u8>("PSTATE_EL", 0x1);
 
     //      mrs     x0, currentel
     // execute_aarch64_instrs_system_register_system
@@ -5894,7 +5891,7 @@ fn tpidr_el0() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write::<u8>("PSTATE_EL", 0x1);
+    register_file.write::<u8>("PSTATE_EL", 0x3);
 
     //  d51bd048        msr     tpidr_el0, x8
     translate_instruction(

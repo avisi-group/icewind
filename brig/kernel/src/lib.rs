@@ -31,6 +31,7 @@ use {
         util::try_get_current_device,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
+    common::TestConfig,
     core::{panic::PanicInfo, sync::atomic::Ordering},
     x86::io::outw,
 };
@@ -100,10 +101,14 @@ fn continue_start() {
         let file = fs
             .read_to_vec("test_config.postcard")
             .expect("failed to load test configuration file");
-        postcard::from_bytes(&file).unwrap()
+        postcard::from_bytes::<TestConfig>(&file).unwrap()
     };
 
-    guest::start(&mut fs, test_config);
+    if test_config == TestConfig::None {
+        guest::start(&mut fs);
+    } else {
+        guest::tests(test_config)
+    }
 }
 
 fn _serial_in() {

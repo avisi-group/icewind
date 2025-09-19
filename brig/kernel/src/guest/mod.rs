@@ -72,7 +72,7 @@ impl GuestExecutionContext {
 }
 
 /// Start guest emulation
-pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
+pub fn start<FS: Filesystem>(guest_data: &mut FS) {
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
 
@@ -91,8 +91,6 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
 
     log::debug!("activating guest execution context");
     temp_exec_ctx.activate();
-
-    crate::tests::run(test_config);
 
     // load data
 
@@ -145,6 +143,28 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
         .get(&InternedString::from_static("core0"))
         .unwrap()
         .start();
+}
+
+pub fn tests(config: TestConfig) {
+    unsafe { GUEST.call_once(Guest::new) };
+    let guest = unsafe { GUEST.get_mut() }.unwrap();
+
+    linux(guest);
+
+    let temp_exec_ctx = Box::new(GuestExecutionContext {
+        current_address_space: guest
+            .address_spaces
+            .get_mut(&("as0".into()))
+            .unwrap()
+            .as_mut() as *mut AddressSpace,
+        interrupt_pending: AtomicU64::new(0),
+        unprivileged_access: 0,
+    });
+
+    log::debug!("activating guest execution context");
+    temp_exec_ctx.activate();
+
+    crate::tests::run(config);
 }
 
 fn simbench(guest: &mut Guest) {
