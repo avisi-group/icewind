@@ -1,4 +1,6 @@
 use {
+    bootloader::BootConfig,
+    bootloader_boot_config::LevelFilter,
     cargo_metadata::{Artifact, Message, TargetKind, diagnostic::DiagnosticLevel},
     clap::{Parser, Subcommand},
     common::{
@@ -102,7 +104,10 @@ fn main() -> color_eyre::Result<()> {
     }
 
     let uefi_kernel_path = kernel_path.parent().unwrap().join("uefi.img");
+    let mut config = BootConfig::default();
+    config.log_level = LevelFilter::Off;
     bootloader::UefiBoot::new(&kernel_path)
+        .set_boot_config(&config)
         .create_disk_image(&uefi_kernel_path)
         .unwrap();
 

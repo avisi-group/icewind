@@ -165,9 +165,9 @@ dependencies = [
 
 [[package]]
 name = "bootloader-boot-config"
-version = "0.11.11"
+version = "0.11.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0934f1bba4b8e8d9365bcc9f5fdc4ea9e3e6ac272ecc531a142a50012c203d43"
+checksum = "6cfbe7f4a5d9843a9a310712e64691f3c474546f02bed7a53ed81775a681d18e"
 dependencies = [
  "serde",
 ]
@@ -177,6 +177,7 @@ name = "brig-cli"
 version = "0.1.0"
 dependencies = [
  "bootloader",
+ "bootloader-boot-config",
  "cargo_metadata",
  "clap",
  "clap-num",
@@ -932,9 +933,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.27"
+version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "lzma-rs"
