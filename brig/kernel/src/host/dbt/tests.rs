@@ -1025,11 +1025,23 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     .unwrap()
     .unwrap();
 
+    let flags = emitter.access_tuple(res.clone(), 1);
+    let _0 = emitter.constant(0, Type::Signed(64));
+    let _1 = emitter.constant(1, Type::Signed(64));
+    let _2 = emitter.constant(1, Type::Signed(64));
+    let _3 = emitter.constant(1, Type::Signed(64));
+
+    let n = emitter.bit_extract(flags.clone(), _0.clone(), _1.clone());
+    emitter.write_register(model.reg_offset("PSTATE_N"), n);
+    let z = emitter.bit_extract(flags.clone(), _1.clone(), _1.clone());
+    emitter.write_register(model.reg_offset("PSTATE_Z"), z);
+    let c = emitter.bit_extract(flags.clone(), _2.clone(), _1.clone());
+    emitter.write_register(model.reg_offset("PSTATE_C"), c);
+    let v = emitter.bit_extract(flags.clone(), _3.clone(), _1.clone());
+    emitter.write_register(model.reg_offset("PSTATE_V"), v);
+
     let sum = emitter.access_tuple(res.clone(), 0);
     emitter.write_register(model.reg_offset("R0"), sum);
-
-    let flags = emitter.access_tuple(res.clone(), 1);
-    emitter.write_register(model.reg_offset("R1"), flags);
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -1039,7 +1051,10 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     (
         register_file.read::<u64>("R0"),
-        register_file.read::<u8>("R1"),
+        register_file.read::<u8>("PSTATE_N") << 3
+            | register_file.read::<u8>("PSTATE_Z") << 2
+            | register_file.read::<u8>("PSTATE_C") << 1
+            | register_file.read::<u8>("PSTATE_V"),
     )
 }
 
