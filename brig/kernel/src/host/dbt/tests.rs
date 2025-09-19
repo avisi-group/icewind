@@ -5619,6 +5619,7 @@ fn simbench_illegal_exception_return() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write::<u8>("PSTATE_EL", 1);
+    register_file.write::<u64>("SCR_EL3_bits", 0x430);
 
     let spsr = emitter.read_register(model.reg_offset("SPSR_EL1_bits"), Type::Unsigned(64));
     let illegal_psr_state = translate(
@@ -5684,6 +5685,7 @@ fn simbench_elusingaarch32k() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("PSTATE_EL", 1u8);
+    register_file.write::<u64>("SCR_EL3_bits", 0x430);
 
     let target = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(2));
     let is_secure_below_el3 = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(1));
