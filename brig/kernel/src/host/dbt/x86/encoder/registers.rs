@@ -8,6 +8,7 @@ use {
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
+#[repr(u32)]
 pub enum PhysicalRegisterGeneral {
     /// rax
     RAX,
@@ -176,6 +177,7 @@ impl From<PhysicalRegisterGeneral> for AsmRegister32 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
+#[repr(u32)]
 pub enum PhysicalRegisterXmm {
     /// xmm0
     XMM0,
@@ -246,6 +248,17 @@ impl PhysicalRegister {
     pub const R13: Self = Self::General(PhysicalRegisterGeneral::R13);
     pub const R14: Self = Self::General(PhysicalRegisterGeneral::R14);
     pub const R15: Self = Self::General(PhysicalRegisterGeneral::R15);
+
+    pub fn index(&self) -> usize {
+        match self {
+            PhysicalRegister::General(physical_register_general) => {
+                (*physical_register_general as u32) as usize
+            }
+            PhysicalRegister::Xmm(physical_register_xmm) => {
+                (*physical_register_xmm as u32) as usize + 16
+            }
+        }
+    }
 }
 
 impl From<&PhysicalRegister> for AsmRegister8 {

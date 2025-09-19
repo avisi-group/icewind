@@ -16,6 +16,7 @@ use {
 //pub mod reverse_scan;
 pub mod naive;
 //pub mod solid_state;
+pub mod regalloc_ng;
 
 pub trait RegisterAllocator {
     // A is for the generic memory allocator, NOT anything to do with the register

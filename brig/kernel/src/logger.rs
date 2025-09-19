@@ -22,7 +22,7 @@ static LOGGER: &Logger = &Logger {
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
         (
             "kernel::host::dbt::x86::register_allocator",
-            LevelFilter::Info,
+            LevelFilter::Debug,
         ),
         ("kernel::host::dbt::x86", LevelFilter::Info),
         ("kernel::host::dbt::models", LevelFilter::Info),

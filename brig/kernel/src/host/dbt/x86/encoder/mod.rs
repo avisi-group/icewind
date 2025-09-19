@@ -138,6 +138,9 @@ pub enum Opcode<A: Alloc> {
         nr_input_args: usize,
         nr_output_args: usize,
     },
+
+    /// label
+    LABEL,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
@@ -755,7 +758,7 @@ impl<A: Alloc> Instruction<A> {
 
         match &self.0 {
             // do not emit dead instructions
-            DEAD => (),
+            DEAD | LABEL => (),
             NOP => assembler.nop().unwrap(),
             MOV(src, dst) => mov::encode(assembler, src, dst),
             MOVZX(src, dst) => movzx::encode(assembler, src, dst),
@@ -1296,6 +1299,7 @@ impl<A: Alloc> Instruction<A> {
                 None,
             ]
             .into_iter(),
+            Opcode::LABEL => [None, None, None].into_iter(),
         }
     }
 
@@ -1388,7 +1392,7 @@ impl<A: Alloc> Instruction<A> {
             .collect(),
             Opcode::PUSH(src) => [((OperandDirection::In, src))].into_iter().collect(),
             Opcode::POP(dest) => [((OperandDirection::Out, dest))].into_iter().collect(),
-            Opcode::DEAD => panic!(),
+            Opcode::DEAD => [].into_iter().collect(),
             Opcode::OUT(port, value) => [
                 ((OperandDirection::In, port)),
                 ((OperandDirection::In, value)),
@@ -1414,6 +1418,7 @@ impl<A: Alloc> Instruction<A> {
                         .map(|reg| (OperandDirection::Out, Operand::preg(Width::_64, reg))),
                 )
                 .collect(),
+            Opcode::LABEL => alloc::vec::Vec::default(),
         }
     }
 

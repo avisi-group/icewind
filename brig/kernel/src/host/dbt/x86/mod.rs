@@ -1,26 +1,34 @@
 use {
-    crate::host::dbt::{
-        Alloc, Translation,
-        emitter::Emitter,
-        register_file::GLOBAL_REGISTER_SIZE,
-        x86::{
-            emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
-            encoder::{
-                Instruction, Opcode, Operand, OperandKind,
-                registers::{PhysicalRegister, Register},
-                width::Width,
+    crate::{
+        host::dbt::{
+            Alloc, Translation,
+            emitter::Emitter,
+            register_file::GLOBAL_REGISTER_SIZE,
+            x86::{
+                emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
+                encoder::{
+                    Instruction, Opcode, Operand, OperandKind,
+                    registers::{PhysicalRegister, Register},
+                    width::Width,
+                },
+                register_allocator::{naive::FreshAllocator, regalloc_ng},
             },
-            register_allocator::naive::FreshAllocator,
         },
+        println,
     },
-    alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
+    alloc::{
+        alloc::Global,
+        collections::{VecDeque, linked_list::LinkedList},
+        rc::Rc,
+        vec::Vec,
+    },
     common::{
         arena::{Arena, Ref},
-        hashmap::{HashMapA, hashmap_in, hashset_in},
+        hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},
         intern::InternedString,
         rudder::Model,
     },
-    core::{fmt::Debug, sync::atomic::AtomicUsize},
+    core::{default, fmt::Debug, sync::atomic::AtomicUsize},
     iced_x86::code_asm::CodeAssembler,
 };
 
@@ -167,108 +175,151 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         let mut label_map = hashmap_in(self.allocator());
 
-        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
-
         log::trace!("building work queue");
 
-        let mut all_blocks = Vec::new_in(self.allocator());
-        let mut work_queue = Vec::new_in(self.allocator());
-        work_queue.push(self.panic_block());
-        work_queue.push(self.initial_block());
+        let all_blocks = {
+            let mut all_blocks = Vec::new_in(self.allocator());
+            let mut work_queue = Vec::new_in(self.allocator());
+            work_queue.push(self.panic_block());
+            work_queue.push(self.initial_block());
 
-        while let Some(block) = work_queue.pop() {
-            if !block.get(self.arena()).is_linked() {
-                block.get_mut(self.arena_mut()).set_linked();
+            while let Some(block) = work_queue.pop() {
+                if !block.get(self.arena()).is_linked() {
+                    block.get_mut(self.arena_mut()).set_linked();
 
-                if let Some(label) = label_map.insert(block, assembler.create_label()) {
-                    panic!("created label for {block:?} but label {label:?} already existed")
-                }
-                all_blocks.push(block);
+                    if let Some(label) = label_map.insert(block, assembler.create_label()) {
+                        panic!("created label for {block:?} but label {label:?} already existed")
+                    }
+                    all_blocks.push(block);
 
-                empty_block_jump_threading(self.arena_mut(), block);
-                for block in block.get(self.arena()).next_blocks() {
-                    work_queue.push(*block);
-                }
-            }
-        }
-
-        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
-
-        log::trace!("allocating registers");
-
-        let global_register_offset = self.global_register_offset;
-
-        all_blocks.iter().for_each(|block| {
-            block
-                .get_mut(self.arena_mut())
-                .allocate_registers(&mut FreshAllocator::new(
-                    num_virtual_registers,
-                    global_register_offset,
-                ));
-        });
-
-        log::trace!("encoding all blocks");
-
-        log::debug!("{}", dot::render(self.arena(), self.initial_block()));
-
-        for (i, block) in all_blocks.iter().enumerate() {
-            let block_label = label_map.get_mut(block).unwrap();
-            if let Err(e) = assembler.set_label(block_label) {
-                // If there is already an active label, then emit a nop and try again.
-                assembler.nop().unwrap();
-
-                // I don't think there is a better way to do this yet, without some
-                // significant re-thinking.  This is because, we pre-create the block
-                // labels, but if we jump forward to a block label, which we then don't
-                // use (because it aliases), then we've already emitted a jump to the
-                // unused label.
-
-                assembler.set_label(block_label).unwrap_or_else(|e| {
-                    panic!(
-                        "{e}: label already set OR label {:?} for block {block:?} re-used",
-                        label_map.get_mut(block).unwrap()
-                    );
-                });
-            }
-
-            // assembler
-            //     .nop_1::<iced_x86::code_asm::AsmMemoryOperand>(iced_x86::code_asm::qword_ptr(
-            //         iced_x86::code_asm::AsmRegister64::from(iced_x86::code_asm::rax)
-            //             + block.index(),
-            //     ))
-            //     .unwrap();
-
-            let instrs = block.get(self.arena()).instructions();
-
-            let (last, rest) = instrs.split_last().unwrap_or_else(|| {
-                panic!(
-                    "block {:?} {block:?} was empty",
-                    label_map.get_mut(block).unwrap()
-                )
-            });
-
-            // all but last
-            for instr in rest {
-                instr.encode(&mut assembler, &label_map);
-            }
-
-            assert!(matches!(
-                last,
-                Instruction(Opcode::JMP(_) | Opcode::INT(_) | Opcode::RET)
-            ));
-
-            // fallthrough jump optimization
-            if let Instruction(Opcode::JMP(op)) = last {
-                if let OperandKind::Target(target) = op.kind() {
-                    if all_blocks.get(i + 1).copied() == Some(*target) {
-                        // do not emit jump
-                        continue;
+                    empty_block_jump_threading(self.arena_mut(), block);
+                    for block in block.get(self.arena()).next_blocks() {
+                        work_queue.push(*block);
                     }
                 }
             }
 
-            last.encode(&mut assembler, &label_map);
+            all_blocks
+        };
+
+        log::error!("{}", dot::render(self.arena(), self.initial_block()));
+
+        let mut instructions = Vec::<Instruction<A>>::new();
+        let mut label_map_hidden = HashMap::<Ref<X86Block<A>>, usize>::default();
+        for block in &all_blocks {
+            label_map_hidden.insert(block.clone(), instructions.len());
+            instructions.push(Instruction(Opcode::LABEL));
+            instructions.extend(block.get(self.arena()).instructions());
         }
+        instructions
+            .iter_mut()
+            .enumerate()
+            .for_each(|(idx, instr)| {
+                if let Opcode::JMP(target) = instr.0 {
+                    let OperandKind::Target(target) = target.kind() else {
+                        panic!();
+                    };
+
+                    let target_index = label_map_hidden.get(target).unwrap();
+
+                    if *target_index == idx + 1 {
+                        instr.0 = Opcode::DEAD;
+                    }
+                }
+            });
+
+        println!("\n\n\nPRE ALLOC");
+        for (idx, instr) in instructions.iter().enumerate() {
+            println!("{idx}: {instr}");
+        }
+
+        regalloc_ng::allocate(&mut instructions, &label_map_hidden, num_virtual_registers);
+
+        println!("\n\n\nPOST ALLOC");
+        for (idx, instr) in instructions.iter().enumerate() {
+            println!("{idx}: {instr}");
+        }
+
+        // log::trace!("allocating registers");
+
+        // let global_register_offset = self.global_register_offset;
+
+        // all_blocks.iter().for_each(|block| {
+        //     block
+        //         .get_mut(self.arena_mut())
+        //         .allocate_registers(&mut FreshAllocator::new(
+        //             num_virtual_registers,
+        //             global_register_offset,
+        //         ));
+        // });
+
+        log::trace!("encoding instructions");
+        for instr in instructions {
+            instr.encode(&mut assembler, &label_map);
+        }
+
+        // log::debug!("{}", dot::render(self.arena(), self.initial_block()));
+
+        // for (i, block) in all_blocks.iter().enumerate() {
+        //     let block_label = label_map.get_mut(block).unwrap();
+        //     if let Err(e) = assembler.set_label(block_label) {
+        //         // If there is already an active label, then emit a nop and try
+        // again.         assembler.nop().unwrap();
+
+        //         // I don't think there is a better way to do this yet, without some
+        //         // significant re-thinking.  This is because, we pre-create the block
+        //         // labels, but if we jump forward to a block label, which we then
+        // don't         // use (because it aliases), then we've already emitted
+        // a jump to the         // unused label.
+
+        //         assembler.set_label(block_label).unwrap_or_else(|e| {
+        //             panic!(
+        //                 "{e}: label already set OR label {:?} for block {block:?}
+        // re-used",                 label_map.get_mut(block).unwrap()
+        //             );
+        //         });
+        //     }
+
+        //     // assembler
+        //     //
+        // .nop_1::<iced_x86::code_asm::AsmMemoryOperand>(iced_x86::code_asm::qword_ptr(
+        //     //
+        // iced_x86::code_asm::AsmRegister64::from(iced_x86::code_asm::rax)
+        //     //             + block.index(),
+        //     //     ))
+        //     //     .unwrap();
+
+        //     let instrs = block.get(self.arena()).instructions();
+
+        //     let (last, rest) = instrs.split_last().unwrap_or_else(|| {
+        //         panic!(
+        //             "block {:?} {block:?} was empty",
+        //             label_map.get_mut(block).unwrap()
+        //         )
+        //     });
+
+        //     // all but last
+        //     for instr in rest {
+        //         instr.encode(&mut assembler, &label_map);
+        //     }
+
+        //     assert!(matches!(
+        //         last,
+        //         Instruction(Opcode::JMP(_) | Opcode::INT(_) | Opcode::RET)
+        //     ));
+
+        //     // fallthrough jump optimization
+        //     if let Instruction(Opcode::JMP(op)) = last {
+        //         if let OperandKind::Target(target) = op.kind() {
+        //             if all_blocks.get(i + 1).copied() == Some(*target) {
+        //                 // do not emit jump
+        //                 continue;
+        //             }
+        //         }
+        //     }
+
+        //     last.encode(&mut assembler, &label_map);
+        // }
 
         log::trace!("assembling");
         let code = assembler.assemble(0).unwrap();
@@ -276,6 +327,8 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         log::trace!("making executable");
 
         let res = Translation::new(code);
+
+        panic!("{res:?}");
 
         log::trace!("done");
 
