@@ -1,21 +1,14 @@
 use {
     crate::{
-        host::dbt::x86::{
-            emitter::X86Block,
-            encoder::{
-                Instruction, Opcode, OperandKind, UseDef, UseDefMut,
-                registers::{PhysicalRegister, Register},
-                width::Width,
-            },
+        host::dbt::x86::encoder::{
+            Instruction, Opcode, Operand, OperandKind, UseDef, UseDefMut,
+            registers::{PhysicalRegister, Register},
+            width::Width,
         },
         println,
     },
     alloc::vec::Vec,
-    bitset_core::BitSet,
-    common::{
-        arena::Ref,
-        hashmap::{HashMap, HashSet},
-    },
+    common::hashmap::{HashMap, HashSet},
 };
 
 use crate::host::dbt::Alloc as MemAlloc;
@@ -30,33 +23,33 @@ struct RegisterTrack {
     last_control_flow_count: i32,
 }
 
+macro_rules! track_phys {
+    ($map: ident, $name: expr) => {
+        $map.insert(Register::Physical($name), RegisterTrack::default());
+    };
+}
+
 pub fn allocate<A: MemAlloc>(
     instructions: &mut Vec<Instruction<A>>,
-    label_map: &HashMap<Ref<X86Block<A>>, usize>,
     num_virtual_registers: usize,
+    global_register_offset: usize,
 ) {
     let mut register_tracking = HashMap::<Register, RegisterTrack>::default();
 
-    register_tracking.insert(
-        Register::Physical(PhysicalRegister::RAX),
-        RegisterTrack::default(),
-    );
-    register_tracking.insert(
-        Register::Physical(PhysicalRegister::RCX),
-        RegisterTrack::default(),
-    );
-    register_tracking.insert(
-        Register::Physical(PhysicalRegister::RDX),
-        RegisterTrack::default(),
-    );
-    register_tracking.insert(
-        Register::Physical(PhysicalRegister::RBX),
-        RegisterTrack::default(),
-    );
-    register_tracking.insert(
-        Register::Physical(PhysicalRegister::RBP),
-        RegisterTrack::default(),
-    );
+    track_phys!(register_tracking, PhysicalRegister::RAX);
+    track_phys!(register_tracking, PhysicalRegister::RCX);
+    track_phys!(register_tracking, PhysicalRegister::RDX);
+    track_phys!(register_tracking, PhysicalRegister::RBX);
+    track_phys!(register_tracking, PhysicalRegister::RSI);
+    track_phys!(register_tracking, PhysicalRegister::RDI);
+    track_phys!(register_tracking, PhysicalRegister::RBP);
+    track_phys!(register_tracking, PhysicalRegister::R8);
+    track_phys!(register_tracking, PhysicalRegister::R9);
+    track_phys!(register_tracking, PhysicalRegister::R10);
+    track_phys!(register_tracking, PhysicalRegister::R11);
+    track_phys!(register_tracking, PhysicalRegister::R12);
+    track_phys!(register_tracking, PhysicalRegister::R13);
+    track_phys!(register_tracking, PhysicalRegister::R14);
 
     for vreg_index in 0..num_virtual_registers {
         register_tracking.insert(Register::Virtual(vreg_index), RegisterTrack::default());
@@ -66,7 +59,7 @@ pub fn allocate<A: MemAlloc>(
 
     calculate_vreg_live_ranges(&mut register_tracking, instructions);
     do_allocate(&mut register_tracking, instructions);
-    commit(&register_tracking, instructions);
+    commit(&register_tracking, instructions, global_register_offset);
 
     println!("{:?}", register_tracking);
 }
@@ -128,6 +121,17 @@ fn do_allocate<A: MemAlloc>(
     avail_phys_regs.insert(PhysicalRegister::RCX);
     avail_phys_regs.insert(PhysicalRegister::RDX);
     avail_phys_regs.insert(PhysicalRegister::RBX);
+
+    avail_phys_regs.insert(PhysicalRegister::RSI);
+    avail_phys_regs.insert(PhysicalRegister::RDI);
+    avail_phys_regs.insert(PhysicalRegister::R8);
+    avail_phys_regs.insert(PhysicalRegister::R9);
+    avail_phys_regs.insert(PhysicalRegister::R10);
+    avail_phys_regs.insert(PhysicalRegister::R11);
+    avail_phys_regs.insert(PhysicalRegister::R12);
+    avail_phys_regs.insert(PhysicalRegister::R13);
+    avail_phys_regs.insert(PhysicalRegister::R14);
+
     avail_phys_regs.insert(PhysicalRegister::RBP);
 
     let mut live_phys_regs = HashSet::<PhysicalRegister>::default();
@@ -231,7 +235,7 @@ fn do_allocate<A: MemAlloc>(
                         }
                     }
                     _ => {
-                        panic!("Unsupported global register allocation");
+                        // Do nothing for globals
                     }
                 }
             }
@@ -334,7 +338,7 @@ fn do_allocate<A: MemAlloc>(
                         }
                     }
                     _ => {
-                        panic!("Unsupported global register allocation");
+                        // Do nothing for globals
                     }
                 }
             }
@@ -344,23 +348,24 @@ fn do_allocate<A: MemAlloc>(
 fn commit<A: MemAlloc>(
     register_tracking: &HashMap<Register, RegisterTrack>,
     instructions: &mut Vec<Instruction<A>>,
+    global_register_offset: usize,
 ) {
     instructions.iter_mut().for_each(|instruction| {
-        // instruction.get_operands_mut().for_each(|op| {
-        //     if let Some((_, op)) = op {
-        //         if let OperandKind::Register(Register::Global(idx)) = op.kind() {
-        //             *op = Operand::mem_base_displ(
-        //                 op.width(),
-        //                 Register::Physical(PhysicalRegister::RBP),
-        //                 i32::try_from(self.global_register_offset + (*idx *
-        // 8)).unwrap(),             )
-        //         }
-        //     }
-        // });
-
         if matches!(instruction.0, Opcode::DEAD) {
             return;
         }
+
+        instruction.get_operands_mut().for_each(|op| {
+            if let Some((_, op)) = op {
+                if let OperandKind::Register(Register::Global(idx)) = op.kind() {
+                    *op = Operand::mem_base_displ(
+                        op.width(),
+                        Register::Physical(PhysicalRegister::RBP),
+                        i32::try_from(global_register_offset + (*idx * 8)).unwrap(),
+                    )
+                }
+            }
+        });
 
         instruction.get_use_defs_mut().for_each(|ud| {
             let (UseDefMut::Def(reg) | UseDefMut::Use(reg) | UseDefMut::UseDef(reg)) = ud;

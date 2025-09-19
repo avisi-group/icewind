@@ -24,7 +24,7 @@ use {
     },
     common::{
         arena::{Arena, Ref},
-        hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},
+        hashmap::{HashMap, HashMapA, HashSet, hashmap_in, hashset_in},
         intern::InternedString,
         rudder::Model,
     },
@@ -173,7 +173,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
     pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
         let mut assembler = CodeAssembler::new(64).unwrap();
 
-        let mut label_map = hashmap_in(self.allocator());
+        //let mut label_map = hashmap_in(self.allocator());
 
         log::trace!("building work queue");
 
@@ -187,9 +187,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 if !block.get(self.arena()).is_linked() {
                     block.get_mut(self.arena_mut()).set_linked();
 
-                    if let Some(label) = label_map.insert(block, assembler.create_label()) {
-                        panic!("created label for {block:?} but label {label:?} already existed")
-                    }
                     all_blocks.push(block);
 
                     empty_block_jump_threading(self.arena_mut(), block);
@@ -202,15 +199,15 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             all_blocks
         };
 
-        log::error!("{}", dot::render(self.arena(), self.initial_block()));
+        // log::error!("{}", dot::render(self.arena(), self.initial_block()));
 
         let mut instructions = Vec::<Instruction<A>>::new();
-        let mut label_map_hidden = HashMap::<Ref<X86Block<A>>, usize>::default();
+        let mut block_to_instruction_index = HashMap::<Ref<X86Block<A>>, usize>::default();
         for block in &all_blocks {
-            label_map_hidden.insert(block.clone(), instructions.len());
-            instructions.push(Instruction(Opcode::LABEL));
+            block_to_instruction_index.insert(block.clone(), instructions.len());
             instructions.extend(block.get(self.arena()).instructions());
         }
+
         instructions
             .iter_mut()
             .enumerate()
@@ -220,7 +217,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                         panic!();
                     };
 
-                    let target_index = label_map_hidden.get(target).unwrap();
+                    let target_index = block_to_instruction_index.get(target).unwrap();
 
                     if *target_index == idx + 1 {
                         instr.0 = Opcode::DEAD;
@@ -228,34 +225,77 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 }
             });
 
-        println!("\n\n\nPRE ALLOC");
+        // println!("\n\n\nPRE ALLOC");
+        // for (idx, instr) in instructions.iter().enumerate() {
+        //     println!("{idx}: {instr}");
+        // }
+
+        regalloc_ng::allocate(
+            &mut instructions,
+            num_virtual_registers,
+            self.global_register_offset,
+        );
+
+        // println!("\n\n\nPOST ALLOC");
+        // for (idx, instr) in instructions.iter().enumerate() {
+        //     println!("{idx}: {instr}");
+        // }
+
+        // Collapse labels
+        // Go through each instruction
+        // Check if instruction is target
+        // Check if not "not dead"
+        // If dead only, remove label
+
+        let mut instruction_labels = HashMap::default();
+        let mut block_labels = hashmap_in(self.allocator());
+
+        log::debug!("jumps:");
         for (idx, instr) in instructions.iter().enumerate() {
-            println!("{idx}: {instr}");
+            log::debug!("{}: {}", idx, instr);
+
+            match instr.0 {
+                Opcode::JE(Operand {
+                    kind: OperandKind::Target(target),
+                    ..
+                })
+                | Opcode::JNE(Operand {
+                    kind: OperandKind::Target(target),
+                    ..
+                })
+                | Opcode::JMP(Operand {
+                    kind: OperandKind::Target(target),
+                    ..
+                }) => {
+                    let target_index = block_to_instruction_index.get(&target).unwrap();
+                    log::debug!("  jump to {}", target_index);
+
+                    let next_valid = instructions
+                        .iter()
+                        .enumerate()
+                        .skip(*target_index)
+                        .find(|(_, instr)| !matches!(instr.0, Opcode::DEAD))
+                        .unwrap();
+
+                    log::debug!("  skipped to {}", next_valid.0);
+
+                    let label = instruction_labels
+                        .entry(next_valid.0)
+                        .or_insert_with(|| assembler.create_label());
+
+                    block_labels.insert(target, label.clone());
+                }
+                _ => {}
+            }
         }
-
-        regalloc_ng::allocate(&mut instructions, &label_map_hidden, num_virtual_registers);
-
-        println!("\n\n\nPOST ALLOC");
-        for (idx, instr) in instructions.iter().enumerate() {
-            println!("{idx}: {instr}");
-        }
-
-        // log::trace!("allocating registers");
-
-        // let global_register_offset = self.global_register_offset;
-
-        // all_blocks.iter().for_each(|block| {
-        //     block
-        //         .get_mut(self.arena_mut())
-        //         .allocate_registers(&mut FreshAllocator::new(
-        //             num_virtual_registers,
-        //             global_register_offset,
-        //         ));
-        // });
 
         log::trace!("encoding instructions");
-        for instr in instructions {
-            instr.encode(&mut assembler, &label_map);
+        for (idx, instr) in instructions.iter().enumerate() {
+            if let Some(instruction_label) = instruction_labels.get_mut(&idx) {
+                assembler.set_label(instruction_label).unwrap();
+            }
+
+            instr.encode(&mut assembler, &block_labels);
         }
 
         // log::debug!("{}", dot::render(self.arena(), self.initial_block()));
@@ -328,7 +368,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         let res = Translation::new(code);
 
-        panic!("{res:?}");
+        //panic!("{res:?}");
 
         log::trace!("done");
 
