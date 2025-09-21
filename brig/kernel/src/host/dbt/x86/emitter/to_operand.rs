@@ -262,15 +262,10 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                                 );
                             }
 
-                            // workaround because you can't mov xmm0:8 :(
-                            if src.width() > Width::_64 && dst.width() < Width::_32 {
-                                let mut intermediate = Operand::vreg(Width::_64, self.next_vreg());
-
-                                src.set_width(Width::_64);
-                                self.push_instruction(Instruction::mov(src, intermediate).unwrap());
-
-                                intermediate.set_width(dst.width());
-                                self.push_instruction(Instruction::mov(intermediate, dst).unwrap());
+                            // workaround for XMM truncation, can't just reinterpret src with a
+                            // lower width like with GPRs
+                            if src.width() > Width::_64 && dst.width() < Width::_128 {
+                                self.push_instruction(Instruction::mov(src, dst).unwrap());
                             } else {
                                 src.set_width(dst.width());
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());

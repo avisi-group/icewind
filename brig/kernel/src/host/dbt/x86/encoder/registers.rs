@@ -249,6 +249,15 @@ impl PhysicalRegister {
     pub const R14: Self = Self::General(PhysicalRegisterGeneral::R14);
     pub const R15: Self = Self::General(PhysicalRegisterGeneral::R15);
 
+    pub const XMM0: Self = Self::Xmm(PhysicalRegisterXmm::XMM0);
+    pub const XMM1: Self = Self::Xmm(PhysicalRegisterXmm::XMM1);
+    pub const XMM2: Self = Self::Xmm(PhysicalRegisterXmm::XMM2);
+    pub const XMM3: Self = Self::Xmm(PhysicalRegisterXmm::XMM3);
+    pub const XMM4: Self = Self::Xmm(PhysicalRegisterXmm::XMM4);
+    pub const XMM5: Self = Self::Xmm(PhysicalRegisterXmm::XMM5);
+    pub const XMM6: Self = Self::Xmm(PhysicalRegisterXmm::XMM6);
+    pub const XMM7: Self = Self::Xmm(PhysicalRegisterXmm::XMM7);
+
     pub fn index(&self) -> usize {
         match self {
             PhysicalRegister::General(physical_register_general) => {
@@ -257,6 +266,20 @@ impl PhysicalRegister {
             PhysicalRegister::Xmm(physical_register_xmm) => {
                 (*physical_register_xmm as u32) as usize + 16
             }
+        }
+    }
+
+    pub fn is_gpr(&self) -> bool {
+        match self {
+            PhysicalRegister::General(_) => true,
+            PhysicalRegister::Xmm(_) => false,
+        }
+    }
+
+    pub fn is_xmm(&self) -> bool {
+        match self {
+            PhysicalRegister::General(_) => true,
+            PhysicalRegister::Xmm(_) => false,
         }
     }
 }

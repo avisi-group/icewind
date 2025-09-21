@@ -549,7 +549,7 @@ impl<A: Alloc> Instruction<A> {
             return Err(Error::OversizeGeneralRegister(dst));
         }
 
-        if src.width() != dst.width() {
+        if src.width() != Width::_128 && src.width() != dst.width() {
             return Err(Error::MovWidthMismatch { src, dst });
         }
 

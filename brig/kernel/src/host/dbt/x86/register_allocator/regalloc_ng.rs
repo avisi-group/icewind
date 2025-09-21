@@ -1,11 +1,8 @@
 use {
-    crate::{
-        host::dbt::x86::encoder::{
-            Instruction, Opcode, Operand, OperandKind, UseDef, UseDefMut,
-            registers::{PhysicalRegister, Register},
-            width::Width,
-        },
-        println,
+    crate::host::dbt::x86::encoder::{
+        Instruction, Opcode, Operand, OperandKind, UseDef, UseDefMut,
+        registers::{PhysicalRegister, Register},
+        width::Width,
     },
     alloc::vec::Vec,
     common::hashmap::{HashMap, HashSet},
@@ -50,6 +47,16 @@ pub fn allocate<A: MemAlloc>(
     track_phys!(register_tracking, PhysicalRegister::R12);
     track_phys!(register_tracking, PhysicalRegister::R13);
     track_phys!(register_tracking, PhysicalRegister::R14);
+    track_phys!(register_tracking, PhysicalRegister::R15);
+
+    track_phys!(register_tracking, PhysicalRegister::XMM0);
+    track_phys!(register_tracking, PhysicalRegister::XMM1);
+    track_phys!(register_tracking, PhysicalRegister::XMM2);
+    track_phys!(register_tracking, PhysicalRegister::XMM3);
+    track_phys!(register_tracking, PhysicalRegister::XMM4);
+    track_phys!(register_tracking, PhysicalRegister::XMM5);
+    track_phys!(register_tracking, PhysicalRegister::XMM6);
+    track_phys!(register_tracking, PhysicalRegister::XMM7);
 
     for vreg_index in 0..num_virtual_registers {
         register_tracking.insert(Register::Virtual(vreg_index), RegisterTrack::default());
@@ -60,8 +67,6 @@ pub fn allocate<A: MemAlloc>(
     calculate_vreg_live_ranges(&mut register_tracking, instructions);
     do_allocate(&mut register_tracking, instructions);
     commit(&register_tracking, instructions, global_register_offset);
-
-    println!("{:?}", register_tracking);
 }
 
 fn calculate_vreg_live_ranges<A: MemAlloc>(
@@ -116,31 +121,36 @@ fn do_allocate<A: MemAlloc>(
     register_tracking: &mut HashMap<Register, RegisterTrack>,
     instructions: &mut Vec<Instruction<A>>,
 ) {
-    let mut avail_phys_regs = HashSet::<PhysicalRegister>::default();
-    avail_phys_regs.insert(PhysicalRegister::RAX);
-    avail_phys_regs.insert(PhysicalRegister::RCX);
-    avail_phys_regs.insert(PhysicalRegister::RDX);
-    avail_phys_regs.insert(PhysicalRegister::RBX);
+    let mut avail_phys_regs_gpr = HashSet::<PhysicalRegister>::default();
+    let mut avail_phys_regs_xmm = HashSet::<PhysicalRegister>::default();
 
-    avail_phys_regs.insert(PhysicalRegister::RSI);
-    avail_phys_regs.insert(PhysicalRegister::RDI);
-    avail_phys_regs.insert(PhysicalRegister::R8);
-    avail_phys_regs.insert(PhysicalRegister::R9);
-    avail_phys_regs.insert(PhysicalRegister::R10);
-    avail_phys_regs.insert(PhysicalRegister::R11);
-    avail_phys_regs.insert(PhysicalRegister::R12);
-    avail_phys_regs.insert(PhysicalRegister::R13);
-    avail_phys_regs.insert(PhysicalRegister::R14);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RAX);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RCX);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RDX);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RBX);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RSI);
+    avail_phys_regs_gpr.insert(PhysicalRegister::RDI);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R8);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R9);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R10);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R11);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R12);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R13);
+    avail_phys_regs_gpr.insert(PhysicalRegister::R14);
 
-    avail_phys_regs.insert(PhysicalRegister::RBP);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM0);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM1);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM2);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM3);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM4);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM5);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM6);
+    avail_phys_regs_xmm.insert(PhysicalRegister::XMM7);
+
+    //let avail_gprs = avail_phys_regs_gpr.iter().filter(|p| p.is_gpr());
+    //let avail_xmms = avail_phys_regs_gpr.iter().filter(|p| p.is_xmm());
 
     let mut live_phys_regs = HashSet::<PhysicalRegister>::default();
-    live_phys_regs.insert(PhysicalRegister::RBP);
-
-    register_tracking
-        .get_mut(&Register::Physical(PhysicalRegister::RBP))
-        .unwrap()
-        .tracking = Some(Register::Physical(PhysicalRegister::RBP));
 
     instructions
         .iter()
@@ -178,7 +188,9 @@ fn do_allocate<A: MemAlloc>(
                     }
                     Register::Physical(usedef_phys_reg) => {
                         // Definition of a physical register
-                        let tracked_phys_reg = register_tracking.get_mut(&usedef_reg).unwrap();
+                        let Some(tracked_phys_reg) = register_tracking.get_mut(&usedef_reg) else {
+                            panic!("register {usedef_reg} is not being tracked!");
+                        };
 
                         if live_phys_regs.contains(&usedef_phys_reg) {
                             live_phys_regs.remove(&usedef_phys_reg);
@@ -193,15 +205,19 @@ fn do_allocate<A: MemAlloc>(
                                 );
 
                                 // Allocate a physical register
-                                let allocated_phys_reg = *avail_phys_regs
-                                    .difference(
-                                        &register_tracking
-                                            .get(&Register::Virtual(conflicting_vreg_index))
-                                            .unwrap()
-                                            .interference,
-                                    )
-                                    .next()
-                                    .unwrap();
+                                let allocated_phys_reg = *(if usedef.1 == Width::_128 {
+                                    &avail_phys_regs_xmm
+                                } else {
+                                    &avail_phys_regs_gpr
+                                })
+                                .difference(
+                                    &register_tracking
+                                        .get(&Register::Virtual(conflicting_vreg_index))
+                                        .unwrap()
+                                        .interference,
+                                )
+                                .next()
+                                .unwrap();
 
                                 register_tracking
                                     .get_mut(&Register::Virtual(conflicting_vreg_index))
@@ -218,7 +234,9 @@ fn do_allocate<A: MemAlloc>(
                                     .unwrap()
                                     .interference = live_phys_regs.clone();
 
-                                for avail_phys_reg in &avail_phys_regs {
+                                for avail_phys_reg in
+                                    avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
+                                {
                                     if live_phys_regs.contains(avail_phys_reg) {
                                         let avail_phys_reg_track = register_tracking
                                             .get(&Register::Physical(*avail_phys_reg))
@@ -255,11 +273,17 @@ fn do_allocate<A: MemAlloc>(
                         let tracked_virt_reg = register_tracking.get_mut(&usedef_reg).unwrap();
 
                         if tracked_virt_reg.last_use == Some(current_instruction_index)
-                            || tracked_virt_reg.physical_register.is_none()
+                            && tracked_virt_reg.physical_register.is_none()
                         {
                             //  ALLOCATE
-                            let allocated_phys_reg =
-                                *avail_phys_regs.difference(&live_phys_regs).next().unwrap();
+                            let allocated_phys_reg = *(if usedef.1 == Width::_128 {
+                                &avail_phys_regs_xmm
+                            } else {
+                                &avail_phys_regs_gpr
+                            })
+                            .difference(&live_phys_regs)
+                            .next()
+                            .unwrap();
 
                             tracked_virt_reg.physical_register = Some(allocated_phys_reg);
                             live_phys_regs.insert(allocated_phys_reg);
@@ -271,7 +295,9 @@ fn do_allocate<A: MemAlloc>(
                                 .unwrap()
                                 .tracking = Some(usedef_reg);
 
-                            for avail_phys_reg in &avail_phys_regs {
+                            for avail_phys_reg in
+                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
+                            {
                                 if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track = register_tracking
                                         .get(&Register::Physical(*avail_phys_reg))
@@ -296,21 +322,72 @@ fn do_allocate<A: MemAlloc>(
                     }
                     Register::Physical(usedef_phys_reg) => {
                         // Use of a physical register
-                        let tracked_phys_reg = register_tracking.get_mut(&usedef_reg).unwrap();
+                        //let tracked_phys_reg = register_tracking.get(&usedef_reg).unwrap();
 
                         if live_phys_regs.contains(&usedef_phys_reg)
-                            && tracked_phys_reg.tracking != Some(usedef_reg)
+                            && register_tracking.get(&usedef_reg).unwrap().tracking
+                                != Some(usedef_reg)
                         {
-                            // let conflicting_vreg =
-                            //     register_tracking.get(&tracked_phys_reg.tracking.unwrap());
+                            let tracking_reg = register_tracking
+                                .get(&usedef_reg)
+                                .unwrap()
+                                .tracking
+                                .unwrap();
+
+                            let conflicting_vreg =
+                                register_tracking.get_mut(&tracking_reg).unwrap();
 
                             log::debug!(
                                 "conflicting use of preg {}, currently tracking {:?}",
                                 usedef_phys_reg,
-                                tracked_phys_reg.tracking
+                                tracking_reg
                             );
 
-                            todo!()
+                            let new_phys_reg = *(if usedef.1 == Width::_128 {
+                                &avail_phys_regs_xmm
+                            } else {
+                                &avail_phys_regs_gpr
+                            })
+                            .difference(&conflicting_vreg.interference)
+                            .next()
+                            .unwrap();
+
+                            log::debug!(
+                                "re-assigning vreg {} to preg {}",
+                                tracking_reg,
+                                new_phys_reg
+                            );
+
+                            conflicting_vreg.physical_register = Some(new_phys_reg);
+                            live_phys_regs.insert(new_phys_reg);
+                            conflicting_vreg.interference = live_phys_regs.clone();
+
+                            register_tracking
+                                .get_mut(&Register::Physical(new_phys_reg))
+                                .unwrap()
+                                .tracking = Some(tracking_reg);
+
+                            //  Update interferences
+                            for avail_phys_reg in
+                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
+                            {
+                                if live_phys_regs.contains(avail_phys_reg) {
+                                    let avail_phys_reg_track = register_tracking
+                                        .get(&Register::Physical(*avail_phys_reg))
+                                        .unwrap();
+
+                                    //log::debug!(" updating preg={} vreg={}")
+
+                                    register_tracking
+                                        .get_mut(&avail_phys_reg_track.tracking.unwrap())
+                                        .unwrap()
+                                        .interference
+                                        .extend(&live_phys_regs);
+                                }
+                            }
+
+                            register_tracking.get_mut(&usedef_reg).unwrap().tracking =
+                                Some(usedef_reg);
                         } else {
                             register_tracking.get_mut(&usedef_reg).unwrap().tracking =
                                 Some(usedef_reg);
@@ -318,7 +395,9 @@ fn do_allocate<A: MemAlloc>(
                             register_tracking.get_mut(&usedef_reg).unwrap().interference =
                                 live_phys_regs.clone();
 
-                            for avail_phys_reg in &avail_phys_regs {
+                            for avail_phys_reg in
+                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
+                            {
                                 if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track = register_tracking
                                         .get(&Register::Physical(*avail_phys_reg))

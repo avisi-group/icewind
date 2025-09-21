@@ -214,7 +214,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             .for_each(|(idx, instr)| {
                 if let Opcode::JMP(target) = instr.0 {
                     let OperandKind::Target(target) = target.kind() else {
-                        panic!();
+                        return;
                     };
 
                     let target_index = block_to_instruction_index.get(target).unwrap();
