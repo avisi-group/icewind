@@ -4,10 +4,10 @@ use {
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm,
     },
-    strum::EnumIter,
+    strum::{EnumCount, EnumIter},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter, EnumCount)]
 #[repr(u32)]
 pub enum PhysicalRegisterGeneral {
     /// rax
@@ -176,7 +176,7 @@ impl From<PhysicalRegisterGeneral> for AsmRegister32 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter, EnumCount)]
 #[repr(u32)]
 pub enum PhysicalRegisterXmm {
     /// xmm0
@@ -264,7 +264,7 @@ impl PhysicalRegister {
                 (*physical_register_general as u32) as usize
             }
             PhysicalRegister::Xmm(physical_register_xmm) => {
-                (*physical_register_xmm as u32) as usize + 16
+                (*physical_register_xmm as u32) as usize + PhysicalRegisterGeneral::COUNT
             }
         }
     }
