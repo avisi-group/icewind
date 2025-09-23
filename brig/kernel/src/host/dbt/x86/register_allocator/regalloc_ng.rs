@@ -35,11 +35,11 @@ pub fn allocate<A: MemAlloc>(
 
     calculate_vreg_live_ranges(&mut register_tracking, instructions);
 
-    let mut call_lives = HashMap::default();
-    do_allocate(&mut register_tracking, instructions, &mut call_lives);
+    let live_at_calls = do_allocate(&mut register_tracking, instructions);
+
     commit(
         &register_tracking,
-        &call_lives,
+        live_at_calls,
         instructions,
         global_register_offset,
     );
@@ -57,47 +57,50 @@ fn calculate_vreg_live_ranges<A: MemAlloc>(
             current_control_flow_count += 1;
         }
 
-        instr.get_use_defs().for_each(|ud| {
-            let (UseDef::Def(reg) | UseDef::UseDef(reg)) = ud.0 else {
-                return;
-            };
-
-            let Register::Virtual(_) = reg else {
-                return;
-            };
-
-            let tracked_register = register_tracking.get_mut(&reg);
-
-            if tracked_register.first_def.is_none() {
-                tracked_register.first_def = Some(current);
-                tracked_register.last_control_flow_count = current_control_flow_count;
-            } else if tracked_register.last_use.is_none() && !matches!(ud.0, UseDef::UseDef(_)) {
-                if tracked_register.last_control_flow_count == current_control_flow_count {
-                    instructions[tracked_register.first_def.unwrap()].0 = Opcode::DEAD;
-                    tracked_register.first_def = Some(current);
+        instr
+            .get_use_defs()
+            .filter_map(|ud| {
+                if let UseDef::Def(reg) | UseDef::UseDef(reg) = ud.0 {
+                    Some((ud.0, reg))
+                } else {
+                    None
                 }
-            }
-        });
+            })
+            .filter(|(_, reg)| matches!(reg, Register::Virtual(_)))
+            .for_each(|(ud, reg)| {
+                let tracked_register = register_tracking.get_mut(&reg);
 
-        instr.get_use_defs().for_each(|ud| {
-            let (UseDef::Use(reg) | UseDef::UseDef(reg)) = ud.0 else {
-                return;
-            };
+                if tracked_register.first_def.is_none() {
+                    tracked_register.first_def = Some(current);
+                    tracked_register.last_control_flow_count = current_control_flow_count;
+                } else if tracked_register.last_use.is_none() && !matches!(ud, UseDef::UseDef(_)) {
+                    if tracked_register.last_control_flow_count == current_control_flow_count {
+                        instructions[tracked_register.first_def.unwrap()].0 = Opcode::DEAD;
+                        tracked_register.first_def = Some(current);
+                    }
+                }
+            });
 
-            let Register::Virtual(_) = reg else {
-                return;
-            };
-
-            register_tracking.get_mut(&reg).last_use = Some(current);
-        });
+        instr
+            .get_use_defs()
+            .filter_map(|ud| {
+                if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud.0 {
+                    Some(reg)
+                } else {
+                    None
+                }
+            })
+            .filter(|reg| matches!(reg, Register::Virtual(_)))
+            .for_each(|reg| {
+                register_tracking.get_mut(&reg).last_use = Some(current);
+            });
     }
 }
 
 fn do_allocate<A: MemAlloc>(
     register_tracking: &mut RegisterTracker,
     instructions: &mut Vec<Instruction<A>>,
-    call_lives: &mut HashMap<usize, PhysicalRegisterSet>,
-) {
+) -> Vec<(usize, PhysicalRegisterSet)> {
     let mut avail_phys_regs_gpr = PhysicalRegisterSet::new();
     let mut avail_phys_regs_xmm = PhysicalRegisterSet::new();
 
@@ -124,10 +127,10 @@ fn do_allocate<A: MemAlloc>(
     avail_phys_regs_xmm.insert(PhysicalRegister::XMM6);
     avail_phys_regs_xmm.insert(PhysicalRegister::XMM7);
 
-    //let avail_gprs = avail_phys_regs_gpr.iter().filter(|p| p.is_gpr());
-    //let avail_xmms = avail_phys_regs_gpr.iter().filter(|p| p.is_xmm());
-
     let mut live_phys_regs = PhysicalRegisterSet::new();
+
+    // store what physical registers are live at a given call
+    let mut live_at_calls = Vec::new();
 
     instructions
         .iter()
@@ -180,17 +183,14 @@ fn do_allocate<A: MemAlloc>(
                                 );
 
                                 // Allocate a physical register
-                                let allocated_phys_reg = (if usedef.1 == Width::_128 {
-                                    &avail_phys_regs_xmm
-                                } else {
-                                    &avail_phys_regs_gpr
-                                })
-                                .first_difference(
+                                let allocated_phys_reg = allocate_phys_reg(
+                                    usedef.1,
+                                    &avail_phys_regs_xmm,
+                                    &avail_phys_regs_gpr,
                                     &register_tracking
                                         .get(&Register::Virtual(conflicting_vreg_index))
                                         .interference,
-                                )
-                                .unwrap();
+                                );
 
                                 register_tracking
                                     .get_mut(&Register::Virtual(conflicting_vreg_index))
@@ -202,7 +202,7 @@ fn do_allocate<A: MemAlloc>(
                                 live_phys_regs.insert(allocated_phys_reg);
                                 register_tracking
                                     .get_mut(&Register::Virtual(conflicting_vreg_index))
-                                    .interference = live_phys_regs.clone();
+                                    .interference = live_phys_regs;
 
                                 for avail_phys_reg in
                                     avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
@@ -244,18 +244,17 @@ fn do_allocate<A: MemAlloc>(
                             && tracked_virt_reg.physical_register.is_none()
                         {
                             //  ALLOCATE
-                            let allocated_phys_reg = (if usedef.1 == Width::_128 {
-                                &avail_phys_regs_xmm
-                            } else {
-                                &avail_phys_regs_gpr
-                            })
-                            .first_difference(&live_phys_regs)
-                            .unwrap();
+                            let allocated_phys_reg = allocate_phys_reg(
+                                usedef.1,
+                                &avail_phys_regs_xmm,
+                                &avail_phys_regs_gpr,
+                                &live_phys_regs,
+                            );
 
                             tracked_virt_reg.physical_register = Some(allocated_phys_reg);
                             live_phys_regs.insert(allocated_phys_reg);
 
-                            tracked_virt_reg.interference = live_phys_regs.clone();
+                            tracked_virt_reg.interference = live_phys_regs;
 
                             register_tracking
                                 .get_mut(&Register::Physical(allocated_phys_reg))
@@ -301,13 +300,12 @@ fn do_allocate<A: MemAlloc>(
                                 tracking_reg
                             );
 
-                            let new_phys_reg = (if usedef.1 == Width::_128 {
-                                &avail_phys_regs_xmm
-                            } else {
-                                &avail_phys_regs_gpr
-                            })
-                            .first_difference(&conflicting_vreg.interference)
-                            .unwrap();
+                            let new_phys_reg = allocate_phys_reg(
+                                usedef.1,
+                                &avail_phys_regs_xmm,
+                                &avail_phys_regs_gpr,
+                                &conflicting_vreg.interference,
+                            );
 
                             log::debug!(
                                 "re-assigning vreg {} to preg {}",
@@ -373,14 +371,16 @@ fn do_allocate<A: MemAlloc>(
             }
 
             if matches!(instruction.0, Opcode::CALL { .. }) {
-                call_lives.insert(current_instruction_index, live_phys_regs.clone());
+                live_at_calls.push((current_instruction_index, live_phys_regs.clone()));
             }
         });
+
+    live_at_calls
 }
 
 fn commit<A: MemAlloc>(
     register_tracking: &RegisterTracker,
-    call_lives: &HashMap<usize, PhysicalRegisterSet>,
+    mut live_at_calls: Vec<(usize, PhysicalRegisterSet)>,
     instructions: &mut Vec<Instruction<A>>,
     global_register_offset: usize,
 ) {
@@ -431,7 +431,11 @@ fn commit<A: MemAlloc>(
                 panic!()
             };
 
-            let live_registers = call_lives.get(&i).unwrap();
+            let Some((popped_idx, live_registers)) = live_at_calls.pop() else {
+                panic!()
+            };
+
+            assert_eq!(i, popped_idx);
 
             let to_save = CALLER_SAVED
                 .iter()
@@ -461,6 +465,21 @@ fn commit<A: MemAlloc>(
             }
         }
     }
+}
+
+fn allocate_phys_reg(
+    width: Width,
+    xmm_avail: &PhysicalRegisterSet,
+    gpr_avail: &PhysicalRegisterSet,
+    in_use: &PhysicalRegisterSet,
+) -> PhysicalRegister {
+    (if width == Width::_128 {
+        xmm_avail
+    } else {
+        gpr_avail
+    })
+    .first_difference(in_use)
+    .unwrap()
 }
 
 struct RegisterTracker {
@@ -493,7 +512,7 @@ impl RegisterTracker {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Copy, Debug)]
 struct PhysicalRegisterSet {
     set: [bool; PhysicalRegister::COUNT],
 }
