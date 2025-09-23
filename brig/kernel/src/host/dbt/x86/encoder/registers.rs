@@ -4,11 +4,12 @@ use {
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm,
     },
+    proc_macro_lib::ktest,
     strum::{EnumCount, EnumIter},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter, EnumCount)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum PhysicalRegisterGeneral {
     /// rax
     RAX,
@@ -177,7 +178,7 @@ impl From<PhysicalRegisterGeneral> for AsmRegister32 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash, EnumIter, EnumCount)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum PhysicalRegisterXmm {
     /// xmm0
     XMM0,
@@ -258,14 +259,45 @@ impl PhysicalRegister {
     pub const XMM6: Self = Self::Xmm(PhysicalRegisterXmm::XMM6);
     pub const XMM7: Self = Self::Xmm(PhysicalRegisterXmm::XMM7);
 
+    pub const COUNT: usize = PhysicalRegisterGeneral::COUNT + PhysicalRegisterXmm::COUNT;
+
     pub fn index(&self) -> usize {
         match self {
             PhysicalRegister::General(physical_register_general) => {
-                (*physical_register_general as u32) as usize
+                usize::from(*physical_register_general as u8)
             }
             PhysicalRegister::Xmm(physical_register_xmm) => {
-                (*physical_register_xmm as u32) as usize + PhysicalRegisterGeneral::COUNT
+                usize::from(*physical_register_xmm as u8) + PhysicalRegisterGeneral::COUNT
             }
+        }
+    }
+    pub fn from_index(index: usize) -> Self {
+        match index {
+            0 => Self::RAX,
+            1 => Self::RCX,
+            2 => Self::RDX,
+            3 => Self::RBX,
+            4 => Self::RSI,
+            5 => Self::RDI,
+            6 => Self::RSP,
+            7 => Self::RBP,
+            8 => Self::R8,
+            9 => Self::R9,
+            10 => Self::R10,
+            11 => Self::R11,
+            12 => Self::R12,
+            13 => Self::R13,
+            14 => Self::R14,
+            15 => Self::R15,
+            16 => Self::XMM0,
+            17 => Self::XMM1,
+            18 => Self::XMM2,
+            19 => Self::XMM3,
+            20 => Self::XMM4,
+            21 => Self::XMM5,
+            22 => Self::XMM6,
+            23 => Self::XMM7,
+            _ => panic!(),
         }
     }
 
@@ -391,4 +423,11 @@ enum RegisterConversionError {
     InvalidXmmAs64(PhysicalRegisterXmm),
     /// General register {0} cannot be converted to `AsmRegisterXmm`
     InvalidGeneralAsXmm(PhysicalRegisterGeneral),
+}
+
+#[ktest]
+fn reg_index() {
+    for i in 0..PhysicalRegister::COUNT {
+        assert_eq!(i, PhysicalRegister::from_index(i).index())
+    }
 }
