@@ -5,12 +5,12 @@ use {
             Instruction, Opcode, Operand,
             OperandKind::{self},
             UseDef, UseDefMut,
-            registers::{PhysicalRegister, PhysicalRegisterGeneral, PhysicalRegisterXmm, Register},
+            registers::{PhysicalRegister, Register},
             width::Width,
         },
     },
     alloc::vec::Vec,
-    common::hashmap::{HashMap, HashMapA, HashSet},
+    common::hashmap::HashMap,
     strum::EnumCount,
 };
 
@@ -159,7 +159,7 @@ fn do_allocate<A: MemAlloc>(
                                     usedef_virt_reg,
                                     tracked_virt_reg.physical_register
                                 );
-                                live_phys_regs.remove(&tracked_virt_reg.physical_register.unwrap());
+                                live_phys_regs.remove(tracked_virt_reg.physical_register.unwrap());
                             }
                         }
                     }
@@ -167,8 +167,8 @@ fn do_allocate<A: MemAlloc>(
                         // Definition of a physical register
                         let tracked_phys_reg = register_tracking.get_mut(&usedef_reg);
 
-                        if live_phys_regs.contains(&usedef_phys_reg) {
-                            live_phys_regs.remove(&usedef_phys_reg);
+                        if live_phys_regs.contains(usedef_phys_reg) {
+                            live_phys_regs.remove(usedef_phys_reg);
 
                             if let Some(Register::Virtual(conflicting_vreg_index)) =
                                 tracked_phys_reg.tracking
@@ -207,7 +207,7 @@ fn do_allocate<A: MemAlloc>(
                                 for avail_phys_reg in
                                     avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
                                 {
-                                    if live_phys_regs.contains(&avail_phys_reg) {
+                                    if live_phys_regs.contains(avail_phys_reg) {
                                         let avail_phys_reg_track = register_tracking
                                             .get(&Register::Physical(avail_phys_reg));
 
@@ -264,7 +264,7 @@ fn do_allocate<A: MemAlloc>(
                             for avail_phys_reg in
                                 avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
                             {
-                                if live_phys_regs.contains(&avail_phys_reg) {
+                                if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
@@ -288,7 +288,7 @@ fn do_allocate<A: MemAlloc>(
                         // Use of a physical register
                         //let tracked_phys_reg = register_tracking.get(&usedef_reg).unwrap();
 
-                        if live_phys_regs.contains(&usedef_phys_reg)
+                        if live_phys_regs.contains(usedef_phys_reg)
                             && register_tracking.get(&usedef_reg).tracking != Some(usedef_reg)
                         {
                             let tracking_reg = register_tracking.get(&usedef_reg).tracking.unwrap();
@@ -327,7 +327,7 @@ fn do_allocate<A: MemAlloc>(
                             for avail_phys_reg in
                                 avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
                             {
-                                if live_phys_regs.contains(&avail_phys_reg) {
+                                if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
@@ -350,7 +350,7 @@ fn do_allocate<A: MemAlloc>(
                             for avail_phys_reg in
                                 avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
                             {
-                                if live_phys_regs.contains(&avail_phys_reg) {
+                                if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
@@ -436,7 +436,7 @@ fn commit<A: MemAlloc>(
             let to_save = CALLER_SAVED
                 .iter()
                 // only save live registers
-                .filter(|r| live_registers.contains(*r))
+                .filter(|r| live_registers.contains(**r))
                 // don't save in-use argument registers
                 .filter(|r| {
                     ARG_REGS
@@ -465,7 +465,7 @@ fn commit<A: MemAlloc>(
 
 struct RegisterTracker {
     virt: Vec<RegisterTrack>,
-    phys: [RegisterTrack; PhysicalRegisterGeneral::COUNT + PhysicalRegisterXmm::COUNT],
+    phys: [RegisterTrack; PhysicalRegister::COUNT],
 }
 
 impl RegisterTracker {
@@ -495,7 +495,7 @@ impl RegisterTracker {
 
 #[derive(Default, Clone, Debug)]
 struct PhysicalRegisterSet {
-    set: [bool; PhysicalRegisterGeneral::COUNT + PhysicalRegisterXmm::COUNT],
+    set: [bool; PhysicalRegister::COUNT],
 }
 
 impl PhysicalRegisterSet {
@@ -509,11 +509,11 @@ impl PhysicalRegisterSet {
         self.set[phys.index()] = true;
     }
 
-    pub fn remove(&mut self, phys: &PhysicalRegister) {
+    pub fn remove(&mut self, phys: PhysicalRegister) {
         self.set[phys.index()] = false;
     }
 
-    pub fn contains(&self, phys: &PhysicalRegister) -> bool {
+    pub fn contains(&self, phys: PhysicalRegister) -> bool {
         self.set[phys.index()]
     }
 

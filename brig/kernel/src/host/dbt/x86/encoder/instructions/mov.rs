@@ -5,10 +5,7 @@ use {
             Operand,
             OperandKind::{Immediate as I, Memory as M, Register as R},
             Width, memory_operand_to_iced,
-            registers::{
-                PhysicalRegister::{self, General as G, Xmm as X},
-                Register::Physical as PHYS,
-            },
+            registers::Register::Physical as PHYS,
             segment_memory_operand_to_iced,
         },
     },
@@ -23,26 +20,6 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         // MOV R -> R
         (
             Operand {
-                kind: R(PHYS(PhysicalRegister::Xmm(xmm))),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            //assert_eq!(src_width_in_bits, dst_width_in_bits);
-
-            assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(
-                    dst.into(),
-                    PhysicalRegister::Xmm(*xmm).into(),
-                )
-                .unwrap();
-        }
-        // MOV R -> R
-        (
-            Operand {
                 kind: R(PHYS(src)),
                 width_in_bits: Width::_64,
             },
@@ -52,10 +29,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
-
-            assembler
-                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
-                .unwrap();
+            if src.is_xmm() {
+                assembler
+                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
         }
 
         // MOV R -> R
@@ -121,16 +103,25 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: R(PHYS(G(dst))),
+                kind: R(PHYS(dst)),
                 width_in_bits: Width::_64,
             },
         ) => {
-            assembler
-                .mov::<AsmRegister64, AsmMemoryOperand>(
-                    dst.into(),
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
-                )
-                .unwrap();
+            if dst.is_xmm() {
+                assembler
+                    .movq::<AsmRegisterXmm, AsmMemoryOperand>(
+                        dst.into(),
+                        qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    )
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister64, AsmMemoryOperand>(
+                        dst.into(),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    )
+                    .unwrap();
+            }
         }
         // MOV M -> R
         (
@@ -728,31 +719,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .movzx::<AsmRegister64, AsmRegister8>(dst.into(), dst.into())
                 .unwrap();
         }
-        // MOV M -> R
-        (
-            Operand {
-                kind:
-                    M {
-                        base: Some(PHYS(base)),
-                        index,
-                        scale,
-                        displacement,
-                        ..
-                    },
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: R(PHYS(X(dst))),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            assembler
-                .movq::<AsmRegisterXmm, AsmMemoryOperand>(
-                    dst.into(),
-                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
-                )
-                .unwrap();
-        }
+
         _ => todo!("mov {src} {dst}"),
     }
 }

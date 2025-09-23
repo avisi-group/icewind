@@ -5,7 +5,7 @@ use {
             Operand,
             OperandKind::{Immediate as I, Register as R},
             Width,
-            registers::{PhysicalRegister, PhysicalRegisterGeneral, Register::Physical as PHYS},
+            registers::{PhysicalRegister, Register::Physical as PHYS},
         },
     },
     iced_x86::code_asm::{
@@ -83,7 +83,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
         }
         (
             Operand {
-                kind: R(PHYS(PhysicalRegister::General(PhysicalRegisterGeneral::RCX))),
+                kind: R(PHYS(PhysicalRegister::RCX)),
                 width_in_bits: Width::_8,
             },
             Operand {
@@ -92,10 +92,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister64, AsmRegister8>(
-                    value.into(),
-                    PhysicalRegisterGeneral::RCX.into(),
-                )
+                .shl::<AsmRegister64, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
         (
@@ -109,10 +106,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
             },
         ) => {
             assembler
-                .shl::<AsmRegister32, AsmRegister8>(
-                    value.into(),
-                    PhysicalRegisterGeneral::RCX.into(),
-                )
+                .shl::<AsmRegister32, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
 

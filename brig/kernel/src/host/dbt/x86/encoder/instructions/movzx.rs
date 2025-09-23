@@ -5,10 +5,7 @@ use {
             Operand,
             OperandKind::{Immediate as I, Register as R},
             Width,
-            registers::{
-                PhysicalRegister::{General as G, Xmm as X},
-                Register::Physical as PHYS,
-            },
+            registers::Register::Physical as PHYS,
         },
     },
     iced_x86::code_asm::{
@@ -25,7 +22,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
             Operand {
-                kind: R(PHYS(X(dst))),
+                kind: R(PHYS(dst)),
                 width_in_bits: Width::_128,
             },
         ) => assembler

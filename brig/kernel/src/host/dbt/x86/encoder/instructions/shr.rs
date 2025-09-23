@@ -6,7 +6,7 @@ use {
             OperandKind::{Immediate as I, Register as R},
             Register::Physical as PHYS,
             Width,
-            registers::{PhysicalRegister, PhysicalRegisterGeneral},
+            registers::PhysicalRegister,
         },
     },
     iced_x86::code_asm::{
@@ -82,10 +82,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 panic!("can't shr %rcx %rcx");
             }
             assembler
-                .shr::<AsmRegister64, AsmRegister8>(
-                    value_reg.into(),
-                    PhysicalRegisterGeneral::RCX.into(),
-                )
+                .shr::<AsmRegister64, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
         (
@@ -102,10 +99,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 panic!("can't shr %rcx %rcx");
             }
             assembler
-                .shr::<AsmRegister32, AsmRegister8>(
-                    value_reg.into(),
-                    PhysicalRegisterGeneral::RCX.into(),
-                )
+                .shr::<AsmRegister32, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
         (

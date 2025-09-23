@@ -2,14 +2,7 @@ use {
     crate::host::dbt::{
         Alloc,
         x86::encoder::{
-            Operand,
-            OperandKind::{Immediate as I, Register as R},
-            Width,
-            registers::{
-                PhysicalRegister::{General as G, Xmm as X},
-                PhysicalRegisterXmm,
-                Register::Physical as PHYS,
-            },
+            Operand, OperandKind::Register as R, Width, registers::Register::Physical as PHYS,
         },
     },
     iced_x86::code_asm::{
@@ -20,7 +13,7 @@ use {
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, dst: &Operand<A>) {
     match dst {
         Operand {
-            kind: R(PHYS(X(value))),
+            kind: R(PHYS(value)),
             width_in_bits: Width::_128,
         } => {
             // https://stackoverflow.com/a/52472340/8070904

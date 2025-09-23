@@ -273,9 +273,7 @@ impl<A: Alloc> Operand<A> {
     }
 
     pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand<A> {
-        if let PhysicalRegister::General(_) = reg
-            && width_in_bits == Width::_128
-        {
+        if reg.is_gpr() && width_in_bits == Width::_128 {
             panic!();
         }
 
@@ -532,21 +530,19 @@ impl<A: Alloc> Instruction<A> {
     pub fn mov(src: Operand<A>, dst: Operand<A>) -> Result<Self, Error<A>> {
         // todo: remove these checks or enforce them earlier
         if src.width() == Width::_128
-            && matches!(
-                src.kind(),
-                OperandKind::Register(Register::Physical(PhysicalRegister::General(_)))
-            )
+            && let OperandKind::Register(Register::Physical(phys)) = src.kind()
         {
-            return Err(Error::OversizeGeneralRegister(src));
+            if phys.is_gpr() {
+                return Err(Error::OversizeGeneralRegister(src));
+            }
         }
 
-        if dst.width() >= Width::_128
-            && matches!(
-                dst.kind(),
-                OperandKind::Register(Register::Physical(PhysicalRegister::General(_)))
-            )
+        if dst.width() == Width::_128
+            && let OperandKind::Register(Register::Physical(phys)) = dst.kind()
         {
-            return Err(Error::OversizeGeneralRegister(dst));
+            if phys.is_gpr() {
+                return Err(Error::OversizeGeneralRegister(dst));
+            }
         }
 
         if src.width() != Width::_128 && src.width() != dst.width() {

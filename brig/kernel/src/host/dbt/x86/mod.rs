@@ -11,7 +11,7 @@ use {
                     registers::{PhysicalRegister, Register},
                     width::Width,
                 },
-                register_allocator::{naive::FreshAllocator, regalloc_ng},
+                register_allocator::regalloc_ng,
             },
         },
         println,
