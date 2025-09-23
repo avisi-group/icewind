@@ -568,7 +568,7 @@ impl<const N: usize, V: Copy> DirectMappedCache<N, V> {
     }
 }
 
-pub extern "C" fn write_to_el(old: u8, new: u8) {
+pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
     if old != new {
         log::debug!("EL changed! {old} -> {new}");
         // chain_cache.fill_keys(1);
@@ -577,11 +577,11 @@ pub extern "C" fn write_to_el(old: u8, new: u8) {
     }
 }
 
-pub extern "C" fn svc_debug(value: u64) {
+pub extern "sysv64" fn svc_debug(value: u64) {
     log::error!("SVC: {value}");
 }
 
-pub extern "C" fn prelude_debug(pc: u64, opcode: u64) {
+pub extern "sysv64" fn prelude_debug(pc: u64, opcode: u64) {
     static ENABLED: AtomicBool = AtomicBool::new(false);
 
     if pc == 0x400008d0 {

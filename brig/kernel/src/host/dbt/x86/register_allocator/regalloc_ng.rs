@@ -1,8 +1,13 @@
 use {
-    crate::host::dbt::x86::encoder::{
-        Instruction, Opcode, Operand, OperandKind, UseDef, UseDefMut,
-        registers::{PhysicalRegister, Register},
-        width::Width,
+    crate::host::dbt::x86::{
+        emitter::{ARG_REGS, CALLER_SAVED},
+        encoder::{
+            Instruction, Opcode, Operand,
+            OperandKind::{self},
+            UseDef, UseDefMut,
+            registers::{PhysicalRegister, Register},
+            width::Width,
+        },
     },
     alloc::vec::Vec,
     common::hashmap::{HashMap, HashSet},
@@ -65,8 +70,15 @@ pub fn allocate<A: MemAlloc>(
     //alloc::vec![VirtualRegister::default(); num_virtual_registers];
 
     calculate_vreg_live_ranges(&mut register_tracking, instructions);
-    do_allocate(&mut register_tracking, instructions);
-    commit(&register_tracking, instructions, global_register_offset);
+
+    let mut call_lives = HashMap::default();
+    do_allocate(&mut register_tracking, instructions, &mut call_lives);
+    commit(
+        &register_tracking,
+        &call_lives,
+        instructions,
+        global_register_offset,
+    );
 }
 
 fn calculate_vreg_live_ranges<A: MemAlloc>(
@@ -120,6 +132,7 @@ fn calculate_vreg_live_ranges<A: MemAlloc>(
 fn do_allocate<A: MemAlloc>(
     register_tracking: &mut HashMap<Register, RegisterTrack>,
     instructions: &mut Vec<Instruction<A>>,
+    call_lives: &mut HashMap<usize, HashSet<PhysicalRegister>>,
 ) {
     let mut avail_phys_regs_gpr = HashSet::<PhysicalRegister>::default();
     let mut avail_phys_regs_xmm = HashSet::<PhysicalRegister>::default();
@@ -421,11 +434,17 @@ fn do_allocate<A: MemAlloc>(
                     }
                 }
             }
+
+            if matches!(instruction.0, Opcode::CALL { .. }) {
+                log::trace!("found CALL @ {current_instruction_index}, live: {live_phys_regs:?}");
+                call_lives.insert(current_instruction_index, live_phys_regs.clone());
+            }
         });
 }
 
 fn commit<A: MemAlloc>(
     register_tracking: &HashMap<Register, RegisterTrack>,
+    call_lives: &HashMap<usize, HashSet<PhysicalRegister>>,
     instructions: &mut Vec<Instruction<A>>,
     global_register_offset: usize,
 ) {
@@ -470,4 +489,57 @@ fn commit<A: MemAlloc>(
             }
         }
     });
+
+    // insert call saves
+    insert_register_saves(instructions, call_lives);
+}
+
+fn insert_register_saves<M: MemAlloc>(
+    instructions: &mut Vec<Instruction<M>>,
+    call_lives: &HashMap<usize, HashSet<PhysicalRegister>>,
+) {
+    for index in 0..instructions.len() {
+        if let Instruction(Opcode::CALL {
+            function,
+            nr_input_args,
+            ..
+        }) = instructions[index]
+        {
+            let Some(Register::Physical(fn_ptr_register)) = function.as_register() else {
+                panic!()
+            };
+
+            let argument_registers = ARG_REGS.iter().take(nr_input_args).collect::<HashSet<_>>();
+
+            let live_registers = call_lives.get(&index).unwrap();
+
+            let saved_live = CALLER_SAVED
+                .iter()
+                // only save live registers
+                .filter(|r| live_registers.contains(*r))
+                .copied()
+                .collect::<Vec<_>>();
+
+            let to_save = saved_live
+                .iter()
+                .filter(|r| !argument_registers.contains(*r))
+                .filter(|r| **r != fn_ptr_register)
+                .copied()
+                .collect::<Vec<_>>();
+
+            log::trace!(
+                "applying CALL @ {index}, live: {live_registers:?}, saved_live: {saved_live:?}, argument_registers: {argument_registers:?}, fn_ptr: {fn_ptr_register:?}, to_save: {to_save:?}"
+            );
+
+            for (i, reg) in to_save.iter().enumerate() {
+                instructions[index - (CALLER_SAVED.len() - i)] =
+                    Instruction::push(Operand::preg(Width::_64, *reg));
+            }
+
+            for (i, reg) in to_save.iter().enumerate().rev() {
+                instructions[index + (CALLER_SAVED.len() - i)] =
+                    Instruction::pop(Operand::preg(Width::_64, *reg));
+            }
+        }
+    }
 }

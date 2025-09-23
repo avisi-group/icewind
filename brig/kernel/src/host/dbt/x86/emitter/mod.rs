@@ -33,10 +33,26 @@ mod to_operand;
 
 const INVALID_OFFSET: i32 = 0xDEAD00F;
 
+// sysv64 ABI
 pub const ARG_REGS: &[PhysicalRegister] = &[
     PhysicalRegister::RDI,
     PhysicalRegister::RSI,
     PhysicalRegister::RDX,
+    PhysicalRegister::RCX,
+    PhysicalRegister::R8,
+    PhysicalRegister::R9,
+];
+
+pub const CALLER_SAVED: &[PhysicalRegister] = &[
+    PhysicalRegister::RAX,
+    PhysicalRegister::RDI,
+    PhysicalRegister::RSI,
+    PhysicalRegister::RDX,
+    PhysicalRegister::RCX,
+    PhysicalRegister::R8,
+    PhysicalRegister::R9,
+    PhysicalRegister::R10,
+    PhysicalRegister::R11,
 ];
 
 /// X86 emitter error
@@ -125,11 +141,21 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 )
             });
 
+        // to be replaced with pushes and pops if necessary, without breaking all jump
+        // indexes
+        for _ in 0..CALLER_SAVED.len() {
+            self.push_instruction(Instruction(Opcode::DEAD));
+        }
+
         self.push_instruction(Instruction::call(
             function,
             arg_count,
             if has_return_value { 1 } else { 0 },
         ));
+
+        for _ in 0..CALLER_SAVED.len() {
+            self.push_instruction(Instruction(Opcode::DEAD));
+        }
     }
 }
 

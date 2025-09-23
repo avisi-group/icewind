@@ -3751,8 +3751,6 @@ fn eret_3() {
     assert_eq!(register_file.read::<u8>("PSTATE_EL"), 3);
     register_file.write::<u64>("ELR_EL3", 0x80000004);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("_PC"), 0x80000004);
@@ -4311,7 +4309,7 @@ fn eret_post_exception() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SEE", -1i64);
+    register_file.write::<u8>("PSTATE_EL", 0x1);
 
     //   0xd69f03e0        eret
     translate_instruction(
@@ -4330,7 +4328,6 @@ fn eret_post_exception() {
     let translation = ctx.compile(num_regs);
 
     register_file.write::<u64>("ELR_EL1", 0x8225_0008);
-    register_file.write::<u8>("PSTATE_EL", 0x1);
     register_file.write::<u64>("SPSR_EL1_bits", 0x3c5);
     register_file.write::<u64>("SPSR_EL2_bits", 0x3c5);
     register_file.write::<u64>("SPSR_EL3_bits", 0x3c9);
@@ -4338,7 +4335,7 @@ fn eret_post_exception() {
 
     translation.execute(&register_file);
 
-    //  assert_eq!(register_file.read::<u64>("_PC"), 0x8225_0008); // todo
+    assert_eq!(register_file.read::<u64>("_PC"), 0x8225_0008); // todo
 }
 
 #[ktest]

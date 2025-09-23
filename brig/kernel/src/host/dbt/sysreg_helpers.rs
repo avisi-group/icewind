@@ -36,7 +36,7 @@ pub fn handler_exists(reg: u64) -> bool {
     SYSREG_HANDLERS.lock().contains_key(&reg)
 }
 
-pub extern "C" fn sys_reg_read(reg: u64) -> u64 {
+pub extern "sysv64" fn sys_reg_read(reg: u64) -> u64 {
     let handler = {
         let guard = SYSREG_HANDLERS.lock();
         guard.get(&reg).unwrap().clone()
@@ -52,7 +52,7 @@ pub extern "C" fn sys_reg_read(reg: u64) -> u64 {
     u64::from_le_bytes(result)
 }
 
-pub extern "C" fn sys_reg_write(reg: u64, value: u64, len: u8) {
+pub extern "sysv64" fn sys_reg_write(reg: u64, value: u64, len: u8) {
     let handler = {
         let guard = SYSREG_HANDLERS.lock();
         guard.get(&reg).unwrap().clone()

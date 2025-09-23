@@ -3,8 +3,8 @@ use {
         Alloc as MemAlloc,
         x86::{
             encoder::{
-                Instruction, MemoryScale, Opcode, Operand, registers::PhysicalRegister,
-                registers::Register, width::Width,
+                Instruction, Opcode, Operand, registers::PhysicalRegister, registers::Register,
+                width::Width,
             },
             register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
         },
