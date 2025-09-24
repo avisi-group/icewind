@@ -327,11 +327,11 @@ impl ModelDevice {
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
-            if exec_result.need_code_cache_flush() {
-                chain_cache.fill_keys(1);
-                block_cache.clear();
-                translation_cache.fill_keys(1);
-            }
+            // if exec_result.need_code_cache_flush() {
+            //     chain_cache.fill_keys(1);
+            //     block_cache.clear();
+            //     translation_cache.fill_keys(1);
+            // }
 
             if exec_result.interrupt_pending() {
                 let masked = self.well_known_registers.i().read(); //self.register_file.read::<bool>("PSTATE_I");

@@ -836,7 +836,6 @@ fn mem_load() {
     assert_eq!(register_file.read::<u64>("R0"), VALUE);
 }
 
-/// failing due to cached SEE
 #[ktest]
 fn fibonacci_block() {
     let model = models::get("aarch64").unwrap();
@@ -869,6 +868,16 @@ fn fibonacci_block() {
     loop {
         let pc_offset = model.reg_offset("_PC");
         let mut current_pc = register_file.read::<u64>("_PC");
+
+        // log::trace!(
+        //     "starting loop @ {current_pc}: {} {} {} {} {}",
+        //     register_file.read::<u64>("R0"),
+        //     register_file.read::<u64>("R1"),
+        //     register_file.read::<u64>("R2"),
+        //     register_file.read::<u64>("R3"),
+        //     register_file.read::<u64>("R4"),
+        // );
+
         let start_pc = current_pc;
         if let Some(translation) = blocks.get(&start_pc) {
             translation.execute(&register_file);
@@ -884,22 +893,18 @@ fn fibonacci_block() {
         let mut emitter = X86Emitter::new(&mut ctx);
 
         loop {
-            register_file.write("SEE", -1i64);
-
             let _false = emitter.constant(0 as u64, Type::Unsigned(1));
             emitter.write_register(model.reg_offset("__BranchTaken"), _false);
 
-            {
-                let opcode = emitter.constant(program[current_pc as usize / 4], Type::Unsigned(32));
-                let _return_value = translate(
-                    Global,
-                    &*model,
-                    "__DecodeA64",
-                    &[opcode],
-                    &mut emitter,
-                    &register_file,
-                );
-            }
+            translate_instruction(
+                Global,
+                &*model,
+                "__DecodeA64",
+                &mut emitter,
+                &register_file,
+                program[current_pc as usize / 4],
+            )
+            .unwrap();
 
             if emitter.ctx().get_pc_write_flag() || (current_pc == ((program.len() * 4) - 8) as u64)
             {
@@ -913,6 +918,8 @@ fn fibonacci_block() {
                 current_pc += 4;
             }
         }
+
+        //log::trace!("stopped translating @ {current_pc}");
 
         // inc PC if branch not taken
         {
@@ -932,7 +939,7 @@ fn fibonacci_block() {
         let num_regs = emitter.next_vreg();
         let translation = ctx.compile(num_regs);
 
-        // log::trace!("{translation:?}")
+        // log::trace!("{translation:?}");
 
         translation.execute(&register_file);
         blocks.insert(start_pc, translation);

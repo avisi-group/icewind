@@ -270,6 +270,9 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                                 Register::CL => (machine_context.rcx, 1),
                                                 Register::CX => (machine_context.rcx, 2),
                                                 Register::ECX => (machine_context.rcx, 4),
+                                                Register::AL => (machine_context.rax, 1),
+                                                Register::AX => (machine_context.rax, 2),
+                                                Register::EAX => (machine_context.rax, 4),
                                                 reg => {
                                                     panic!("todo write src reg {reg:?}")
                                                 }

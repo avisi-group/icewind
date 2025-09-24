@@ -73,6 +73,8 @@ fn calculate_vreg_live_ranges<A: MemAlloc>(
                 if tracked_register.first_def.is_none() {
                     tracked_register.first_def = Some(current);
                     tracked_register.last_control_flow_count = current_control_flow_count;
+                } else if matches!(instr.0, Opcode::CMOVNE(_, _)) {
+                    tracked_register.last_use = Some(current);
                 } else if tracked_register.last_use.is_none() && !matches!(ud, UseDef::UseDef(_)) {
                     if tracked_register.last_control_flow_count == current_control_flow_count {
                         instructions[tracked_register.first_def.unwrap()].0 = Opcode::DEAD;
