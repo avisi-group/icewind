@@ -500,8 +500,8 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
     } else if name.as_ref() == "PSTATE_EL"
         || name.as_ref().starts_with("SPE")
         || name.as_ref() == "_MPAM3_EL3_bits"
-        || name.as_ref() == "_MPAM2_EL2_bits"
-    //     || name.as_ref() == "SCR_EL3_bits" // todo: re-enable me
+        || name.as_ref() == "MPAM2_EL2_bits"// not a bug, the underscores are correct
+        || name.as_ref() == "SCR_EL3_bits"
     {
         RegisterCacheType::Read
     } else {
