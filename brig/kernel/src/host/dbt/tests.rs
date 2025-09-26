@@ -6166,8 +6166,6 @@ fn add_8h() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::error!("{translation:?}");
-
     let z_offset = model.reg_offset("_Z");
 
     let q8_offset = z_offset + (8 * 256);
@@ -6254,7 +6252,5 @@ fn simd_const() {
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-
-    log::error!("{translation:?}");
+    let _translation = ctx.compile(num_regs);
 }

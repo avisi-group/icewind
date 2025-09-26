@@ -51,11 +51,11 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_32,
             },
         ) => {
-            if *left > i32::MAX as u64 {
+            if *left > u32::MAX as u64 {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
-                .and::<AsmRegister32, i32>(right.into(), *left as i32)
+                .and::<AsmRegister32, u32>(right.into(), *left as u32)
                 .unwrap();
         }
         (

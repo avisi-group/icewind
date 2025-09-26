@@ -75,8 +75,8 @@ pub enum Opcode<A: Alloc> {
     NEG(Operand<A>),
     /// bextr {0}, {1}, {2}
     BEXTR(Operand<A>, Operand<A>, Operand<A>),
-    /// pinsrw {0}, {1},  {2},
-    PINSRW(Operand<A>, Operand<A>, Operand<A>),
+    /// pinsr {0}, {1}, {2}
+    PINSR(Operand<A>, Operand<A>, Operand<A>),
 
     /// jmp {0}
     JMP(Operand<A>),
@@ -562,10 +562,9 @@ impl<A: Alloc> Instruction<A> {
     }
 
     pub fn movzx(src: Operand<A>, dst: Operand<A>) -> Result<Self, Error<A>> {
-        assert!(
-            src.width() < dst.width(),
-            "can't zero extend {src} to {dst}"
-        );
+        if src.width() >= dst.width() {
+            return Err(Error::MovZeroExtendDestinationNotGreater { src, dst });
+        }
 
         if let OperandKind::Immediate(_) = src.kind()
             && dst.width() == Width::_128
@@ -624,8 +623,8 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::BEXTR(ctrl, src, dst))
     }
 
-    pub fn pinsrw(index: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
-        Self(Opcode::PINSRW(index, src, dst))
+    pub fn pinsr(index: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
+        Self(Opcode::PINSR(index, src, dst))
     }
 
     pub fn jmp(block: Ref<X86Block<A>>) -> Self {
@@ -1200,7 +1199,7 @@ impl<A: Alloc> Instruction<A> {
                 .out::<i32, AsmRegister8>((*port).try_into().unwrap(), value.into())
                 .unwrap(),
 
-            PINSRW(
+            PINSR(
                 Operand {
                     kind: I(index),
                     width_in_bits: Width::_8,
@@ -1216,6 +1215,29 @@ impl<A: Alloc> Instruction<A> {
             ) => {
                 assembler
                     .pinsrw::<AsmRegisterXmm, AsmRegister32, i32>(
+                        dst.into(),
+                        src.into(),
+                        i32::try_from(*index).unwrap(),
+                    )
+                    .unwrap();
+            }
+
+            PINSR(
+                Operand {
+                    kind: I(index),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => {
+                assembler
+                    .pinsrq::<AsmRegisterXmm, AsmRegister64, i32>(
                         dst.into(),
                         src.into(),
                         i32::try_from(*index).unwrap(),
@@ -1316,7 +1338,7 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::InOut, c)),
             ]
             .into_iter(),
-            Opcode::PINSRW(index, src, dst) => [
+            Opcode::PINSR(index, src, dst) => [
                 Some((OperandDirection::In, index)),
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
@@ -1415,7 +1437,7 @@ impl<A: Alloc> Instruction<A> {
             .into_iter()
             .collect(),
 
-            Opcode::PINSRW(index, src, dst) => [
+            Opcode::PINSR(index, src, dst) => [
                 ((OperandDirection::In, index)),
                 ((OperandDirection::In, src)),
                 ((OperandDirection::InOut, dst)),
@@ -1520,4 +1542,6 @@ pub enum Error<A: Alloc> {
     MovImmediateSSE { src: Operand<A>, dst: Operand<A> },
     /// Found general register greater than 64-bits wide: {0}
     OversizeGeneralRegister(Operand<A>),
+    /// Cannot zero extend {src} into equal-or-smaller destination {dst}
+    MovZeroExtendDestinationNotGreater { src: Operand<A>, dst: Operand<A> },
 }

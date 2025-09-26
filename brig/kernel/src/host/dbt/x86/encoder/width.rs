@@ -25,8 +25,8 @@ impl Ord for Width {
 }
 
 impl Width {
-    pub fn from_uncanonicalized(bits: u32) -> Result<Self, WidthError> {
-        match bits {
+    pub fn from_uncanonicalized<U: Into<u64>>(bits: U) -> Result<Self, WidthError> {
+        match bits.into() {
             1..=8 => Ok(Self::_8),
             9..=16 => Ok(Self::_16),
             17..=32 => Ok(Self::_32),

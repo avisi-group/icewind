@@ -33,32 +33,54 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    /// Same as `to_operand_inner` but handles XMM quirks
+    /// Same as `to_operand_inner` but handles immediate quirks
     pub fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         let op = self.to_operand_inner(node);
 
-        // can't move immediates into XMM registers, so promote to reg
         if let OperandKind::Immediate(value) = op.kind() {
             // todo: optimize for value == 0
             // if value == 0 {
             // }
 
-            if op.width() > Width::_64 || (*value > u64::try_from(i32::MAX).unwrap()) {
+            // can't move immediates into XMM registers, so promote to reg
+            if op.width() > Width::_64 {
                 // limit width to 64
-                // we only use 64 bits to store immediates so this truncation is fine for >64
-                // bit widthss
-                let target_width = min(Width::_64, op.width());
+                let limited_width = min(Width::_64, op.width());
 
-                let truncated_op = Operand::imm(target_width, *value);
-                let tmp = Operand::vreg(target_width, self.next_vreg());
+                let truncated_op = Operand::imm(limited_width, *value);
+                let tmp = Operand::vreg(limited_width, self.next_vreg());
+
                 let tmp_full = Operand::vreg(op.width(), self.next_vreg());
                 self.push_instruction(Instruction::mov(truncated_op, tmp).unwrap());
                 self.push_instruction(Instruction::movzx(tmp, tmp_full).unwrap());
-                return tmp_full;
-            }
-        }
 
-        op
+                tmp_full
+            } else if *value > u64::try_from(i32::MAX).unwrap() && op.width() > Width::_32 {
+                // will fit in a general register, but the immediate is too
+                // large
+
+                let low_half = Operand::imm(Width::_64, value & 0x0000_0000_FFFF_FFFF);
+                let low_half_reg = Operand::vreg(op.width(), self.next_vreg());
+                self.push_instruction(Instruction::mov(low_half, low_half_reg).unwrap());
+
+                let high_half = Operand::imm(Width::_64, (value & 0xFFFF_FFFF_0000_0000) >> 32);
+                let high_half_reg = Operand::vreg(op.width(), self.next_vreg());
+                self.push_instruction(Instruction::mov(high_half, high_half_reg).unwrap());
+
+                self.push_instruction(Instruction::shl(
+                    Operand::imm(Width::_16, 32),
+                    high_half_reg,
+                ));
+
+                self.push_instruction(Instruction::or(low_half_reg, high_half_reg));
+
+                high_half_reg
+            } else {
+                op
+            }
+        } else {
+            op
+        }
     }
 
     fn to_operand_inner(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
@@ -242,13 +264,17 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     self.push_instruction(Instruction::mov(src, dst).unwrap());
                 } else {
                     match kind {
-                        CastOperationKind::ZeroExtend => {
-                            if src.width() == dst.width() {
+                        CastOperationKind::ZeroExtend => match src.width().cmp(&dst.width()) {
+                            Ordering::Equal => {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());
-                            } else {
+                            }
+                            Ordering::Less => {
                                 self.push_instruction(Instruction::movzx(src, dst).unwrap());
                             }
-                        }
+                            Ordering::Greater => {
+                                panic!()
+                            }
+                        },
                         CastOperationKind::SignExtend => {
                             if src.width() == dst.width() {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());
@@ -370,16 +396,15 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     };
 
                     let target = self.to_operand(target);
-                    let source = self.to_operand(source);
+                    let mut source = self.to_operand(source);
 
                     let index = Operand::imm(Width::_8, start / length);
 
-                    if *length == 16 {
-                        self.push_instruction(Instruction::pinsrw(index, source, target));
-                        target
-                    } else {
-                        todo!()
-                    }
+                    source.set_width(Width::from_uncanonicalized(*length).unwrap());
+
+                    self.push_instruction(Instruction::pinsr(index, source, target));
+
+                    target
                 } else {
                     // todo: test this and use x86 bit insert instructions
                     let target = self.to_operand(target);
