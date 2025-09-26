@@ -1357,15 +1357,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             Statement::ReadElement { .. } => {
                 todo!()
             }
-            Statement::AssignElement {
-                vector,
-                value,
-                index,
-            } => {
-                let vector = value_store.get(*vector);
-                let value = value_store.get(*value);
-                let index = value_store.get(*index);
-                StatementResult::Data(Some(self.emitter.mutate_element(vector, index, value)))
+            Statement::AssignElement { .. } => {
+                todo!()
             }
             Statement::Panic(value) => {
                 let Statement::Constant(Constant::String(msg)) = value.get(arena) else {

@@ -75,14 +75,6 @@ pub trait Emitter<A: Alloc> {
     fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef;
     fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef);
 
-    // returns the vector with the new element
-    fn mutate_element(
-        &mut self,
-        vector: Self::NodeRef,
-        index: Self::NodeRef,
-        value: Self::NodeRef,
-    ) -> Self::NodeRef;
-
     fn panic(&mut self, msg: &str);
 
     fn branch(

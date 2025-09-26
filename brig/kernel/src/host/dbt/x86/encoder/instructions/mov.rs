@@ -39,6 +39,23 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .unwrap();
             }
         }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_128,
+            },
+        ) => {
+            //assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+            assembler
+                .movdqa::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
+                .unwrap();
+        }
 
         // MOV R -> R
         (
@@ -696,10 +713,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: Width::_128,
+                width_in_bits: Width::_8,
             },
         ) => {
-            todo!("{src:?} {dst:?}");
+            assembler
+                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                .unwrap();
+            assembler
+                .movzx::<AsmRegister64, AsmRegister8>(dst.into(), dst.into())
+                .unwrap();
         }
         // MOV R -> R
         (
@@ -709,14 +731,29 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: Width::_8,
+                width_in_bits: Width::_16,
             },
         ) => {
             assembler
                 .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
                 .unwrap();
             assembler
-                .movzx::<AsmRegister64, AsmRegister8>(dst.into(), dst.into())
+                .movzx::<AsmRegister64, AsmRegister16>(dst.into(), dst.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.into())
                 .unwrap();
         }
 

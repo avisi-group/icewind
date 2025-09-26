@@ -19,8 +19,8 @@ use {
     derive_where::derive_where,
     displaydoc::Display,
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
-        CodeLabel, qword_ptr,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
+        AsmRegisterXmm, CodeAssembler, CodeLabel, qword_ptr,
     },
 };
 
@@ -75,6 +75,9 @@ pub enum Opcode<A: Alloc> {
     NEG(Operand<A>),
     /// bextr {0}, {1}, {2}
     BEXTR(Operand<A>, Operand<A>, Operand<A>),
+    /// pinsrw {0}, {1},  {2},
+    PINSRW(Operand<A>, Operand<A>, Operand<A>),
+
     /// jmp {0}
     JMP(Operand<A>),
     /// push {0}
@@ -619,6 +622,10 @@ impl<A: Alloc> Instruction<A> {
 
     pub fn bextr(ctrl: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::BEXTR(ctrl, src, dst))
+    }
+
+    pub fn pinsrw(index: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
+        Self(Opcode::PINSRW(index, src, dst))
     }
 
     pub fn jmp(block: Ref<X86Block<A>>) -> Self {
@@ -1192,6 +1199,29 @@ impl<A: Alloc> Instruction<A> {
             ) => assembler
                 .out::<i32, AsmRegister8>((*port).try_into().unwrap(), value.into())
                 .unwrap(),
+
+            PINSRW(
+                Operand {
+                    kind: I(index),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_16,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => {
+                assembler
+                    .pinsrw::<AsmRegisterXmm, AsmRegister32, i32>(
+                        dst.into(),
+                        src.into(),
+                        i32::try_from(*index).unwrap(),
+                    )
+                    .unwrap();
+            }
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1286,6 +1316,12 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::InOut, c)),
             ]
             .into_iter(),
+            Opcode::PINSRW(index, src, dst) => [
+                Some((OperandDirection::In, index)),
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst)),
+            ]
+            .into_iter(),
             Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
             Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
             Opcode::DEAD => panic!(),
@@ -1375,6 +1411,14 @@ impl<A: Alloc> Instruction<A> {
                 ((OperandDirection::In, ctrl)),
                 ((OperandDirection::In, src)),
                 ((OperandDirection::Out, dst)),
+            ]
+            .into_iter()
+            .collect(),
+
+            Opcode::PINSRW(index, src, dst) => [
+                ((OperandDirection::In, index)),
+                ((OperandDirection::In, src)),
+                ((OperandDirection::InOut, dst)),
             ]
             .into_iter()
             .collect(),

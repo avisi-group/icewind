@@ -881,7 +881,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             // register read direct
             (
                 NodeKind::GuestRegister { offset },
-                NodeKind::Constant { value: 0, .. },
+                NodeKind::Constant {
+                    value: bit_extract_offset,
+                    ..
+                },
                 NodeKind::Constant {
                     value: length_value @ (8 | 16 | 32 | 64 | 128),
                     ..
@@ -894,7 +897,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     _ => todo!("{typ:?}"),
                 };
 
-                self.read_register(*offset, new_typ)
+                assert!((bit_extract_offset % 8) == 0);
+
+                self.read_register(*offset + (bit_extract_offset / 8), new_typ)
             }
             // // register read with bitextract
             // (
@@ -986,16 +991,32 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             (
                 _,
                 _,
-                NodeKind::Constant { value: start, .. },
-                NodeKind::Constant { value: length, .. },
+                NodeKind::Constant { value: start_c, .. },
+                NodeKind::Constant {
+                    value: length_c, ..
+                },
             ) => {
-                let length = u32::try_from(*length).unwrap();
-                let start = u32::try_from(*start).unwrap();
-
-                // todo: hack fixme
-                if start >= 64 {
-                    return target;
+                // if we're dealing with 128 bit stuff, and is valid for vector stuff, pass it
+                // down to the emitter
+                if target.typ().width() == 128 {
+                    if !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0) {
+                        panic!(
+                            "unsupported vector stuff, curious if we ever hit this (we shouldnt)"
+                        )
+                    }
+                    return self.node(X86Node {
+                        typ,
+                        kind: NodeKind::BitInsert {
+                            target,
+                            source,
+                            start,
+                            length,
+                        },
+                    });
                 }
+
+                let length = u32::try_from(*length_c).unwrap();
+                let start = u32::try_from(*start_c).unwrap();
 
                 let cleared_target = {
                     let mask = self.constant(
@@ -1512,15 +1533,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::jne(self.panic_block.clone()));
             }
         }
-    }
-
-    fn mutate_element(
-        &mut self,
-        _vector: Self::NodeRef,
-        _index: Self::NodeRef,
-        _value: Self::NodeRef,
-    ) -> Self::NodeRef {
-        todo!()
     }
 
     // returns a tuple of (operation_result, flags)

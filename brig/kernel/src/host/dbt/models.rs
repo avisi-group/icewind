@@ -327,11 +327,11 @@ impl ModelDevice {
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
-            // if exec_result.need_code_cache_flush() {
-            //     chain_cache.fill_keys(1);
-            //     block_cache.clear();
-            //     translation_cache.fill_keys(1);
-            // }
+            if exec_result.need_code_cache_flush() {
+                chain_cache.fill_keys(1);
+                block_cache.clear();
+                translation_cache.fill_keys(1);
+            }
 
             if exec_result.interrupt_pending() {
                 let masked = self.well_known_registers.i().read(); //self.register_file.read::<bool>("PSTATE_I");
@@ -497,11 +497,28 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref().starts_with("current_exception")
     {
         RegisterCacheType::ReadWrite
-    } else if name.as_ref() == "PSTATE_EL"
-        || name.as_ref().starts_with("SPE")
-        || name.as_ref() == "_MPAM3_EL3_bits"
-        || name.as_ref() == "MPAM2_EL2_bits"// not a bug, the underscores are correct
-        || name.as_ref() == "SCR_EL3_bits"
+    } else if name.as_ref().starts_with("SPE")
+        || [
+            "PSTATE_EL",
+            "_MPAM1_EL1_bits",
+            "_MPAM3_EL3_bits",
+            "_MPAM3_EL3_bits",
+            "MPAM0_EL1_bits",
+            "MPAM2_EL2_bits", // not a bug, the underscores are correct
+            "SCR_EL3_bits",
+            "CPTR_EL2_bits",
+            "CPTR_EL3_bits",
+            "_EDSCR_bits",
+            "MDCCSR_EL0_bits",
+            "SMCR_EL1_bits",
+            "SMCR_EL2_bits",
+            "SMCR_EL3_bits",
+            "SCTLR_EL1_bits",
+            "SCTLR_EL2_bits",
+            "SCTLR_EL3_bits",
+            "CPACR_EL1_bits",
+        ]
+        .contains(&name.as_ref())
     {
         RegisterCacheType::Read
     } else {

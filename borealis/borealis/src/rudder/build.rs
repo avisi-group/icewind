@@ -1743,7 +1743,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "ELUsingAArch32"
             | "EffectiveTBI"
             | "GCSPCREnabled"
-            | "EndOfInstruction" =>
+            | "EndOfInstruction"
+            | "CheckFPAdvSIMDEnabled64" // todo: re-enable this and make sure it's optimized away rather than hard-coded
+            =>
             // todo: don't replace with constant, delete
             {
                 Some(build(
