@@ -502,7 +502,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
         register_file: &'r RegisterFile,
     ) -> Self {
-        log::debug!("translating {function:?}: {:?}", arguments);
+        log::debug!("translating {function:?}: {:#?}", arguments);
 
         if FN_DENYLIST.contains(&function) {
             panic!("attempted to translate denylisted function: {function:?}")

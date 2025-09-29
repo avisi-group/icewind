@@ -4919,9 +4919,7 @@ fn extr() {
     // 100000ac8: 93c20462     extr    x2, x3, x2, #0x1
 
     for (opcode, expected) in [
-        // shift = 0, todo: no zero width constants allowed! Unsigned(0) @ ref 0x36 (arena
-        // 4294967295) fix by specializing lsb = 0
-        //    (0x93c20062, 0x1122334455667788),
+        (0x93c20062, 0x1122334455667788), // shift = 0
         (0x93c20462, 0x889119a22ab33bc4), // shift = 1
         (0x93c24062, 0xeeff112233445566), // shift = 16
         (0x93c28062, 0xccddeeff11223344), // shift = 32

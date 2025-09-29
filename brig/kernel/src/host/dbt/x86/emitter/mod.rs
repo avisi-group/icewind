@@ -21,10 +21,11 @@ use {
     alloc::{rc::Rc, vec::Vec},
     common::{arena::Ref, hashmap::HashMap, mask::mask},
     core::{
-        cmp::Ordering,
+        cmp::{Ordering, min},
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
+        ops::RangeBounds,
         panic,
     },
     derive_where::derive_where,
@@ -998,8 +999,96 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         Type::Unsigned(u32::try_from(*bitext_length).unwrap()),
                         CastOperationKind::Truncate,
                     )
-                } else {
-                    panic!("todo: some boundary crossing combination")
+                }
+                // overlap, gnarly to deal with :(
+                else {
+                    // AAAA0000
+                    //     ^ start = 16, length = 16
+                    // AAAABBBB
+                    //   [  ]
+                    //
+                    // A = bitins_target
+                    // B = bitins_source
+                    // C = extracted final region
+
+                    // length of the total A region
+                    let a_length = *bitins_start;
+                    let a_range = 0..a_length;
+                    // length of the total B region
+                    let b_length = *bitins_length;
+                    let b_range = a_length..(a_length + b_length);
+
+                    let c_start = *bitext_start;
+                    let c_length = *bitext_length;
+                    let c_end = c_start + c_length;
+
+                    log::error!(
+                        "(target[{bitins_start}/{bitins_length}]) = source)[{bitext_start}/{bitext_length}]"
+                    );
+
+                    match (
+                        a_range.contains(&c_start),
+                        a_range.contains(&c_end),
+                        b_range.contains(&c_start),
+                        b_range.contains(&c_end),
+                    ) {
+                        (true, true, false, false) => {
+                            log::error!("= target[{c_start}/{c_length}]");
+                            let start = self.constant(c_start, Type::Signed(64));
+                            let length = self.constant(c_length, Type::Signed(64));
+                            self.bit_extract(bitins_target.clone(), start, length)
+                        }
+                        (false, false, true, true) => {
+                            let start = c_start - a_length;
+                            log::error!("= source[{start}/{c_length}]");
+                            let start = self.constant(start, Type::Signed(64));
+                            let length = self.constant(c_length, Type::Signed(64));
+                            self.bit_extract(bitins_source.clone(), start, length)
+                        }
+                        (true, false, false, true) => {
+                            // subregion of A we're extracting
+                            let a_subregion_start = *bitext_start;
+                            let a_subregion_length = a_length - a_subregion_start;
+
+                            // subregion of B we're extracting
+                            let b_subregion_start = 0;
+                            let b_subregion_length =
+                                bitext_length.saturating_sub(a_subregion_length);
+
+                            assert_eq!(a_subregion_length + b_subregion_length, *bitext_length);
+
+                            log::error!(
+                                "= target[{a_subregion_start}/{a_subregion_length}] ++ source[{b_subregion_start}/{b_subregion_length}]"
+                            );
+
+                            let a = {
+                                let start = self.constant(a_subregion_start, Type::Signed(64));
+                                let length = self.constant(a_subregion_length, Type::Signed(64));
+                                self.bit_extract(bitins_target.clone(), start, length)
+                            };
+
+                            let b = {
+                                let start = self.constant(b_subregion_start, Type::Signed(64));
+                                let length = self.constant(b_subregion_length, Type::Signed(64));
+                                self.bit_extract(bitins_source.clone(), start, length)
+                            };
+
+                            let expanded_a = self.cast(
+                                a,
+                                Type::Unsigned(u32::try_from(*bitext_length).unwrap()),
+                                CastOperationKind::ZeroExtend,
+                            );
+
+                            let combined = {
+                                let start = self.constant(a_subregion_length, Type::Signed(64));
+                                let length = self.constant(b_subregion_length, Type::Signed(64));
+                                self.bit_insert(expanded_a, b, start, length)
+                            };
+
+                            combined
+                        }
+                        x => todo!("unreachable I think??? {x:?}"),
+                    }
                 }
             }
 
@@ -1007,21 +1096,35 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             (
                 _,
                 NodeKind::Constant {
-                    value: _start_value,
-                    ..
+                    value: start_value, ..
                 },
                 NodeKind::Constant {
                     value: length_value,
                     ..
                 },
             ) => {
+                let value = match (value.kind(), value.typ()) {
+                    (
+                        NodeKind::Cast {
+                            value: pre_cast_value,
+                            kind: CastOperationKind::ZeroExtend,
+                        },
+                        Type::Unsigned(cast_len),
+                    ) => {
+                        // if we had enough bits before zero extending, use those
+                        if u64::from(pre_cast_value.typ().width()) >= *start_value + *length_value {
+                            pre_cast_value.clone()
+                        } else {
+                            value.clone()
+                        }
+                    }
+                    _ => value.clone(),
+                };
+
                 // value >> start && mask(length)
                 // should emit fixed shift?
-                let shifted = self.shift(
-                    value.clone(),
-                    start.clone(),
-                    ShiftOperationKind::LogicalShiftRight,
-                );
+                let shifted =
+                    self.shift(value, start.clone(), ShiftOperationKind::LogicalShiftRight);
 
                 let cast = self.cast(
                     shifted,
@@ -1079,8 +1182,13 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             ) => {
                 // if we're dealing with 128 bit stuff, and is valid for vector stuff, pass it
                 // down to the emitter
-                if target.typ().width() == 128 {
-                    if !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0) {
+                if (*start_c >= 64)
+                    || ((*start_c + *length_c) >= 64)
+                    || (target.typ().width() == 128)
+                {
+                    if (target.typ().width() == 128)
+                        && !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0)
+                    {
                         panic!(
                             "unsupported vector stuff, curious if we ever hit this (we shouldnt)"
                         )
