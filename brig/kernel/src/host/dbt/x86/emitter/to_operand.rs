@@ -254,57 +254,54 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let target_width = Width::from_uncanonicalized(node.typ().width()).unwrap();
                 let dst = Operand::vreg(target_width, self.next_vreg());
 
-                let mut src = if target_width > Width::_64 {
-                    self.to_operand_reg_promote(value)
-                } else {
-                    self.to_operand(value)
-                };
+                let src = self.to_operand(value);
 
-                if node.typ() == value.typ() {
+                if src.width() == dst.width() {
                     self.push_instruction(Instruction::mov(src, dst).unwrap());
                 } else {
-                    match kind {
-                        CastOperationKind::ZeroExtend => match src.width().cmp(&dst.width()) {
-                            Ordering::Equal => {
-                                self.push_instruction(Instruction::mov(src, dst).unwrap());
-                            }
-                            Ordering::Less => {
-                                self.push_instruction(Instruction::movzx(src, dst).unwrap());
-                            }
-                            Ordering::Greater => {
-                                panic!()
-                            }
-                        },
-                        CastOperationKind::SignExtend => {
-                            if src.width() == dst.width() {
-                                self.push_instruction(Instruction::mov(src, dst).unwrap());
-                            } else {
-                                self.push_instruction(Instruction::movsx(src, dst));
-                            }
+                    use {CastOperationKind::*, Ordering::*};
+
+                    match (kind, src.width().cmp(&dst.width())) {
+                        (ZeroExtend, Equal) => {
+                            self.push_instruction(Instruction::mov(src, dst).unwrap())
                         }
-                        CastOperationKind::Convert => {
+                        (ZeroExtend, Less) => {
+                            self.push_instruction(Instruction::movzx(src, dst).unwrap())
+                        }
+                        (ZeroExtend, Greater) => {
+                            panic!("cannot zero extend when dst ({dst}) is larger than src ({src})")
+                        }
+
+                        (SignExtend, Equal) => {
+                            self.push_instruction(Instruction::mov(src, dst).unwrap())
+                        }
+                        (SignExtend, Less) => self.push_instruction(Instruction::movsx(src, dst)),
+                        (SignExtend, Greater) => {
+                            panic!("cannot sign extend when dst ({dst}) is larger than src ({src})")
+                        }
+
+                        (Convert, _) => {
                             panic!("{:?}\n{:#?}", node.typ(), value);
                         }
-                        CastOperationKind::Truncate => {
-                            let src_width = src.width();
-                            let dst_width = dst.width();
-                            if src_width < dst_width {
-                                log::warn!(
-                                    "src ({src_width} bits) must be larger than dst ({dst_width} bits) in node:\n{node:#?}"
-                                );
-                            }
-
-                            // workaround for XMM truncation, can't just reinterpret src with a
-                            // lower width like with GPRs
+                        (Truncate, Greater) => {
+                            // workaround for XMM truncation, if we change the width to match dst it
+                            // will be emitted as a regular register, has to stay 128-bit for it to
+                            // be an XMM, but it's fine because there's already a XMM -> GPR mov
+                            // that is equivalent to a truncation
                             if src.width() > Width::_64 && dst.width() < Width::_128 {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());
                             } else {
+                                // normal case, just access src as a smaller register
+                                let mut src = src;
                                 src.set_width(dst.width());
                                 self.push_instruction(Instruction::mov(src, dst).unwrap());
                             }
                         }
+                        (Truncate, Equal | Less) => {
+                            panic!("invalid truncate: {:?} {:?}", value.typ(), node.typ(),)
+                        }
 
-                        CastOperationKind::Reinterpret => match src.width().cmp(&dst.width()) {
+                        (Reinterpret, _) => match src.width().cmp(&dst.width()) {
                             Ordering::Equal => {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap())
                             }
@@ -312,12 +309,12 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                                 self.push_instruction(Instruction::movzx(src, dst).unwrap())
                             }
                             Ordering::Greater => {
-                                src.set_width(dst.width());
-
-                                self.push_instruction(Instruction::mov(src, dst).unwrap())
+                                let mut src_trunc = src;
+                                src_trunc.set_width(dst.width());
+                                self.push_instruction(Instruction::mov(src_trunc, dst).unwrap())
                             }
                         },
-                        _ => todo!("{kind:?} to {:?}\n{value:#?}", node.typ()),
+                        (Broadcast, _) => todo!(),
                     }
                 }
 

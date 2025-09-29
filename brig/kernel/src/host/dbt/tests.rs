@@ -6198,6 +6198,7 @@ fn addp_16b() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
     translate_instruction(
         Global,
         &model,
@@ -6253,4 +6254,70 @@ fn simd_const() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let _translation = ctx.compile(num_regs);
+}
+
+#[ktest]
+fn tst_x10_0x7() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //f240095f        tst     x10, #0x7
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xf240095f,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let _translation = ctx.compile(num_regs);
+}
+
+#[ktest]
+fn cnt_8b() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  0e205903        cnt     v3.8b, v8.8b
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e205903,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q3_offset = z_offset + (3 * 256);
+    let q8_offset = z_offset + (8 * 256);
+
+    register_file.write_raw::<u128>(
+        q8_offset.try_into().unwrap(),
+        0xd697f587e3887926a72f69dbcb976731,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q3_offset.try_into().unwrap()),
+        0x0505040605050503,
+    );
 }

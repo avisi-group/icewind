@@ -6,5 +6,6 @@
     "brig-cli/Cargo.toml",
     "brig/Cargo.toml",
     "common/Cargo.toml"
-  ]
+  ],
+  "liveshare.allowGuestTaskControl": true
 }

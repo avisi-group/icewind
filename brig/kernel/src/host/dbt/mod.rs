@@ -13,6 +13,7 @@ use {
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
+pub mod dag;
 pub mod emitter;
 pub mod interpret;
 pub mod models;

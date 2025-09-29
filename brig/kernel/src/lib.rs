@@ -3,7 +3,6 @@
 #![feature(allocator_api)] // needed for pci config regions and alignedallocator
 #![feature(btree_cursors)]
 #![feature(int_roundings)]
-#![feature(new_zeroed_alloc)] // bump allocator
 #![feature(btreemap_alloc)]
 #![feature(iter_collect_into)]
 #![feature(unsafe_cell_access)]
@@ -14,12 +13,9 @@ extern crate alloc;
 use {
     crate::{
         host::{
-            arch::x86::{
-                backtrace::backtrace,
-                memory::{
-                    HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
-                    VirtualMemoryArea,
-                },
+            arch::x86::memory::{
+                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
+                VirtualMemoryArea,
             },
             dbt::models,
             devices::manager::SharedDeviceManager,
