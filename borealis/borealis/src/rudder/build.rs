@@ -2275,90 +2275,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             left.get(arena).typ(arena).unwrap(),
             right.get(arena).typ(arena).unwrap(),
         ) {
-            (Type::Bits, Type::Bits) => {
-                let l_value = cast(
-                    self.block,
-                    self.block_arena_mut(),
-                    left.clone(),
-                    Type::u64(),
-                );
-                let l_length = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::SizeOf { value: left },
-                );
-
-                let r_value = cast(
-                    self.block,
-                    self.block_arena_mut(),
-                    right.clone(),
-                    Type::u64(),
-                );
-                let r_length = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::SizeOf { value: right },
-                );
-
-                let shift = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: l_value,
-                        amount: r_length.clone(),
-                    },
-                );
-
-                let value = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: shift,
-                        rhs: r_value,
-                    },
-                );
-                let length = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: l_length,
-                        rhs: r_length,
-                    },
-                );
-
-                // lhs.value << rhs.len | rhs.value
-                // lhs.len + rhs.len
-                build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::CreateBits {
-                        value,
-                        width: length,
-                    },
-                )
-            }
             (
                 Type::Primitive(PrimitiveType::UnsignedInteger(left_width)),
                 Type::Primitive(PrimitiveType::UnsignedInteger(right_width)),
             ) => {
                 let target_width = left_width + right_width;
-
-                // cast left to width left + right
-                // shift left by width of right
-                // OR in right
-
-                let left_cast = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Cast {
-                        kind: CastOperationKind::ZeroExtend,
-                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(target_width)),
-                        value: left,
-                    },
-                );
 
                 let right_cast = build(
                     self.block,
@@ -2370,6 +2291,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 );
 
+                let left_width_constant = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant(Constant::new_unsigned(
+                        u64::try_from(left_width).unwrap(),
+                        16,
+                    )),
+                );
+
                 let right_width_constant = build(
                     self.block,
                     self.block_arena_mut(),
@@ -2379,110 +2309,64 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     )),
                 );
 
-                let left_shift = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: left_cast,
-                        amount: right_width_constant,
-                    },
-                );
-
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: left_shift,
-                        rhs: right_cast,
+                    Statement::BitInsert {
+                        target: right_cast,
+                        source: left,
+                        start: right_width_constant,
+                        width: left_width_constant,
                     },
                 )
             }
-            (Type::Primitive(PrimitiveType::UnsignedInteger(left_width)), Type::Bits) => {
-                let right_width = build(
+            (
+                Type::Bits | Type::Primitive(PrimitiveType::UnsignedInteger(_)),
+                Type::Bits | Type::Primitive(PrimitiveType::UnsignedInteger(_)),
+            ) => {
+                let l_length = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::SizeOf { value: left },
+                );
+
+                let r_length = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::SizeOf { value: right },
                 );
 
-                let left_width = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant(Constant::new_unsigned(
-                        u64::try_from(left_width).unwrap(),
-                        16,
-                    )),
-                );
-
-                let length = build(
+                let sum_length = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::BinaryOperation {
                         kind: BinaryOperationKind::Add,
-                        lhs: left_width,
-                        rhs: right_width,
+                        lhs: l_length,
+                        rhs: r_length,
                     },
                 );
 
-                let left_cast = build(
+                let tmp = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::CreateBits {
-                        value: left,
-                        width: length,
-                    },
-                );
-
-                let left_shift = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: left_cast,
-                        amount: right_width,
-                    },
-                );
-                build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: left_shift,
-                        rhs: right,
-                    },
-                )
-            }
-            (Type::Bits, Type::Primitive(PrimitiveType::UnsignedInteger(right_width))) => {
-                let right_width = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant(Constant::new_unsigned(
-                        u64::try_from(right_width).unwrap(),
-                        16,
-                    )),
-                );
-
-                let left_shift = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: left,
-                        amount: right_width,
+                        value: right,
+                        width: sum_length,
                     },
                 );
 
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: left_shift,
-                        rhs: right,
+                    Statement::BitInsert {
+                        target: tmp,
+                        source: left,
+                        start: r_length,
+                        width: l_length,
                     },
                 )
             }
+
             (a, b) => panic!("todo concat for {a:?} {b:?}"),
         }
     }

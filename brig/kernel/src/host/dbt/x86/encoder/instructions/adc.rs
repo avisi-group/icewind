@@ -181,6 +181,27 @@ pub fn encode<A: Alloc>(
                 .add::<AsmRegister64, AsmRegister64>(dst.into(), carry.into())
                 .unwrap();
         }
+        (
+            Operand {
+                kind: I(0),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(carry)),
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            assembler
+                .movzx::<AsmRegister32, AsmRegister8>(carry.into(), carry.into())
+                .unwrap();
+            assembler
+                .add::<AsmRegister32, AsmRegister32>(dst.into(), carry.into())
+                .unwrap();
+        }
         _ => todo!("adc {src} {dst} {carry}"),
     }
 }

@@ -846,6 +846,25 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 // mask to width of value
                 self.constant(shifted, typ)
             }
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: 32,
+                },
+                NodeKind::Constant {
+                    value: amount_value,
+                    ..
+                },
+                ShiftOperationKind::ArithmeticShiftRight,
+            ) => {
+                let signed_value = *value_value as i32;
+                let shifted = signed_value
+                    .checked_shr(u32::try_from(*amount_value).unwrap())
+                    .unwrap() as u64;
+
+                // mask to width of value
+                self.constant(shifted, typ)
+            }
             (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
                 todo!("{k:?}")
             }

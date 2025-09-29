@@ -187,6 +187,7 @@ pub enum Statement {
         true_value: Ref<Statement>,
         false_value: Ref<Statement>,
     },
+
     BitExtract {
         value: Ref<Statement>,
         start: Ref<Statement>,
@@ -208,6 +209,7 @@ pub enum Statement {
         pattern: Ref<Statement>,
         count: Ref<Statement>,
     },
+
     ReadElement {
         vector: Ref<Statement>,
         index: Ref<Statement>,
