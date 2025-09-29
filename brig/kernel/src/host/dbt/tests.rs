@@ -6427,6 +6427,7 @@ fn extr_fuzz0() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // 93d20383        extr    x3, x28, x18, #0
+    // decode_extr_aarch64_instrs_integer_ins_ext_extract_immediate
     translate_instruction(
         Global,
         &*model,

@@ -757,6 +757,22 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .unwrap();
         }
 
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            assembler
+                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                .unwrap();
+        }
+
         _ => todo!("mov {src} {dst}"),
     }
 }

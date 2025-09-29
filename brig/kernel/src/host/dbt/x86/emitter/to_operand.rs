@@ -298,7 +298,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             }
                         }
                         (Truncate, Equal | Less) => {
-                            panic!("invalid truncate: {:?} {:?}", value.typ(), node.typ(),)
+                            panic!(
+                                "invalid truncate: source value: {:?}, cast node target type: {:?}, src_width: {}, dst_width: {}",
+                                value.typ(),
+                                node.typ(),
+                                src.width(),
+                                dst.width()
+                            )
                         }
 
                         (Reinterpret, _) => match src.width().cmp(&dst.width()) {

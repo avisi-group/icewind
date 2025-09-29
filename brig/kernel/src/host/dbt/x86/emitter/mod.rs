@@ -17,9 +17,11 @@ use {
             },
         },
     },
+    aarch64_paging::target,
     alloc::{rc::Rc, vec::Vec},
     common::{arena::Ref, hashmap::HashMap, mask::mask},
     core::{
+        cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
@@ -204,7 +206,13 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 _ => todo!(),
             };
 
-            self.cast(value, target_type, CastOperationKind::Truncate)
+            let kind = match value.typ().width().cmp(&length) {
+                Ordering::Less => CastOperationKind::ZeroExtend,
+                Ordering::Equal => CastOperationKind::Reinterpret,
+                Ordering::Greater => CastOperationKind::Truncate,
+            };
+
+            self.cast(value, target_type, kind)
         } else {
             // todo: attach length information
             value
@@ -940,6 +948,60 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             //     };
             //     todo!();
             // }
+
+            // concat optimization
+            (
+                NodeKind::BitInsert {
+                    target: bitins_target,
+                    source: bitins_source,
+                    start: bitins_start,
+                    length: bitins_length,
+                },
+                NodeKind::Constant {
+                    value: bitext_start,
+                    ..
+                },
+                NodeKind::Constant {
+                    value: bitext_length,
+                    ..
+                },
+            ) => {
+                let NodeKind::Constant {
+                    value: bitins_start,
+                    ..
+                } = bitins_start.kind()
+                else {
+                    panic!()
+                };
+
+                let NodeKind::Constant {
+                    value: bitins_length,
+                    ..
+                } = bitins_length.kind()
+                else {
+                    panic!()
+                };
+
+                // extracting exactly what was inserted
+                if bitext_start == bitins_start && bitext_length == bitins_length {
+                    bitins_source.clone()
+                }
+                // extracting from the original insert target up to the start of the inserted
+                // portion
+                else if *bitext_start == 0 && bitext_length == bitins_start {
+                    // need to truncate to the currently requested extract length
+                    //
+                    // truncate should be correct because target should be bigger to hold whatever
+                    // was being inserted
+                    self.cast(
+                        bitins_target.clone(),
+                        Type::Unsigned(u32::try_from(*bitext_length).unwrap()),
+                        CastOperationKind::Truncate,
+                    )
+                } else {
+                    panic!("todo: some boundary crossing combination")
+                }
+            }
 
             // known start and length
             (
