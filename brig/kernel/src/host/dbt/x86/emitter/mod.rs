@@ -1022,8 +1022,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     let c_length = *bitext_length;
                     let c_end = c_start + c_length;
 
-                    log::error!(
-                        "(target[{bitins_start}/{bitins_length}]) = source)[{bitext_start}/{bitext_length}]"
+                    log::trace!(
+                        "(target[{bitins_start}/{bitins_length}]) = source)[{bitext_start}/{bitext_length}]",
                     );
 
                     match (
@@ -1033,14 +1033,14 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         b_range.contains(&c_end),
                     ) {
                         (true, true, false, false) => {
-                            log::error!("= target[{c_start}/{c_length}]");
+                            log::trace!("= target[{c_start}/{c_length}]");
                             let start = self.constant(c_start, Type::Signed(64));
                             let length = self.constant(c_length, Type::Signed(64));
                             self.bit_extract(bitins_target.clone(), start, length)
                         }
                         (false, false, true, true) => {
                             let start = c_start - a_length;
-                            log::error!("= source[{start}/{c_length}]");
+                            log::trace!("= source[{start}/{c_length}]");
                             let start = self.constant(start, Type::Signed(64));
                             let length = self.constant(c_length, Type::Signed(64));
                             self.bit_extract(bitins_source.clone(), start, length)
@@ -1057,8 +1057,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                             assert_eq!(a_subregion_length + b_subregion_length, *bitext_length);
 
-                            log::error!(
-                                "= target[{a_subregion_start}/{a_subregion_length}] ++ source[{b_subregion_start}/{b_subregion_length}]"
+                            log::trace!(
+                                "= target[{a_subregion_start}/{a_subregion_length}] ++ source[{b_subregion_start}/{b_subregion_length}]",
                             );
 
                             let a = {

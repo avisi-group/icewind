@@ -390,7 +390,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 start,
                 length,
             } => {
-                if target.typ().width() == 128 {
+                let target = self.to_operand(target);
+
+                if target.width() == Width::_128 {
                     let NodeKind::Constant { value: start, .. } = start.kind() else {
                         panic!()
                     };
@@ -398,8 +400,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                         panic!()
                     };
 
-                    let target = self.to_operand(target);
                     let mut source = self.to_operand(source);
+
+                    assert!(start % length == 0);
 
                     let index = Operand::imm(Width::_8, start / length);
 
@@ -410,7 +413,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     target
                 } else {
                     // todo: test this and use x86 bit insert instructions
-                    let target = self.to_operand(target);
                     let source = self.to_operand(source);
 
                     let start = self.to_operand(start);
@@ -439,7 +441,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                         );
                     } else {
                         self.push_instruction(
-                            Instruction::mov(Operand::imm(width, 1), mask).unwrap(),
+                            Instruction::mov(Operand::imm(width, 1), mask).unwrap_or_else(|e| {
+                                panic!("{e:?}: {target} {source} {start} {length}")
+                            }),
                         );
                         self.push_instruction(Instruction::shl(length, mask));
                         self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask));
