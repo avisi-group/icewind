@@ -402,13 +402,17 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                     let mut source = self.to_operand(source);
 
-                    assert!(start % length == 0);
+                    if *start == 0 && source.width() == target.width() {
+                        self.push_instruction(Instruction::mov(source, target).unwrap());
+                    } else {
+                        assert!(start % length == 0);
 
-                    let index = Operand::imm(Width::_8, start / length);
+                        let index = Operand::imm(Width::_8, start / length);
 
-                    source.set_width(Width::from_uncanonicalized(*length).unwrap());
+                        source.set_width(Width::from_uncanonicalized(*length).unwrap());
 
-                    self.push_instruction(Instruction::pinsr(index, source, target));
+                        self.push_instruction(Instruction::pinsr(index, source, target));
+                    }
 
                     target
                 } else {

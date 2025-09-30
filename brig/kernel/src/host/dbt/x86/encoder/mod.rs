@@ -1244,25 +1244,7 @@ impl<A: Alloc> Instruction<A> {
                     )
                     .unwrap();
             }
-            PINSR(
-                Operand {
-                    kind: I(0),
-                    width_in_bits: Width::_8,
-                },
-                Operand {
-                    kind: R(PHYS(src)),
-                    width_in_bits: Width::_128,
-                },
-                Operand {
-                    kind: R(PHYS(dst)),
-                    width_in_bits: Width::_128,
-                },
-            ) => {
-                // todo: terrible, terrible hack, fix this higher up
-                assembler
-                    .movdqu::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
-                    .unwrap();
-            }
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
