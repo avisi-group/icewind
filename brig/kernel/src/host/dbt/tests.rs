@@ -6449,3 +6449,84 @@ fn extr_fuzz0() {
 
     assert_eq!(register_file.read::<u64>("R3"), 0x63c68fa3f1af6ec2);
 }
+
+#[ktest]
+fn movi() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 2f00e413        movi    d19, #0x0
+    // (64-bit scalar variant)
+    // execute_aarch64_instrs_vector_logical
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x2f00e413,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q19_offset = z_offset + (19 * 256);
+
+    register_file.write_raw::<u128>(
+        q19_offset.try_into().unwrap(),
+        0x0633_1f8f_bf71_6915_8b38_29bf_0b64_c3fb,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q19_offset.try_into().unwrap()),
+        0x0,
+    );
+}
+
+#[ktest]
+fn v_set_zeroextend() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let value = emitter.constant(0x0, Type::Unsigned(64));
+
+    let n = emitter.constant(3, Type::Signed(64));
+    let width = emitter.constant(128, Type::Signed(64));
+    translate(
+        Global,
+        &*model,
+        "V_set",
+        &[n, width, value],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let q3_offset = usize::try_from(model.reg_offset("_Z") + 3 * 256).unwrap();
+
+    register_file.write_raw::<u128>(q3_offset, u128::MAX);
+
+    translation.execute(&register_file);
+
+    let q3 = register_file.read_raw::<u128>(q3_offset);
+
+    assert_eq!(q3, 0x0)
+}

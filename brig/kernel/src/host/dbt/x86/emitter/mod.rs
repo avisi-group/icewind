@@ -1171,6 +1171,24 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 bit_insert(*target, *source, *start, *length),
                 Type::Unsigned(*target_width),
             ),
+            // // constant start and length, and source
+            // (
+            //     _,
+            //     NodeKind::Constant {
+            //         value: source_value,
+            //         width: source_width,
+            //     },
+            //     NodeKind::Constant { value: start_c, .. },
+            //     NodeKind::Constant {
+            //         value: length_c, ..
+            //     },
+            // ) => {
+            //     if u64::from(*source_width) != *length_c {
+            //         panic!()
+            //     }
+
+            //     if *start_c == 0 {  } else { todo!() }
+            // }
             // constant start and length
             (
                 _,
@@ -1193,6 +1211,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                             "unsupported vector stuff, curious if we ever hit this (we shouldnt)"
                         )
                     }
+
                     return self.node(X86Node {
                         typ,
                         kind: NodeKind::BitInsert {
@@ -2483,11 +2502,17 @@ fn contains_addwithcarry<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A
 }
 
 fn is_no_op_and(left_type: Type, right_type: Type, right_constant: u64) -> bool {
-    // right hand side is all 1s for the width of the left hand side value
-    (right_constant == mask(left_type.width())
+    if left_type.width() > 128 {
+        // we aren't handling >128 bit values correctly anyway so don't even try
+        // anything clever
+        false
+    } else {
+        // right hand side is all 1s for the width of the left hand side value
+        (right_constant == mask(left_type.width())
                         // and it's a whole power of two (had some weird issues with intermediate width sizes, todo: fixme)
                         && matches!(right_type.width(), 8 | 16 | 32 | 64 | 128))
                         // OR the width is wider than the container for constants, so we assume the high bits would be 1s if they existed
                         // also todo: fixme because this is super hacky
                         || (left_type.width() > 64 && right_constant == u64::MAX)
+    }
 }
