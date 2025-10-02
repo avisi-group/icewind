@@ -6530,3 +6530,90 @@ fn v_set_zeroextend() {
 
     assert_eq!(q3, 0x0)
 }
+
+#[ktest]
+fn and_16b_fuzz0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  4e391ef7        and     v23.16b, v23.16b, v25.16b
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_logical_and_orr
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4e391ef7,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q23_offset = z_offset + (23 * 256);
+    let q25_offset = z_offset + (25 * 256);
+
+    register_file.write_raw::<u128>(
+        q23_offset.try_into().unwrap(),
+        0x9eb304522041182818bcf95624574a2b,
+    );
+    register_file.write_raw::<u128>(
+        q25_offset.try_into().unwrap(),
+        0x25166d3d3314667bd66dd0839c033d5,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q23_offset.try_into().unwrap()),
+        0x2110452000100201824d90020400201,
+    );
+}
+
+#[ktest]
+fn and_16b_fuzz1() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  4e291dc9        and     v9.16b, v14.16b, v9.16b
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4e291dc9,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q9 = z_offset + (9 * 256);
+    let q14 = z_offset + (14 * 256);
+
+    register_file.write_raw::<u128>(q9.try_into().unwrap(), 0x77de563527e15eff04aab0566879b64a);
+    register_file.write_raw::<u128>(q14.try_into().unwrap(), 0x58ff01ce77a710837235c72a6f6bafca);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q9.try_into().unwrap()),
+        0x50de000427a11083002080026869a64a,
+    );
+}
