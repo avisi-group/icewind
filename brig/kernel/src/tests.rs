@@ -47,12 +47,12 @@ pub fn run(config: TestConfig) {
 
     log::info!("running {} tests", tests.len());
 
-    for (name, test) in tests {
+    for (name, test) in &tests {
         log::trace!("running {name:?}");
         test();
     }
 
-    log::info!("all tests ran successfully");
+    log::info!("all {} tests ran successfully", tests.len());
     qemu_exit();
 }
 
