@@ -67,8 +67,8 @@ pub enum Opcode<A: Alloc> {
     IMUL(Operand<A>, Operand<A>),
     /// imul1 {0}, {1}, {2} (one-operand form has 128 bit output)
     IMUL1(Operand<A>, Operand<A>, Operand<A>),
-    /// idiv {0}, {1}, {2}
-    IDIV(Operand<A>, Operand<A>, Operand<A>),
+    /// idiv RDX:RAX {0}
+    IDIV(Operand<A>),
     /// not {0}
     NOT(Operand<A>),
     /// neg {0}
@@ -603,8 +603,8 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::IMUL1(src, dst_lo, dst_hi))
     }
 
-    pub fn idiv(dividend_hi: Operand<A>, dividend_lo: Operand<A>, divisor: Operand<A>) -> Self {
-        Self(Opcode::IDIV(dividend_hi, dividend_lo, divisor))
+    pub fn idiv(divisor: Operand<A>) -> Self {
+        Self(Opcode::IDIV(divisor))
     }
 
     pub fn shl(amount: Operand<A>, op0: Operand<A>) -> Self {
@@ -1157,22 +1157,10 @@ impl<A: Alloc> Instruction<A> {
                 assert_eq!(*dst_lo, PhysicalRegister::RAX);
                 assembler.imul::<AsmRegister64>(src.into()).unwrap()
             }
-            IDIV(
-                Operand {
-                    kind: R(PHYS(hi)),
-                    width_in_bits: Width::_64,
-                },
-                Operand {
-                    kind: R(PHYS(lo)),
-                    width_in_bits: Width::_64,
-                },
-                Operand {
-                    kind: R(PHYS(div)),
-                    width_in_bits: Width::_64,
-                },
-            ) => {
-                assert_eq!(*hi, PhysicalRegister::RDX);
-                assert_eq!(*lo, PhysicalRegister::RAX);
+            IDIV(Operand {
+                kind: R(PHYS(div)),
+                width_in_bits: Width::_64,
+            }) => {
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
             CALL {
@@ -1290,12 +1278,9 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::Out, dst_hi)),
             ]
             .into_iter(),
-            Opcode::IDIV(dividend_hi, dividend_lo, divisor) => [
-                Some((OperandDirection::InOut, dividend_hi)),
-                Some((OperandDirection::InOut, dividend_lo)),
-                Some((OperandDirection::In, divisor)),
-            ]
-            .into_iter(),
+            Opcode::IDIV(divisor) => {
+                [Some((OperandDirection::In, divisor)), None, None].into_iter()
+            }
             Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::JE(tgt) => {
                 [Some((OperandDirection::In, tgt)), None, None].into_iter()
             }
@@ -1358,7 +1343,7 @@ impl<A: Alloc> Instruction<A> {
         }
     }
 
-    pub fn get_operands_copy(&self) -> Vec<(OperandDirection, Operand<A>)> {
+    pub fn get_apparent_operands(&self) -> Vec<(OperandDirection, Operand<A>)> {
         match self.0 {
             Opcode::MOV(src, dst)
             | Opcode::MOVZX(src, dst)
@@ -1397,13 +1382,22 @@ impl<A: Alloc> Instruction<A> {
             ]
             .into_iter()
             .collect(),
-            Opcode::IDIV(dividend_hi, dividend_lo, divisor) => [
-                (OperandDirection::InOut, dividend_hi),
-                (OperandDirection::InOut, dividend_lo),
-                (OperandDirection::In, divisor),
-            ]
-            .into_iter()
-            .collect(),
+            Opcode::IDIV(divisor) => {
+                let width = divisor.width();
+                [
+                    (
+                        OperandDirection::InOut,
+                        Operand::preg(width, PhysicalRegister::RDX),
+                    ),
+                    (
+                        OperandDirection::InOut,
+                        Operand::preg(width, PhysicalRegister::RAX),
+                    ),
+                    (OperandDirection::In, divisor),
+                ]
+                .into_iter()
+                .collect()
+            }
             Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::JE(tgt) => {
                 [((OperandDirection::In, tgt))].into_iter().collect()
             }
@@ -1486,7 +1480,7 @@ impl<A: Alloc> Instruction<A> {
     }
 
     pub fn get_use_defs(&self) -> impl Iterator<Item = (UseDef, Width)> + '_ {
-        self.get_operands_copy()
+        self.get_apparent_operands()
             .into_iter()
             .filter_map(|(direction, operand)| match operand.kind() {
                 OperandKind::Memory {

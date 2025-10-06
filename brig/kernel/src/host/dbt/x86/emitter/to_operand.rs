@@ -622,10 +622,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let rax = Operand::preg(width, PhysicalRegister::RAX);
                 let rdx = Operand::preg(width, PhysicalRegister::RDX);
 
-                self.push_instruction(Instruction::xor(rdx, rdx));
                 self.push_instruction(Instruction::mov(num, rax).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
-                self.push_instruction(Instruction::idiv(rdx, rax, divisor));
+
+                let _0 = Operand::imm(Width::_64, 0);
+                self.push_instruction(Instruction::mov(_0, rdx).unwrap());
+
+                self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
                 let remainder = Operand::vreg(width, self.next_vreg());
@@ -666,10 +669,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let rax = Operand::preg(width, PhysicalRegister::RAX);
                 let rdx = Operand::preg(width, PhysicalRegister::RDX);
 
-                self.push_instruction(Instruction::xor(rdx, rdx));
                 self.push_instruction(Instruction::mov(num, rax).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
-                self.push_instruction(Instruction::idiv(rdx, rax, divisor));
+
+                let _0 = Operand::imm(Width::_64, 0);
+                self.push_instruction(Instruction::mov(_0, rdx).unwrap());
+
+                self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
                 let remainder = Operand::vreg(width, self.next_vreg());
@@ -873,9 +879,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 self.push_instruction(Instruction::mov(_0, hi).unwrap());
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
-                self.push_instruction(Instruction::idiv(hi, lo, divisor));
+                self.push_instruction(Instruction::idiv(divisor));
 
-                lo
+                let dst = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::mov(lo, dst).unwrap());
+                dst
             }
 
             BinaryOperationKind::Modulo(dividend, divisor) => {
@@ -892,9 +900,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 self.push_instruction(Instruction::mov(_0, hi).unwrap());
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
-                self.push_instruction(Instruction::idiv(hi, lo, divisor));
+                self.push_instruction(Instruction::idiv(divisor));
 
-                hi
+                let dst = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::mov(hi, dst).unwrap());
+                dst
             }
 
             op => todo!("{op:#?}"),

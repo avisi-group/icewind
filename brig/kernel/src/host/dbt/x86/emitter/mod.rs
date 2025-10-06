@@ -1706,6 +1706,8 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     }
 
     fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef) {
+        log::debug!("writing stack variable {id:#x}: {value:#?}");
+
         let value = self.to_operand(&value);
 
         // let mem = Operand::mem_base_displ(

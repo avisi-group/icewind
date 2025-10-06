@@ -6300,7 +6300,6 @@ fn cnt_8b() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
 
@@ -6342,7 +6341,6 @@ fn eon0() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     register_file.write::<u64>("R1", 0x2bff0ab223a5d276);
     register_file.write::<u64>("R14", 0xc00f72da2c87ce6d);
@@ -6374,7 +6372,6 @@ fn eon1() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     register_file.write::<u64>("R1", 0xb6372387c2d7c933);
     register_file.write::<u64>("R17", 0xced92c4a57e3d54c);
@@ -6406,7 +6403,6 @@ fn ngc() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     register_file.write::<u64>("R8", 0xa989ef1cfc82fcde);
     register_file.write::<u64>("R25", 0x2e0d38b5c2b1f8a0);
@@ -6439,7 +6435,6 @@ fn extr_fuzz0() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     register_file.write::<u64>("R3", 0xc3c37f76e3192302);
     register_file.write::<u64>("R18", 0x63c68fa3f1af6ec2);
@@ -6554,7 +6549,6 @@ fn and_16b_fuzz0() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
 
@@ -6600,7 +6594,6 @@ fn and_16b_fuzz1() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&register_file);
 
     let z_offset = model.reg_offset("_Z");
 
@@ -6616,4 +6609,474 @@ fn and_16b_fuzz1() {
         register_file.read_raw::<u128>(q9.try_into().unwrap()),
         0x50de000427a11083002080026869a64a,
     );
+}
+
+#[ktest]
+fn scvtf() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //1e22007e        scvtf   s30, w3
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e22007e,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q30 = z_offset + (30 * 256);
+
+    register_file.write::<u64>("R3", 0xecf92f9fcd4d46f7);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q30.try_into().unwrap()),
+        0xce4acae4,
+    );
+}
+
+#[ktest]
+fn ror_fuzz0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1ac92d30        ror     w16, w9, w9
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ac92d30,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R9", 0xe6c9cbd5dd74ba18);
+    register_file.write::<u64>("R16", 0xe2642ce94754f140);
+
+    translation.execute(&register_file);
+
+    // ror = lambda val, r_bits, max_bits: \
+    //     ((val & (2**max_bits-1)) >> r_bits%max_bits) | \
+    //     (val << (max_bits-(r_bits%max_bits)) & (2**max_bits-1))
+    //
+    // hex(ror(0xdd74ba18, 24, 32)) == 0x74ba18dd
+    //
+    // but instead we're getting 0xdd74ba18
+    // which is
+    // hex(ror(0xdd74ba18, 0, 32)) or hex(ror(0xdd74ba18, 32, 32))
+
+    assert_eq!(register_file.read::<u64>("R16"), 0x0000000074ba18dd);
+}
+
+#[ktest]
+fn ror_fuzz1() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //   1ac72fb2        ror     w18, w29, w7
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ac72fb2,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R7", 0x7e8ef49be3c7f8dd);
+    register_file.write::<u64>("R18", 0x2ad8c433a8cd3cf2);
+    register_file.write::<u64>("R29", 0x14dbeac7f5f41321);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R18"), 0x00000000afa0990f);
+}
+
+#[ktest]
+fn ror_fuzz2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1ac52f1a        ror     w26, w24, w5
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ac52f1a,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R5", 0xf2da4c18b6f72872);
+    register_file.write::<u64>("R24", 0x09d7b322ae0ae0a6);
+    register_file.write::<u64>("R26", 0xba967a6b1fea241c);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R26"), 0x00000000b829ab82);
+}
+
+#[ktest]
+fn modulo() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let reg = emitter.read_register(model.reg_offset("R9"), Type::Unsigned(32));
+    let cast = emitter.cast(reg, Type::Signed(64), CastOperationKind::Reinterpret);
+    let _32 = emitter.constant(32, Type::Signed(64));
+    let res = emitter.binary_operation(BinaryOperationKind::Modulo(cast, _32));
+    emitter.write_register(model.reg_offset("R10"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R9", 0xdd74ba18u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(24, register_file.read::<u64>("R10"))
+}
+
+#[ktest]
+fn ror_0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R0", 0xffu32);
+    register_file.write("R1", 0x1u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(0x8000007f, register_file.read::<u64>("R2"))
+}
+
+#[ktest]
+fn ror_1() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R0", 0xffu32);
+    register_file.write("R1", 0x8u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(0xff000000, register_file.read::<u64>("R2"))
+}
+
+#[ktest]
+fn ror_2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R0", 0xffu32);
+    register_file.write("R1", 0x4u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(0xf000000f, register_file.read::<u64>("R2"))
+}
+
+#[ktest]
+fn ror_3() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R0", 0xffu32);
+    register_file.write("R1", 10u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(0x3fc00000, register_file.read::<u64>("R2"))
+}
+
+#[ktest]
+fn ror_4() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
+
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R0", 0xffu32);
+    register_file.write("R1", 17u32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(0x7f8000, register_file.read::<u64>("R2"))
+}
+
+#[ktest]
+fn shiftreg_2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let reg = emitter.constant(1, Type::Signed(64));
+    let shift_type = emitter.constant(3, Type::Signed(32));
+    let amount = emitter.constant(17, Type::Signed(64));
+    let width = emitter.constant(32, Type::Signed(64));
+    let value = translate(
+        Global,
+        &*model,
+        "ShiftReg",
+        &[reg, shift_type, amount, width],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R0"), value);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R1", 0xff);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u32>("R0"), 0x7f8000);
+}
+
+#[ktest]
+fn ror_no_modulo() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let read = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(32));
+    let cast_read = emitter.cast(read, Type::Signed(64), CastOperationKind::Reinterpret);
+    // let _32 = emitter.constant(32, Type::Signed(64));
+    // let amount = emitter.binary_operation(BinaryOperationKind::Modulo(cast_read,
+    // _32));
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+
+    let value = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, cast_read],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), value);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0xff);
+    register_file.write::<u64>("R1", 17);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u32>("R2"), 0x7f8000);
+}
+
+#[ktest]
+fn ror_modulo() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let read = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(32));
+    let cast_read = emitter.cast(read, Type::Signed(64), CastOperationKind::Reinterpret);
+    let _32 = emitter.constant(32, Type::Signed(64));
+    let amount = emitter.binary_operation(BinaryOperationKind::Modulo(cast_read, _32));
+
+    let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+
+    let value = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, amount],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.write_register(model.reg_offset("R2"), value);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0xff);
+    register_file.write::<u64>("R1", 17);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u32>("R2"), 0x7f8000);
 }

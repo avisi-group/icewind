@@ -1180,7 +1180,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 log::debug!(
                     "finished translating {:?}, now in {:?}",
                     target.as_ref(),
-                    self.function.name()
+                    self.function.name(),
                 );
 
                 res
