@@ -647,8 +647,11 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::NOP)
     }
 
-    pub fn test(op0: Operand<A>, op1: Operand<A>) -> Self {
-        Self(Opcode::TEST(op0, op1))
+    pub fn test(op0: Operand<A>, op1: Operand<A>) -> Result<Self, Error<A>> {
+        if let (OperandKind::Immediate(_), OperandKind::Immediate(_)) = (op0.kind(), op1.kind()) {
+            return Err(Error::TestImmediates);
+        }
+        Ok(Self(Opcode::TEST(op0, op1)))
     }
 
     pub fn cmp(op0: Operand<A>, op1: Operand<A>) -> Self {
@@ -1161,6 +1164,7 @@ impl<A: Alloc> Instruction<A> {
                 kind: R(PHYS(div)),
                 width_in_bits: Width::_64,
             }) => {
+                assembler.cqo().unwrap();
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
             CALL {
@@ -1539,4 +1543,6 @@ pub enum Error<A: Alloc> {
     OversizeGeneralRegister(Operand<A>),
     /// Cannot zero extend {src} into equal-or-smaller destination {dst}
     MovZeroExtendDestinationNotGreater { src: Operand<A>, dst: Operand<A> },
+    /// Cannot test two immedaites
+    TestImmediates,
 }

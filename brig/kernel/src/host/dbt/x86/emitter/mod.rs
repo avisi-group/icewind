@@ -465,6 +465,22 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         width: *width,
                     },
                 }),
+                (NodeKind::Constant { value: 0, .. }, _) => self.node(X86Node {
+                    typ: rhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: 0,
+                        width: rhs.typ().width(),
+                    },
+                }),
+                (NodeKind::Constant { value: 1, .. }, _) => rhs.clone(),
+                (_, NodeKind::Constant { value: 0, .. }) => self.node(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: 0,
+                        width: lhs.typ().width(),
+                    },
+                }),
+                (_, NodeKind::Constant { value: 1, .. }) => lhs.clone(),
                 _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
@@ -1516,8 +1532,11 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 let right = self.to_operand(right);
 
                 match (left.kind(), right.kind()) {
+                    (OperandKind::Immediate(_), OperandKind::Immediate(_)) => {
+                        todo!()
+                    }
                     (_, OperandKind::Immediate(0)) => {
-                        self.push_instruction(Instruction::test(left, left))
+                        self.push_instruction(Instruction::test(left, left).unwrap())
                     }
                     (_, OperandKind::Immediate(_)) => {
                         self.push_instruction(Instruction::cmp(right, left))
@@ -1534,7 +1553,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             _ => {
                 let condition = self.to_operand(&condition);
 
-                self.push_instruction(Instruction::test(condition, condition));
+                self.push_instruction(Instruction::test(condition, condition).unwrap());
 
                 self.push_instruction(Instruction::jne(true_target));
                 self.push_target(true_target);
@@ -1611,10 +1630,13 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             ));
         }
 
-        self.push_instruction(Instruction::test(
-            Operand::preg(Width::_32, PhysicalRegister::RAX),
-            Operand::preg(Width::_32, PhysicalRegister::RAX),
-        ));
+        self.push_instruction(
+            Instruction::test(
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
+            )
+            .unwrap(),
+        );
         self.push_instruction(Instruction::jne(return_block));
         self.push_target(return_block);
 
@@ -1732,7 +1754,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 let not_condition = self.unary_operation(UnaryOperationKind::Not(condition));
                 let op = self.to_operand(&not_condition);
 
-                self.push_instruction(Instruction::test(op, op));
+                self.push_instruction(Instruction::test(op, op).unwrap());
                 self.push_instruction(
                     Instruction::mov(
                         Operand::imm(Width::_64, meta),

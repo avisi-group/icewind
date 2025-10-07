@@ -1492,7 +1492,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::Cast { kind: CastOperationKind::ZeroExtend, typ: Type::u128(), value: value });
 
-let _256 =  build(
+                    let _256 =  build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant(Constant::UnsignedInteger { value: 256, width: 64 }));
@@ -1504,7 +1504,7 @@ let _256 =  build(
                     Statement::Constant(Constant::UnsignedInteger { value: z_offset, width: 64 }));
 
 
-let offset = build(
+                let offset = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::BinaryOperation { kind: BinaryOperationKind::Multiply, lhs: n, rhs: _256 });

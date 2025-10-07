@@ -536,9 +536,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let true_value = self.to_operand_reg_promote(true_value);
                 let false_value = self.to_operand(false_value);
 
+                assert!(!matches!(condition.kind(), OperandKind::Immediate(_)));
+
                 // if this sequence is modified, the register allocator must be fixed
                 self.push_instruction(Instruction::mov(false_value, dest).unwrap());
-                self.push_instruction(Instruction::test(condition, condition));
+                self.push_instruction(Instruction::test(condition, condition).unwrap());
                 self.push_instruction(Instruction::cmovne(true_value, dest)); // this write to dest does not result in deallocation
 
                 dest
@@ -615,32 +617,37 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 assert_eq!(num.typ().width(), den.typ().width());
 
                 let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
-                let num = self.to_operand(num);
-                let den = self.to_operand(den);
+
                 let divisor = Operand::vreg(width, self.next_vreg());
 
-                let rax = Operand::preg(width, PhysicalRegister::RAX);
-                let rdx = Operand::preg(width, PhysicalRegister::RDX);
+                if let (NodeKind::Constant { .. }, NodeKind::Constant { .. }) =
+                    (num.kind(), den.kind())
+                {
+                    todo!("const result")
+                }
 
-                self.push_instruction(Instruction::mov(num, rax).unwrap());
+                let num = self.to_operand_reg_promote(num);
+                let den = self.to_operand_reg_promote(den);
+
+                let lo = Operand::preg(width, PhysicalRegister::RAX);
+                let hi = Operand::preg(width, PhysicalRegister::RDX);
+
+                self.push_instruction(Instruction::mov(num, lo).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
-
-                let _0 = Operand::imm(Width::_64, 0);
-                self.push_instruction(Instruction::mov(_0, rdx).unwrap());
 
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
                 let remainder = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(rax, quotient).unwrap());
-                self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
+                self.push_instruction(Instruction::mov(lo, quotient).unwrap());
+                self.push_instruction(Instruction::mov(hi, remainder).unwrap());
 
                 let nz = Operand::vreg(Width::_8, self.next_vreg());
                 let g = Operand::vreg(Width::_8, self.next_vreg());
 
-                self.push_instruction(Instruction::test(remainder, remainder));
+                self.push_instruction(Instruction::test(remainder, remainder).unwrap());
                 self.push_instruction(Instruction::setnz(nz));
-                self.push_instruction(Instruction::test(num, num));
+                self.push_instruction(Instruction::test(num, num).unwrap());
                 self.push_instruction(Instruction::setg(g));
                 self.push_instruction(Instruction::and(g, nz));
                 let mask = Operand::vreg(width, self.next_vreg());
@@ -662,32 +669,36 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 assert_eq!(num.typ().width(), den.typ().width());
 
                 let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
-                let num = self.to_operand(num);
-                let den = self.to_operand(den);
                 let divisor = Operand::vreg(width, self.next_vreg());
 
-                let rax = Operand::preg(width, PhysicalRegister::RAX);
-                let rdx = Operand::preg(width, PhysicalRegister::RDX);
+                if let (NodeKind::Constant { .. }, NodeKind::Constant { .. }) =
+                    (num.kind(), den.kind())
+                {
+                    todo!("const result")
+                }
 
-                self.push_instruction(Instruction::mov(num, rax).unwrap());
+                let num = self.to_operand_reg_promote(num);
+                let den = self.to_operand_reg_promote(den);
+
+                let lo = Operand::preg(width, PhysicalRegister::RAX);
+                let hi = Operand::preg(width, PhysicalRegister::RDX);
+
+                self.push_instruction(Instruction::mov(num, lo).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
-
-                let _0 = Operand::imm(Width::_64, 0);
-                self.push_instruction(Instruction::mov(_0, rdx).unwrap());
 
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
                 let remainder = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(rax, quotient).unwrap());
-                self.push_instruction(Instruction::mov(rdx, remainder).unwrap());
+                self.push_instruction(Instruction::mov(lo, quotient).unwrap());
+                self.push_instruction(Instruction::mov(hi, remainder).unwrap());
 
                 let nz = Operand::vreg(Width::_8, self.next_vreg());
                 let s = Operand::vreg(Width::_8, self.next_vreg());
 
-                self.push_instruction(Instruction::test(remainder, remainder));
+                self.push_instruction(Instruction::test(remainder, remainder).unwrap());
                 self.push_instruction(Instruction::setnz(nz));
-                self.push_instruction(Instruction::test(num, num));
+                self.push_instruction(Instruction::test(num, num).unwrap());
                 self.push_instruction(Instruction::sets(s));
                 self.push_instruction(Instruction::and(s, nz));
                 let mask = Operand::vreg(width, self.next_vreg());
@@ -872,17 +883,14 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let dividend = self.to_operand(dividend);
                 let divisor = self.to_operand_reg_promote(divisor);
 
-                let _0 = Operand::imm(Width::_64, 0);
-
-                let hi = Operand::preg(width, PhysicalRegister::RDX);
                 let lo = Operand::preg(width, PhysicalRegister::RAX);
 
-                self.push_instruction(Instruction::mov(_0, hi).unwrap());
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let dst = Operand::vreg(width, self.next_vreg());
                 self.push_instruction(Instruction::mov(lo, dst).unwrap());
+
                 dst
             }
 
@@ -893,12 +901,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let dividend = self.to_operand(dividend);
                 let divisor = self.to_operand_reg_promote(divisor);
 
-                let _0 = Operand::imm(Width::_64, 0);
-
                 let hi = Operand::preg(width, PhysicalRegister::RDX);
                 let lo = Operand::preg(width, PhysicalRegister::RAX);
 
-                self.push_instruction(Instruction::mov(_0, hi).unwrap());
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
                 self.push_instruction(Instruction::idiv(divisor));
 

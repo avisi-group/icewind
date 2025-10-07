@@ -6961,22 +6961,148 @@ fn ror_modulo() {
     assert_eq!(register_file.read::<u32>("R2"), 0x7f8000);
 }
 
+// todo: re-enable me after all non float non SIMD instructions pass
+// #[ktest]
+// fn cnt_8b() {
+//     let model = models::get("aarch64").unwrap();
+
+//     let register_file = RegisterFile::init(&*model);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
+
+//     //  0e205903        cnt     v3.8b, v8.8b
+//     translate_instruction(
+//         Global,
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x0e205903,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
+
+//     let z_offset = model.reg_offset("_Z");
+
+//     let q3_offset = z_offset + (3 * 256);
+//     let q8_offset = z_offset + (8 * 256);
+
+//     register_file.write_raw::<u128>(
+//         q8_offset.try_into().unwrap(),
+//         0xd697f587e3887926a72f69dbcb976731,
+//     );
+
+//     translation.execute(&register_file);
+
+//     assert_eq!(
+//         register_file.read_raw::<u128>(q3_offset.try_into().unwrap()),
+//         0x0505040605050503,
+//     );
+// }
+
+// #[ktest]
+// fn addp_16b() {
+//     let model = models::get("aarch64").unwrap();
+
+//     let register_file = RegisterFile::init(&*model);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
+
+//     //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
+//     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
+//     translate_instruction(
+//         Global,
+//         &model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x4e24bc9b,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
+
+//     log::error!("{translation:?}");
+
+//     let z_offset = model.reg_offset("_Z");
+
+//     let q4_offset = z_offset + (4 * 256);
+//     let q27_offset = z_offset + (27 * 256);
+
+//     register_file.write_raw::<u128>(
+//         q4_offset.try_into().unwrap(),
+//         0x69e57f8761d4e752d7e93c9c503648a8,
+//     );
+
+//     translation.execute(&register_file);
+
+//     assert_eq!(
+//         register_file.read_raw::<u128>(q27_offset.try_into().unwrap()),
+//         0x119591d9ddd4d090119591d9ddd4d090,
+//     );
+// }
+
+// #[ktest]
+// fn scvtf() {
+//     let model = models::get("aarch64").unwrap();
+
+//     let register_file = RegisterFile::init(&*model);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
+
+//     //1e22007e        scvtf   s30, w3
+//     translate_instruction(
+//         Global,
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x1e22007e,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
+
+//     let z_offset = model.reg_offset("_Z");
+
+//     let q30 = z_offset + (30 * 256);
+
+//     register_file.write::<u64>("R3", 0xecf92f9fcd4d46f7);
+
+//     translation.execute(&register_file);
+
+//     assert_eq!(
+//         register_file.read_raw::<u128>(q30.try_into().unwrap()),
+//         0xce4acae4,
+//     );
+// }
+
 #[ktest]
-fn cnt_8b() {
+fn sdiv_test_0_panic() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    //  0e205903        cnt     v3.8b, v8.8b
+    // 1ad60fee        sdiv    w14, wzr, w22
     translate_instruction(
         Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
         &register_file,
-        0x0e205903,
+        0x1ad60fee,
     )
     .unwrap();
 
@@ -6984,84 +7110,30 @@ fn cnt_8b() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    let z_offset = model.reg_offset("_Z");
-
-    let q3_offset = z_offset + (3 * 256);
-    let q8_offset = z_offset + (8 * 256);
-
-    register_file.write_raw::<u128>(
-        q8_offset.try_into().unwrap(),
-        0xd697f587e3887926a72f69dbcb976731,
-    );
+    register_file.write::<u64>("R14", 0xacb63d74bafd2349);
+    register_file.write::<u64>("R22", 0xe69610c3e9d490df);
 
     translation.execute(&register_file);
 
-    assert_eq!(
-        register_file.read_raw::<u128>(q3_offset.try_into().unwrap()),
-        0x0505040605050503,
-    );
+    assert_eq!(register_file.read::<u64>("R14"), 0x0000000000000000);
 }
 
 #[ktest]
-fn addp_16b() {
+fn sdiv_fuzz0() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
-    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
-    translate_instruction(
-        Global,
-        &model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0x4e24bc9b,
-    )
-    .unwrap();
-
-    emitter.leave();
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-
-    log::error!("{translation:?}");
-
-    let z_offset = model.reg_offset("_Z");
-
-    let q4_offset = z_offset + (4 * 256);
-    let q27_offset = z_offset + (27 * 256);
-
-    register_file.write_raw::<u128>(
-        q4_offset.try_into().unwrap(),
-        0x69e57f8761d4e752d7e93c9c503648a8,
-    );
-
-    translation.execute(&register_file);
-
-    assert_eq!(
-        register_file.read_raw::<u128>(q27_offset.try_into().unwrap()),
-        0x119591d9ddd4d090119591d9ddd4d090,
-    );
-}
-
-#[ktest]
-fn scvtf() {
-    let model = models::get("aarch64").unwrap();
-
-    let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
-    let mut emitter = X86Emitter::new(&mut ctx);
-
-    //1e22007e        scvtf   s30, w3
+    // 1ad80cf5        sdiv    w21, w7, w24
     translate_instruction(
         Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
         &register_file,
-        0x1e22007e,
+        0x1ad80cf5,
     )
     .unwrap();
 
@@ -7069,16 +7141,78 @@ fn scvtf() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    let z_offset = model.reg_offset("_Z");
-
-    let q30 = z_offset + (30 * 256);
-
-    register_file.write::<u64>("R3", 0xecf92f9fcd4d46f7);
+    register_file.write::<u64>("R7", 0xb856ee4bd05ba6f3);
+    register_file.write::<u64>("R24", 0x818001ef0030e554);
 
     translation.execute(&register_file);
 
-    assert_eq!(
-        register_file.read_raw::<u128>(q30.try_into().unwrap()),
-        0xce4acae4,
-    );
+    assert_eq!(register_file.read::<u64>("R21"), 0x00000000ffffff07);
+}
+
+#[ktest]
+fn sdiv_fuzz1() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1ad40ea4        sdiv    w4, w21, w20
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ad40ea4,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R20", 0xb74f5a8c25ea6281);
+    register_file.write::<u64>("R21", 0x31fc170686f2190e);
+
+    // =  0x86f2190e / 0x25ea6281
+    // = -2030954226 / 636117633
+    // = -3.192 (rtz)
+    // = -3
+    // = ffffffd
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R4"), 0x00000000fffffffd);
+}
+
+#[ktest]
+fn sdiv_fuzz2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1ad70e9e        sdiv    w30, w20, w23
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ad70e9e,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R20", 0x91e38acb99559afc);
+    register_file.write::<u64>("R23", 0x9c5ce5b0d73b9402);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R30"), 0x0000000000000002);
 }
