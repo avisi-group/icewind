@@ -2112,6 +2112,7 @@ fn udiv() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
+    // execute_aarch64_instrs_integer_arithmetic_div
     translate(
         Global,
         &*model,
@@ -2134,9 +2135,18 @@ fn udiv() {
     register_file.write("R1", y);
     register_file.write("R19", x);
 
+    // = 0xffff_ff80_08bf_ffffu64 / 0x200000
+    // = 8796092760134.0
+    // = 0x7fffffc0046 (?? why one less idk)
+
+    // but if we sign extend we get
+
+    // = 0xffff_ffff_ffff_ffff ++ ffff_ff80_08bf_ffff / 0x200000
+    // = 0x07ff_ffff_ffff_ffff_ffff_fffc_0045
+
     translation.execute(&register_file);
 
-    assert_eq!(0x7fffffc0045, register_file.read::<u64>("R19"));
+    assert_eq!(0x0000_07ff_fffc_0045, register_file.read::<u64>("R19"));
 }
 
 // #[ktest]

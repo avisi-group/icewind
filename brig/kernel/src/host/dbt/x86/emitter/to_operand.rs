@@ -926,27 +926,11 @@ fn encode_compare<A: Alloc>(
 ) -> Operand<A> {
     use crate::host::dbt::x86::encoder::OperandKind::*;
 
-    let (left, right) = match (left.kind(), right.kind()) {
-        (NodeKind::Constant { .. }, NodeKind::Constant { .. }) => {
-            panic!("should've been fixed earlier")
-        }
-        (NodeKind::Tuple(left_real), NodeKind::Tuple(right_real)) => {
-            match (left_real.clone().as_slice(), right_real.as_slice()) {
-                ([left_num, left_den], [right_num, right_den]) => (
-                    emitter.binary_operation(BinaryOperationKind::Multiply(
-                        left_num.clone(),
-                        right_den.clone(),
-                    )),
-                    emitter.binary_operation(BinaryOperationKind::Multiply(
-                        left_den.clone(),
-                        right_num.clone(),
-                    )),
-                ),
-                _ => panic!(),
-            }
-        }
-        _ => (left, right),
-    };
+    if let (NodeKind::Constant { .. }, NodeKind::Constant { .. })
+    | (NodeKind::Tuple(_), NodeKind::Tuple(_)) = (left.kind(), right.kind())
+    {
+        panic!("should've been fixed earlier")
+    }
 
     let is_signed = match (left.typ(), right.typ()) {
         (Type::Unsigned(_) | Type::Bits, Type::Unsigned(_) | Type::Bits) => false,
@@ -1044,7 +1028,10 @@ fn encode_compare<A: Alloc>(
         }
 
         (Immediate(_), Immediate(_)) => {
-            panic!("why was this not const evaluated? {:?} {:?}", left, right,)
+            panic!(
+                "why was this not const evaluated? {kind:?} {:?} {:?}",
+                left, right,
+            )
         }
         (Target(_), _) | (_, Target(_)) => panic!("why"),
     }

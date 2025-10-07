@@ -2374,11 +2374,29 @@ fn emit_compare<A: Alloc>(
                     _ => panic!(),
                 }
             } else {
-                // else emit an X86 node
-                emitter.node(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                })
+                let (left, right) = match (left_real.clone().as_slice(), right_real.as_slice()) {
+                    ([left_num, left_den], [right_num, right_den]) => (
+                        emitter.binary_operation(BinaryOperationKind::Multiply(
+                            left_num.clone(),
+                            right_den.clone(),
+                        )),
+                        emitter.binary_operation(BinaryOperationKind::Multiply(
+                            left_den.clone(),
+                            right_num.clone(),
+                        )),
+                    ),
+                    _ => panic!(),
+                };
+
+                let bin_op = match &op {
+                    CompareLessThan(_, _) => CompareLessThan(left, right),
+                    CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
+                    CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
+                    CompareGreaterThanOrEqual(_, _) => CompareGreaterThanOrEqual(left, right),
+                    _ => panic!(),
+                };
+
+                emitter.binary_operation(bin_op)
             }
         }
         _ => {
