@@ -640,28 +640,15 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 if !is_unsigned {
                     self.push_instruction(Instruction::cqo());
+                    self.push_instruction(Instruction::idiv(divisor));
                 } else {
                     self.push_instruction(Instruction::xor(hi, hi));
+                    self.push_instruction(Instruction::div(divisor));
                 }
-                self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
-                let remainder = Operand::vreg(width, self.next_vreg());
+
                 self.push_instruction(Instruction::mov(lo, quotient).unwrap());
-                self.push_instruction(Instruction::mov(hi, remainder).unwrap());
-
-                let nz = Operand::vreg(Width::_8, self.next_vreg());
-                let g = Operand::vreg(Width::_8, self.next_vreg());
-
-                self.push_instruction(Instruction::test(remainder, remainder).unwrap());
-                self.push_instruction(Instruction::setnz(nz));
-                self.push_instruction(Instruction::test(num, num).unwrap());
-                self.push_instruction(Instruction::setg(g));
-                self.push_instruction(Instruction::and(g, nz));
-                let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::movzx(nz, mask).unwrap());
-
-                self.push_instruction(Instruction::add(mask, quotient));
 
                 quotient
             }
@@ -699,28 +686,15 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 if !is_unsigned {
                     self.push_instruction(Instruction::cqo());
+                    self.push_instruction(Instruction::idiv(divisor));
                 } else {
                     self.push_instruction(Instruction::xor(hi, hi));
+                    self.push_instruction(Instruction::div(divisor));
                 }
-                self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
-                let remainder = Operand::vreg(width, self.next_vreg());
+
                 self.push_instruction(Instruction::mov(lo, quotient).unwrap());
-                self.push_instruction(Instruction::mov(hi, remainder).unwrap());
-
-                let nz = Operand::vreg(Width::_8, self.next_vreg());
-                let s = Operand::vreg(Width::_8, self.next_vreg());
-
-                self.push_instruction(Instruction::test(remainder, remainder).unwrap());
-                self.push_instruction(Instruction::setnz(nz));
-                self.push_instruction(Instruction::test(num, num).unwrap());
-                self.push_instruction(Instruction::sets(s));
-                self.push_instruction(Instruction::and(s, nz));
-                let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::movzx(nz, mask).unwrap());
-
-                self.push_instruction(Instruction::sub(mask, quotient));
 
                 quotient
             }

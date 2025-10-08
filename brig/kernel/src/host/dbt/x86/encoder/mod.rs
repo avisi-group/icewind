@@ -69,6 +69,8 @@ pub enum Opcode<A: Alloc> {
     IMUL1(Operand<A>, Operand<A>, Operand<A>),
     /// idiv RDX:RAX {0}
     IDIV(Operand<A>),
+    /// div RDX:RAX {0}
+    DIV(Operand<A>),
     /// cqo
     CQO,
     /// not {0}
@@ -607,6 +609,9 @@ impl<A: Alloc> Instruction<A> {
 
     pub fn idiv(divisor: Operand<A>) -> Self {
         Self(Opcode::IDIV(divisor))
+    }
+    pub fn div(divisor: Operand<A>) -> Self {
+        Self(Opcode::DIV(divisor))
     }
     pub fn cqo() -> Self {
         Self(Opcode::CQO)
@@ -1174,6 +1179,12 @@ impl<A: Alloc> Instruction<A> {
             }) => {
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
+            DIV(Operand {
+                kind: R(PHYS(div)),
+                width_in_bits: Width::_64,
+            }) => {
+                assembler.div::<AsmRegister64>(div.into()).unwrap();
+            }
 
             CALL {
                 function:
@@ -1293,6 +1304,7 @@ impl<A: Alloc> Instruction<A> {
             Opcode::IDIV(divisor) => {
                 [Some((OperandDirection::In, divisor)), None, None].into_iter()
             }
+            Opcode::DIV(divisor) => [Some((OperandDirection::In, divisor)), None, None].into_iter(),
             Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::JE(tgt) => {
                 [Some((OperandDirection::In, tgt)), None, None].into_iter()
             }
@@ -1396,6 +1408,22 @@ impl<A: Alloc> Instruction<A> {
             .into_iter()
             .collect(),
             Opcode::IDIV(divisor) => {
+                let width = divisor.width();
+                [
+                    (
+                        OperandDirection::InOut,
+                        Operand::preg(width, PhysicalRegister::RDX),
+                    ),
+                    (
+                        OperandDirection::InOut,
+                        Operand::preg(width, PhysicalRegister::RAX),
+                    ),
+                    (OperandDirection::In, divisor),
+                ]
+                .into_iter()
+                .collect()
+            }
+            Opcode::DIV(divisor) => {
                 let width = divisor.width();
                 [
                     (

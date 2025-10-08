@@ -7263,3 +7263,34 @@ fn fuzz_0b2313e2_59_fixed() {
 
     assert_eq!(register_file.read::<u64>("R2"), 0x40005d80);
 }
+
+#[ktest]
+fn fuzz_1ac20abb_2645_fixed() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1ac20abb        udiv    w27, w21, w2
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1ac20abb,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R21", 0xb8259bcc103f4a0a);
+    register_file.write::<u64>("R2", 0x2c12f99d2af9e7c4);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R27"), 0x0);
+}
