@@ -7231,3 +7231,35 @@ fn udiv() {
 
     assert_eq!(0x0000_07ff_fffc_0045, register_file.read::<u64>("R19"));
 }
+
+#[ktest]
+fn fuzz_0b2313e2_59_fixed() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 0b2313e2        add     w2, wsp, w3, uxtb #4
+
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xb2313e2,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R3", 0x5344d5fdd5205949);
+    register_file.write::<u64>("SP_EL3", 0x400058f0);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R2"), 0x40005d80);
+}

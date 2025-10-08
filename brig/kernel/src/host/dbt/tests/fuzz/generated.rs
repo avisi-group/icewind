@@ -1,4 +1,3 @@
-
 #[proc_macro_lib::ktest]
 fn fuzz_1a0900c7_0() {
     super::fuzz_test(

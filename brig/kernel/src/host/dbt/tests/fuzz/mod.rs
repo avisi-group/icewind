@@ -20,6 +20,8 @@ fn fuzz_test(instruction: u32, index: usize, input_state: &[u64], output_state: 
 
     register_file.write::<u8>("PSTATE_EL", 1);
     register_file.write::<u64>("CPACR_EL1_bits", 0b11u64 << 20 | 0b11 << 24);
+    register_file.write::<u64>("SP_EL1", 0x400058f0);
+    register_file.write::<u64>("_PC", 0x40004f9c);
 
     translate_instruction(
         Global,
@@ -45,8 +47,8 @@ fn fuzz_test(instruction: u32, index: usize, input_state: &[u64], output_state: 
     output_state.iter().enumerate().for_each(|(i, value)| {
         let read = register_file.read::<u64>(format!("R{i}"));
         if read != *value {
-            //panic!("R{i} mismatch! expected {value}, got {}", read)
-            log::error!("fuzz_{instruction:08x}_{index}")
+            panic!("R{i} mismatch! expected {value}, got {}", read)
+            //log::error!("fuzz_{instruction:08x}_{index}")
         }
     });
 }
