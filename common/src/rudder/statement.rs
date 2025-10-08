@@ -1275,6 +1275,69 @@ pub fn cast_at(
             }
         }
         (Type::Primitive(PrimitiveType::UnsignedInteger(_)), Type::Bits) => source,
+
+        // generic int stuff
+        (Type::Primitive(PrimitiveType::UnsignedInteger(_)), Type::Int) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::ZeroExtend,
+                typ: Type::Primitive(PrimitiveType::UnsignedInteger(64)),
+                value: source,
+            },
+            location,
+        ),
+        (Type::Primitive(PrimitiveType::SignedInteger(_)), Type::Int) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::SignExtend,
+                typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
+                value: source,
+            },
+            location,
+        ),
+        (Type::Int, Type::Primitive(PrimitiveType::SignedInteger(64))) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
+                value: source,
+            },
+            location,
+        ),
+        (Type::Int, Type::Primitive(PrimitiveType::SignedInteger(size))) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::Truncate,
+                typ: Type::Primitive(PrimitiveType::SignedInteger(*size)),
+                value: source,
+            },
+            location,
+        ),
+        (Type::Int, Type::Primitive(PrimitiveType::UnsignedInteger(64))) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: Type::Primitive(PrimitiveType::UnsignedInteger(64)),
+                value: source,
+            },
+            location,
+        ),
+        (Type::Int, Type::Primitive(PrimitiveType::UnsignedInteger(size))) => build_at(
+            block,
+            arena,
+            Statement::Cast {
+                kind: CastOperationKind::Truncate,
+                typ: Type::Primitive(PrimitiveType::UnsignedInteger(*size)),
+                value: source,
+            },
+            location,
+        ),
+
         (Type::Primitive(PrimitiveType::SignedInteger(width)), Type::Bits) => {
             if *width > 64 {
                 log::warn!(
@@ -1319,12 +1382,7 @@ pub fn cast_at(
         ),
 
         (Type::String, Type::Tuple(t)) => {
-            if *t
-                == [
-                    Type::Primitive(PrimitiveType::SignedInteger(64)),
-                    Type::Primitive(PrimitiveType::SignedInteger(64)),
-                ]
-            {
+            if *t == [Type::Int, Type::Int] {
                 let Statement::Constant(value) = source.get(s_arena) else {
                     panic!("{:?}", source.get(s_arena).to_string(s_arena))
                 };

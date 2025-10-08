@@ -768,6 +768,10 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         .collect(),
                 )
             }
+            Type::Int => Value::SignedInteger {
+                value: self.register_file.read_raw::<i64>(offset),
+                width: 64,
+            },
             t => todo!("{t}"),
         }
     }
@@ -832,6 +836,18 @@ impl PartialOrd for Value {
                 //assert_eq!(left_length, right_length);
                 left.partial_cmp(right)
             }
+
+            (
+                Value::SignedInteger {
+                    value: left,
+                    width: _left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    width: _right_length,
+                },
+            ) => left.partial_cmp(&i64::try_from(*right).unwrap()),
+
             (l, r) => todo!("{l:?} {r:?}"),
         }
     }

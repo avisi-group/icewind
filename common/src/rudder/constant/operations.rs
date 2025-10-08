@@ -105,6 +105,23 @@ impl Sub for Constant {
                 },
                 Constant::FloatingPoint { value: r, .. },
             ) => Constant::new_float(l - r, l_width),
+
+            (
+                Constant::UnsignedInteger {
+                    value: l,
+                    width: l_width,
+                },
+                Constant::SignedInteger {
+                    value: r,
+                    width: r_width,
+                },
+            ) => {
+                assert_eq!(l_width, r_width);
+                Constant::SignedInteger {
+                    value: i64::try_from(l).unwrap() - r,
+                    width: l_width,
+                }
+            }
             (l, r) => panic!("invalid types for sub: {l:?} {r:?}"),
         }
     }
@@ -185,8 +202,8 @@ impl Not for Constant {
     fn not(self) -> Self::Output {
         match self {
             Constant::UnsignedInteger { value, width } => Constant::new_unsigned(!value, width),
-            Constant::SignedInteger { .. } => todo!("neg??"), /* ConstantValue::SignedInteger(!
-                                                                * v), */
+            Constant::SignedInteger { .. } => todo!("neg??"), /* ConstantValue::SignedInteger(! */
+            // v),
             Constant::FloatingPoint { .. }
             | Constant::String(_)
             | Constant::Tuple(_)

@@ -34,7 +34,11 @@ pub enum Type {
 
     Tuple(Vec<Self>),
 
+    // Generic over any unsigned int
     Bits,
+
+    // Generic over i64/u64 (but almost always i64)
+    Int,
 
     // Used for debugging
     String,
@@ -78,6 +82,7 @@ impl Type {
                 .unwrap(),
 
             Self::Bits => 64,
+            Self::Int => 64,
 
             // width of internedstring
             Self::String => 32,
@@ -144,6 +149,7 @@ impl Display for Type {
                 element_type,
             } => write!(f, "[{element_type}; {element_count:?}]"),
             Type::Bits => write!(f, "bv"),
+            Type::Int => write!(f, "int"),
             Type::String => write!(f, "str"),
             Type::Tuple(ts) => {
                 write!(f, "(").unwrap();

@@ -110,6 +110,7 @@ pub enum Type {
     Signed(u32),
     Floating(u32),
     Bits,
+    Int,
     Tuple,
 }
 
@@ -118,6 +119,7 @@ impl Type {
         match self {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => *w,
             Type::Bits => 64, // todo: should this be the runtime length?
+            Type::Int => 64,
             Type::Tuple => todo!(),
         }
     }

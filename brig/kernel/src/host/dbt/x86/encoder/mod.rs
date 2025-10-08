@@ -69,6 +69,8 @@ pub enum Opcode<A: Alloc> {
     IMUL1(Operand<A>, Operand<A>, Operand<A>),
     /// idiv RDX:RAX {0}
     IDIV(Operand<A>),
+    /// cqo
+    CQO,
     /// not {0}
     NOT(Operand<A>),
     /// neg {0}
@@ -605,6 +607,9 @@ impl<A: Alloc> Instruction<A> {
 
     pub fn idiv(divisor: Operand<A>) -> Self {
         Self(Opcode::IDIV(divisor))
+    }
+    pub fn cqo() -> Self {
+        Self(Opcode::CQO)
     }
 
     pub fn shl(amount: Operand<A>, op0: Operand<A>) -> Self {
@@ -1160,13 +1165,16 @@ impl<A: Alloc> Instruction<A> {
                 assert_eq!(*dst_lo, PhysicalRegister::RAX);
                 assembler.imul::<AsmRegister64>(src.into()).unwrap()
             }
+            CQO => {
+                assembler.cqo().unwrap();
+            }
             IDIV(Operand {
                 kind: R(PHYS(div)),
                 width_in_bits: Width::_64,
             }) => {
-                assembler.cqo().unwrap();
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
+
             CALL {
                 function:
                     Operand {
@@ -1343,6 +1351,7 @@ impl<A: Alloc> Instruction<A> {
                 None,
             ]
             .into_iter(),
+            Opcode::CQO => [None, None, None].into_iter(),
             Opcode::LABEL => [None, None, None].into_iter(),
         }
     }
@@ -1435,7 +1444,6 @@ impl<A: Alloc> Instruction<A> {
             ]
             .into_iter()
             .collect(),
-
             Opcode::PINSR(index, src, dst) => [
                 ((OperandDirection::In, index)),
                 ((OperandDirection::In, src)),
@@ -1480,6 +1488,18 @@ impl<A: Alloc> Instruction<A> {
                 )
                 .collect(),
             Opcode::LABEL => alloc::vec::Vec::default(),
+            Opcode::CQO => [
+                (
+                    OperandDirection::InOut,
+                    Operand::preg(Width::_64, PhysicalRegister::RAX),
+                ),
+                (
+                    OperandDirection::Out,
+                    Operand::preg(Width::_64, PhysicalRegister::RDX),
+                ),
+            ]
+            .into_iter()
+            .collect(),
         }
     }
 

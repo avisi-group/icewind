@@ -27,7 +27,7 @@ impl Pass for LowerReals {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        // implement body of "to_real(p0: i64)" as `return (p0, 1)`
+        // implement body of "to_real(p0: %i)" as `return (p0, 1)`
         ast.get_mut()
             .functions
             .get_mut(&InternedString::from_static("to_real"))
@@ -43,7 +43,7 @@ impl Pass for LowerReals {
             block
         };
 
-        // replace all real types with (i64, i64)
+        // replace all real types with (i, i)
         ast.get_mut().registers.values().for_each(try_replace_type);
         ast.get_mut().structs.iter().for_each(|(_, fields)| {
             fields
@@ -86,10 +86,10 @@ fn try_replace_type(typ: &Shared<Type>) {
         Type::Real => {
             *typ = Type::Tuple(vec![
                 Shared::new(Type::Integer {
-                    size: Size::Static(64),
+                    size: Size::Unknown,
                 }),
                 Shared::new(Type::Integer {
-                    size: Size::Static(64),
+                    size: Size::Unknown,
                 }),
             ])
         }

@@ -614,6 +614,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     panic!();
                 };
 
+                let is_unsigned =
+                    matches!(num.typ(), Type::Unsigned(_)) | matches!(den.typ(), Type::Unsigned(_));
+
                 assert_eq!(num.typ().width(), den.typ().width());
 
                 let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
@@ -635,6 +638,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::mov(num, lo).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
 
+                if !is_unsigned {
+                    self.push_instruction(Instruction::cqo());
+                } else {
+                    self.push_instruction(Instruction::xor(hi, hi));
+                }
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
@@ -666,6 +674,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     panic!();
                 };
 
+                let is_unsigned =
+                    matches!(num.typ(), Type::Unsigned(_)) | matches!(den.typ(), Type::Unsigned(_));
+
                 assert_eq!(num.typ().width(), den.typ().width());
 
                 let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
@@ -686,6 +697,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::mov(num, lo).unwrap());
                 self.push_instruction(Instruction::mov(den, divisor).unwrap());
 
+                if !is_unsigned {
+                    self.push_instruction(Instruction::cqo());
+                } else {
+                    self.push_instruction(Instruction::xor(hi, hi));
+                }
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let quotient = Operand::vreg(width, self.next_vreg());
@@ -832,6 +848,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 todo!()
             }
 
+            (
+                Type::Signed(64) | Type::Unsigned(64) | Type::Int,
+                Type::Signed(64) | Type::Unsigned(64) | Type::Int,
+            ) => (self.to_operand(left), self.to_operand(right)),
+
             (left, right) => todo!("{left:?} {right:?}"),
         };
 
@@ -880,12 +901,23 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 assert_eq!(dividend.typ().width(), 64);
                 assert_eq!(divisor.typ().width(), 64);
 
+                let is_unsigned = matches!(dividend.typ(), Type::Unsigned(_))
+                    | matches!(divisor.typ(), Type::Unsigned(_));
+
                 let dividend = self.to_operand(dividend);
                 let divisor = self.to_operand_reg_promote(divisor);
 
                 let lo = Operand::preg(width, PhysicalRegister::RAX);
+                let hi = Operand::preg(width, PhysicalRegister::RDX);
 
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
+
+                if !is_unsigned {
+                    self.push_instruction(Instruction::cqo());
+                } else {
+                    self.push_instruction(Instruction::xor(hi, hi));
+                }
+
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let dst = Operand::vreg(width, self.next_vreg());
@@ -898,6 +930,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 assert_eq!(dividend.typ().width(), 64);
                 assert_eq!(divisor.typ().width(), 64);
 
+                let is_unsigned = matches!(dividend.typ(), Type::Unsigned(_))
+                    | matches!(divisor.typ(), Type::Unsigned(_));
+
                 let dividend = self.to_operand(dividend);
                 let divisor = self.to_operand_reg_promote(divisor);
 
@@ -905,6 +940,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let lo = Operand::preg(width, PhysicalRegister::RAX);
 
                 self.push_instruction(Instruction::mov(dividend, lo).unwrap());
+
+                if !is_unsigned {
+                    self.push_instruction(Instruction::cqo());
+                } else {
+                    self.push_instruction(Instruction::xor(hi, hi));
+                }
+
                 self.push_instruction(Instruction::idiv(divisor));
 
                 let dst = Operand::vreg(width, self.next_vreg());
@@ -934,7 +976,7 @@ fn encode_compare<A: Alloc>(
 
     let is_signed = match (left.typ(), right.typ()) {
         (Type::Unsigned(_) | Type::Bits, Type::Unsigned(_) | Type::Bits) => false,
-        (Type::Signed(_), Type::Signed(_)) => true,
+        (Type::Signed(_) | Type::Int, Type::Signed(_) | Type::Int) => true,
         _ => panic!("different types in comparison:\n{left:?}\nand\n{right:?}"),
     };
 

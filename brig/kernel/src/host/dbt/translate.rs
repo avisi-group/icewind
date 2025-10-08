@@ -1477,6 +1477,7 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
         },
         rudder::types::Type::Bits => emitter::Type::Bits,
         rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
+        rudder::types::Type::Int => emitter::Type::Int,
         t => panic!("todo codegen type instance: {t:?}"),
     }
 }

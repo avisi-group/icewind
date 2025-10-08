@@ -1832,6 +1832,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     }
                 }
             }
+            Type::Int => self.constant(64, Type::Unsigned(16)),
             Type::Tuple => todo!(),
         }
     }
@@ -2298,6 +2299,9 @@ fn emit_compare<A: Alloc>(
                     assert_eq!(lw, rw);
                     (true, lw)
                 }
+                (Type::Int, Type::Signed(64)) => (true, 64),
+                (Type::Unsigned(64), Type::Signed(64)) => (true, 64),
+                (Type::Signed(64), Type::Unsigned(64)) => (true, 64),
                 types => todo!("compare {types:?}"),
             };
 

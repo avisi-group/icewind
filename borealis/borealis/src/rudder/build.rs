@@ -180,12 +180,12 @@ impl BuildContext {
                 // todo: this is broken:(
                 self.resolve_type(inner.clone())
             }
-            boom::Type::Integer { size } => {
-                Type::new_primitive(PrimitiveType::SignedInteger(match size {
-                    boom::Size::Static(size) => u32::try_from(*size).unwrap(),
-                    boom::Size::Unknown => 64,
-                }))
-            }
+            boom::Type::Integer { size } => match size {
+                boom::Size::Static(size) => {
+                    Type::new_primitive(PrimitiveType::SignedInteger(u32::try_from(*size).unwrap()))
+                }
+                boom::Size::Unknown => Type::Int,
+            },
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => Type::new_primitive(PrimitiveType::UnsignedInteger(
                     u32::try_from(*size).unwrap(),
@@ -1079,8 +1079,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Cast {
-                        kind: CastOperationKind::Reinterpret,
-                        typ: Type::s64(),
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Type::u64(), // this is bad, bad, we're making rudder have really funky types in order to fix signed/unsigned division
                         value: args[0].clone(),
                     },
                 ))
@@ -2068,10 +2068,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits => {
-                        todo!()
-                    }
-
+                    Type::Bits => todo!(),
+                    Type::Int => todo!(),
                     Type::Tuple(_) => todo!(),
                 };
 
