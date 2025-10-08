@@ -30,6 +30,8 @@ use {
     proc_macro_lib::ktest,
 };
 
+mod fuzz;
+
 #[ktest]
 fn init_system() {
     let model = models::get("aarch64").unwrap();
@@ -2100,53 +2102,6 @@ fn place_slice() {
             width: 64
         }
     );
-}
-
-#[ktest]
-fn udiv() {
-    let model = models::get("aarch64").unwrap();
-
-    let register_file = RegisterFile::init(&*model);
-
-    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
-    let mut emitter = X86Emitter::new(&mut ctx);
-
-    let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
-    // execute_aarch64_instrs_integer_arithmetic_div
-    translate(
-        Global,
-        &*model,
-        "__DecodeA64",
-        &[opcode],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap();
-
-    emitter.leave();
-
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-
-    let x = 0xffffff8008bfffffu64;
-    let y = 0x200000u64;
-
-    register_file.write("SEE", -1i64);
-    register_file.write("R1", y);
-    register_file.write("R19", x);
-
-    // = 0xffff_ff80_08bf_ffffu64 / 0x200000
-    // = 8796092760134.0
-    // = 0x7fffffc0046 (?? why one less idk)
-
-    // but if we sign extend we get
-
-    // = 0xffff_ffff_ffff_ffff ++ ffff_ff80_08bf_ffff / 0x200000
-    // = 0x07ff_ffff_ffff_ffff_ffff_fffc_0045
-
-    translation.execute(&register_file);
-
-    assert_eq!(0x0000_07ff_fffc_0045, register_file.read::<u64>("R19"));
 }
 
 // #[ktest]
@@ -7205,6 +7160,8 @@ fn sdiv_fuzz2() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // 1ad70e9e        sdiv    w30, w20, w23
+    // decode_sdiv_aarch64_instrs_integer_arithmetic_div
+    // execute_aarch64_instrs_integer_arithmetic_div, is_unsigned = false
     translate_instruction(
         Global,
         &*model,
@@ -7225,4 +7182,52 @@ fn sdiv_fuzz2() {
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R30"), 0x0000000000000002);
+}
+
+#[ktest]
+fn udiv() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
+    // decode_udiv_aarch64_instrs_integer_arithmetic_div
+    // execute_aarch64_instrs_integer_arithmetic_div, is_unsigned = true
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let x = 0xffffff8008bfffffu64;
+    let y = 0x200000u64;
+
+    register_file.write("SEE", -1i64);
+    register_file.write("R1", y);
+    register_file.write("R19", x);
+
+    // = 0xffff_ff80_08bf_ffffu64 / 0x200000
+    // = 8796092760134.0
+    // = 0x7fffffc0046 (?? why one less idk)
+
+    // but if we sign extend we get
+
+    // = 0xffff_ffff_ffff_ffff ++ ffff_ff80_08bf_ffff / 0x200000
+    // = 0x07ff_ffff_ffff_ffff_ffff_fffc_0045
+
+    translation.execute(&register_file);
+
+    assert_eq!(0x0000_07ff_fffc_0045, register_file.read::<u64>("R19"));
 }
