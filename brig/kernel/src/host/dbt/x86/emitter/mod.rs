@@ -1108,6 +1108,21 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 }
             }
 
+            // mul high, has to be done at lower level because we want to emit specific
+            // instructions, so pass it down
+            (
+                NodeKind::BinaryOperation(BinaryOperationKind::Multiply(_, _)),
+                NodeKind::Constant { value: 64, .. },
+                NodeKind::Constant { value: 64, .. },
+            ) => self.node(X86Node {
+                typ,
+                kind: NodeKind::BitExtract {
+                    value,
+                    start,
+                    length,
+                },
+            }),
+
             // known start and length
             (
                 _,

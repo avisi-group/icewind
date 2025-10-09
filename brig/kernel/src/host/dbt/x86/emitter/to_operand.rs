@@ -197,6 +197,37 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 start,
                 length,
             } => {
+                if let NodeKind::BinaryOperation(BinaryOperationKind::Multiply(left, right)) =
+                    value.kind()
+                    && let NodeKind::Constant { value: 64, .. } = start.kind()
+                    && let NodeKind::Constant { value: 64, .. } = length.kind()
+                {
+                    let is_signed = matches!(left.typ(), Type::Signed(_))
+                        | matches!(right.typ(), Type::Signed(_));
+
+                    let hi = Operand::preg(Width::_64, PhysicalRegister::RDX);
+                    let lo = Operand::preg(Width::_64, PhysicalRegister::RAX);
+
+                    let _0 = Operand::imm(Width::_64, 0);
+                    let left = self.to_operand(left);
+                    let right = self.to_operand(right);
+
+                    self.push_instruction(Instruction::mov(_0, hi).unwrap());
+                    self.push_instruction(Instruction::mov(left, lo).unwrap());
+
+                    if is_signed {
+                        self.push_instruction(Instruction::imul1(right, lo, hi));
+                    } else {
+                        self.push_instruction(Instruction::mul(right, lo, hi));
+                    }
+
+                    let result = Operand::vreg(Width::_64, self.next_vreg());
+
+                    self.push_instruction(Instruction::mov(hi, result).unwrap());
+
+                    return result;
+                }
+
                 let mut value = if let NodeKind::Constant { .. } = value.kind() {
                     let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let value_reg = Operand::vreg(width, self.next_vreg());
