@@ -1634,7 +1634,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         );
 
         self.push_instruction(Instruction::shl(
-            Operand::imm(Width::_32, 1),
+            Operand::imm(Width::_32, 2),
             Operand::preg(Width::_32, PhysicalRegister::RAX),
         ));
 
