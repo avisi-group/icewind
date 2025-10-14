@@ -1017,6 +1017,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     )
                 }
                 // overlap, gnarly to deal with :(
+                // todo: optimize this
                 else {
                     // AAAA0000
                     //     ^ start = 16, length = 16
@@ -1192,16 +1193,34 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         match (target.kind(), source.kind(), start.kind(), length.kind()) {
             (
                 NodeKind::Constant {
-                    value: target,
-                    width: target_width,
+                    value: target_c,
+                    width: target_width_c,
                 },
-                NodeKind::Constant { value: source, .. },
-                NodeKind::Constant { value: start, .. },
-                NodeKind::Constant { value: length, .. },
-            ) => self.constant(
-                bit_insert(*target, *source, *start, *length),
-                Type::Unsigned(*target_width),
-            ),
+                NodeKind::Constant {
+                    value: source_c, ..
+                },
+                NodeKind::Constant { value: start_c, .. },
+                NodeKind::Constant {
+                    value: length_c, ..
+                },
+            ) => {
+                if *target_width_c <= 64 {
+                    self.constant(
+                        bit_insert(*target_c, *source_c, *start_c, *length_c),
+                        Type::Unsigned(*target_width_c),
+                    )
+                } else {
+                    self.node(X86Node {
+                        typ,
+                        kind: NodeKind::BitInsert {
+                            target,
+                            source,
+                            start,
+                            length,
+                        },
+                    })
+                }
+            }
             // // constant start and length, and source
             // (
             //     _,

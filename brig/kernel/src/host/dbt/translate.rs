@@ -5,7 +5,7 @@ use {
         register_file::{GLOBAL_REGISTER_SIZE, RegisterFile},
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
+            emitter::{CastOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
     },
@@ -703,6 +703,24 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 &mut variables,
             )? {
                 StatementResult::Data(Some(value)) => {
+                    // if let NodeKind::Constant { .. } = value.kind() {
+                    //     log::error!(
+                    //         "({}) {} {} = {:?}",
+                    //         self.function.name(),
+                    //         s,
+                    //         s.get(block.arena()).to_string(block.arena()),
+                    //         value.kind(),
+                    //     )
+                    // } else {
+                    //     log::error!(
+                    //         "({}) {} {} = type {:?}",
+                    //         self.function.name(),
+                    //         s,
+                    //         s.get(block.arena()).to_string(block.arena()),
+                    //         value.typ(),
+                    //     )
+                    // }
+
                     log::trace!(
                         "{} {} = {:?}",
                         s,
@@ -1417,11 +1435,17 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 if matches!(typ, Type::Bits) {
                     let width = *self.bits_stack_widths.get(&id).unwrap();
-                    self.emitter.cast(
-                        read,
-                        Type::Unsigned(width),
-                        super::x86::emitter::CastOperationKind::Truncate,
-                    )
+
+                    if width > Type::Bits.width() {
+                        self.emitter.cast(
+                            read,
+                            Type::Unsigned(width),
+                            CastOperationKind::ZeroExtend,
+                        )
+                    } else {
+                        self.emitter
+                            .cast(read, Type::Unsigned(width), CastOperationKind::Truncate)
+                    }
                 } else {
                     read
                 }

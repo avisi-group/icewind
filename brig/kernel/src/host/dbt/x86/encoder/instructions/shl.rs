@@ -24,9 +24,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_8,
             },
         ) => {
-            assembler
-                .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
-                .unwrap();
+            if *amount >= 8 {
+                assembler
+                    .xor::<AsmRegister8, AsmRegister8>(value.into(), value.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
         }
         (
             Operand {
@@ -37,9 +43,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_16,
             },
         ) => {
-            assembler
-                .shl::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
-                .unwrap();
+            if *amount >= 16 {
+                assembler
+                    .xor::<AsmRegister16, AsmRegister16>(value.into(), value.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .shl::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
         }
         (
             Operand {
@@ -50,9 +62,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_32,
             },
         ) => {
-            assembler
-                .shl::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
-                .unwrap();
+            if *amount >= 32 {
+                assembler
+                    .xor::<AsmRegister32, AsmRegister32>(value.into(), value.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .shl::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
         }
         (
             Operand {
@@ -63,9 +81,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_64,
             },
         ) => {
-            assembler
-                .shl::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
-                .unwrap();
+            if *amount >= 64 {
+                assembler
+                    .xor::<AsmRegister64, AsmRegister64>(value.into(), value.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .shl::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
         }
         (
             Operand {

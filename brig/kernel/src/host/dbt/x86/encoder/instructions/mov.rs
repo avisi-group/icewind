@@ -540,6 +540,27 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         (
             Operand {
                 kind: I(src),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            if *src == 0 {
+                assembler
+                    .xor::<AsmRegister16, AsmRegister16>(dst.into(), dst.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister16, i32>(dst.into(), (*src).try_into().unwrap())
+                    .unwrap();
+            }
+        }
+        // MOV I -> R
+        (
+            Operand {
+                kind: I(src),
                 width_in_bits: Width::_64,
             },
             Operand {

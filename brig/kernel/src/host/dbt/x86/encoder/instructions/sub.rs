@@ -8,7 +8,9 @@ use {
             registers::Register::Physical as PHYS,
         },
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
@@ -86,6 +88,21 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .sub::<AsmRegister8, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .unwrap();
+        }
+        // SUB IMM -> R
+        (
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .sub::<AsmRegister16, i32>(dst.into(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         _ => todo!("sub {src} {dst}"),

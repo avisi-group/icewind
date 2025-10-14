@@ -81,7 +81,8 @@ pub enum Opcode<A: Alloc> {
     BEXTR(Operand<A>, Operand<A>, Operand<A>),
     /// pinsr {0}, {1}, {2}
     PINSR(Operand<A>, Operand<A>, Operand<A>),
-
+    /// punpckl {0}, {1}
+    PUNPCKL(Operand<A>, Operand<A>),
     /// jmp {0}
     JMP(Operand<A>),
     /// push {0}
@@ -631,6 +632,10 @@ impl<A: Alloc> Instruction<A> {
 
     pub fn bextr(ctrl: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::BEXTR(ctrl, src, dst))
+    }
+
+    pub fn punpckl(src: Operand<A>, dst: Operand<A>) -> Self {
+        Self(Opcode::PUNPCKL(src, dst))
     }
 
     pub fn pinsr(index: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
@@ -1256,6 +1261,19 @@ impl<A: Alloc> Instruction<A> {
                     .unwrap();
             }
 
+            PUNPCKL(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => assembler
+                .punpcklqdq::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
+                .unwrap(),
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1283,7 +1301,8 @@ impl<A: Alloc> Instruction<A> {
             | Opcode::ADD(src, dst)
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst)
-            | Opcode::IMUL(src, dst) => [
+            | Opcode::IMUL(src, dst)
+            | Opcode::PUNPCKL(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
@@ -1388,7 +1407,8 @@ impl<A: Alloc> Instruction<A> {
             | Opcode::ADD(src, dst)
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst)
-            | Opcode::IMUL(src, dst) => {
+            | Opcode::IMUL(src, dst)
+            | Opcode::PUNPCKL(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
                     .into_iter()
                     .collect()

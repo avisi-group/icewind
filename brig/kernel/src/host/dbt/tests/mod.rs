@@ -7329,3 +7329,245 @@ fn fuzz_9b487f10_2213_fixed() {
 
     assert_eq!(register_file.read::<u64>("R16"), 0xe16c38dd300b71d9);
 }
+
+#[ktest]
+fn crc() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  9ac34c08        crc32x  w8, w0, x3
+    // execute_aarch64_instrs_integer_crc
+    // Poly32Mod2
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x9ac34c08,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0x0);
+    register_file.write::<u64>("R3", 0x1234_5678_0a0b_cdef);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R8"), 0x39786938);
+}
+
+#[ktest]
+fn bitreverse_dyn_32() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let data_in = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+
+    let res = translate(
+        Global,
+        &*model,
+        "BitReverse",
+        &[data_in],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(res.typ().width(), 32);
+
+    emitter.write_register(model.reg_offset("R1"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0x12345678);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 0x1e6a2c48);
+}
+
+#[ktest]
+fn bitreverse_const_32() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let data_in = emitter.constant(0x12345678, Type::Unsigned(32));
+
+    let res = translate(
+        Global,
+        &*model,
+        "BitReverse",
+        &[data_in],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0x1e6a2c48,
+            width: 32
+        }
+    );
+}
+
+#[ktest]
+fn bitinsert_128_0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _0 = emitter.constant(0, Type::Unsigned(16));
+    let _32 = emitter.constant(32, Type::Unsigned(16));
+    let _63 = emitter.constant(63, Type::Unsigned(16));
+    let _96 = emitter.constant(96, Type::Unsigned(16));
+
+    let source = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let target = emitter.create_bits(_0, _96);
+
+    let res = emitter.bit_insert(target, source, _63, _32);
+
+    let mut boxed = Box::new(0u128);
+    let address = emitter.constant(&mut *boxed as *mut u128 as u64, Type::Unsigned(64));
+
+    emitter.write_memory(address, res, false);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0x12345678);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*boxed, 0x12345678 << 63)
+}
+
+#[ktest]
+fn bitinsert_128_1() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _0 = emitter.constant(0, Type::Unsigned(16));
+    let length = emitter.constant(32, Type::Unsigned(16));
+    let start = emitter.constant(47, Type::Unsigned(16));
+    let _96 = emitter.constant(96, Type::Unsigned(16));
+
+    let source = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let target = emitter.create_bits(_0, _96);
+
+    let res = emitter.bit_insert(target, source, start, length);
+
+    let mut boxed = Box::new(0u128);
+    let address = emitter.constant(&mut *boxed as *mut u128 as u64, Type::Unsigned(64));
+
+    emitter.write_memory(address, res, false);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0xAABB_CCDD_1234_5678);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*boxed, 0x1234_5678 << 47)
+}
+
+#[ktest]
+fn bitinsert_64() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _0 = emitter.constant(0, Type::Unsigned(16));
+    let _16 = emitter.constant(16, Type::Unsigned(16));
+    let _32 = emitter.constant(32, Type::Unsigned(16));
+    let _64 = emitter.constant(64, Type::Unsigned(16));
+
+    let source = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
+    let target = emitter.create_bits(_0, _64);
+
+    let res = emitter.bit_insert(target, source, _32, _16);
+
+    let mut boxed = Box::new(u64::MAX);
+    let address = emitter.constant(&mut *boxed as *mut u64 as u64, Type::Unsigned(64));
+
+    emitter.write_memory(address, res, false);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0x12345678);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*boxed, 0x5678 << 32)
+}
+
+#[ktest]
+fn poly32mod2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let mut boxed = Box::new(0u128);
+    let addr = emitter.constant(&mut *boxed as *mut u128 as u64, Type::Unsigned(96));
+
+    let data_in = emitter.read_memory(addr, Type::Unsigned(96));
+    let poly = emitter.constant(0x04C11DB7, Type::Unsigned(32));
+
+    let res = translate(
+        Global,
+        &*model,
+        "Poly32Mod2",
+        &[data_in, poly],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(res.typ().width(), 32);
+
+    emitter.write_register(model.reg_offset("R1"), res);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 0x1e6a2c48);
+}

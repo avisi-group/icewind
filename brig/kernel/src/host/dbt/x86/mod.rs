@@ -400,7 +400,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         self.current_variable_id += 1;
 
         // todo: be better about this
-        if id >= GLOBAL_REGISTER_SIZE / 8 {
+        if id >= GLOBAL_REGISTER_SIZE / 16 {
             panic!("variable number {id:#x} exceeded MAX_STACK_SIZE ({GLOBAL_REGISTER_SIZE:#x})")
         }
 

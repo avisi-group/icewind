@@ -148,10 +148,14 @@ fn do_allocate<A: MemAlloc>(
                     continue;
                 };
 
+                log::debug!("ud def: {usedef_reg:?}");
+
                 match usedef_reg {
                     Register::Virtual(usedef_virt_reg) => {
                         // Definition of a virtual register
                         let tracked_virt_reg = register_tracking.get_mut(&usedef_reg);
+
+                        log::debug!("tracked virt reg: {tracked_virt_reg:?}");
 
                         if tracked_virt_reg.first_def == Some(current_instruction_index) {
                             if tracked_virt_reg.last_use.is_none() {
@@ -236,6 +240,8 @@ fn do_allocate<A: MemAlloc>(
                 let (UseDef::Use(usedef_reg) | UseDef::UseDef(usedef_reg)) = usedef.0 else {
                     continue;
                 };
+
+                log::debug!("ud use: {usedef_reg:?}");
 
                 match usedef_reg {
                     Register::Virtual(usedef_virt_reg) => {
@@ -397,7 +403,7 @@ fn commit<A: MemAlloc>(
                     *op = Operand::mem_base_displ(
                         op.width(),
                         Register::Physical(PhysicalRegister::RBP),
-                        i32::try_from(global_register_offset + (*idx * 8)).unwrap(),
+                        i32::try_from(global_register_offset + (*idx * 16)).unwrap(),
                     )
                 }
             }

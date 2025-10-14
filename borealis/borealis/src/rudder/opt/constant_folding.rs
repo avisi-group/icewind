@@ -201,7 +201,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             }
         }
         Statement::Cast {
-            kind: CastOperationKind::ZeroExtend,
+            kind: CastOperationKind::ZeroExtend | CastOperationKind::SignExtend,
             typ,
             value,
         } => {

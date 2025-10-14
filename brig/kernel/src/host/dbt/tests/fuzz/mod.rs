@@ -11,7 +11,7 @@ use {
 
 mod generated;
 
-fn fuzz_test(instruction: u32, _index: usize, input_state: &[u64], output_state: &[u64]) {
+pub fn fuzz_test(instruction: u32, _index: usize, input_state: &[u64], output_state: &[u64]) {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
