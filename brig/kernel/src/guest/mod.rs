@@ -12,10 +12,7 @@ use {
         host::{
             dbt::sysreg_helpers::{self, encode_sysreg_id},
             fs::Filesystem,
-            objects::{
-                Object, ObjectStore,
-                device::{Device, MemoryMappedDevice},
-            },
+            objects::device::{Device, MemoryMappedDevice, RegisterMappedDevice},
         },
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
@@ -193,14 +190,10 @@ fn _simbench(guest: &mut Guest) {
     core0.register_file.write::<u64>("SCR_EL3_bits", 0x430);
 
     guest.devices.insert("core0".into(), core0.clone());
-    ObjectStore::global().insert(core0.clone());
-    ObjectStore::global().insert_alias(core0.id(), "core0".into());
 
     // gic
     let gic = Arc::new(GlobalInterruptController::new());
     guest.devices.insert("gic0".into(), gic.clone());
-    ObjectStore::global().insert(gic.clone());
-    ObjectStore::global().insert_alias(gic.id(), "gic0".into());
 
     let (cpu, distributor) = GlobalInterruptController::as_interfaces(gic.clone());
     attach_mmap_device(guest, "gic0_cpu".into(), cpu, "as0".into(), 0x0801_0000);
@@ -215,8 +208,6 @@ fn _simbench(guest: &mut Guest) {
     // serial
     let pl011 = Arc::new(Pl011::new(66, gic.clone()));
     guest.devices.insert("serial".into(), pl011.clone());
-    ObjectStore::global().insert(pl011.clone());
-    ObjectStore::global().insert_alias(pl011.id(), "serial".into());
     attach_mmap_device(guest, "serial".into(), pl011, "as0".into(), 0x0900_0000);
 }
 
@@ -256,14 +247,10 @@ fn linux(guest: &mut Guest) {
     let initial_pc = 0x8000_0000;
     let core0 = Arc::new(ModelDevice::new("core0".into(), model, initial_pc));
     guest.devices.insert("core0".into(), core0.clone());
-    ObjectStore::global().insert(core0.clone());
-    ObjectStore::global().insert_alias(core0.id(), "core0".into());
 
     // gic
     let gic = Arc::new(GlobalInterruptController::new());
     guest.devices.insert("gic0".into(), gic.clone());
-    ObjectStore::global().insert(gic.clone());
-    ObjectStore::global().insert_alias(gic.id(), "gic0".into());
 
     let (cpu, distributor) = GlobalInterruptController::as_interfaces(gic.clone());
     attach_mmap_device(guest, "gic0_cpu".into(), cpu, "as0".into(), 0x2c00_2000);
@@ -278,22 +265,19 @@ fn linux(guest: &mut Guest) {
     // serial
     let pl011 = Arc::new(Pl011::new(66, gic.clone()));
     guest.devices.insert("serial".into(), pl011.clone());
-    ObjectStore::global().insert(pl011.clone());
-    ObjectStore::global().insert_alias(pl011.id(), "serial".into());
+
     attach_mmap_device(guest, "serial".into(), pl011, "as0".into(), 0x3c00_0000);
 
     // block
     let block = Arc::new(VirtioBlock::new(64, gic.clone()));
     guest.devices.insert("block".into(), block.clone());
-    ObjectStore::global().insert(block.clone());
-    ObjectStore::global().insert_alias(block.id(), "block".into());
+
     attach_mmap_device(guest, "block".into(), block, "as0".into(), 0x3d00_0000);
 
     // timer
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));
     guest.devices.insert("timer".into(), timer.clone());
-    ObjectStore::global().insert(timer.clone());
-    ObjectStore::global().insert_alias(timer.id(), "timer".into());
+
     let sysregs = [
         ("cntkctl_el1", [3, 0, 14, 1, 0]),
         ("cntfrq_el0", [3, 3, 14, 0, 0]),
@@ -317,16 +301,15 @@ fn linux(guest: &mut Guest) {
     attach_sysreg_device(timer, sysregs);
 }
 
-fn attach_sysreg_device(device: Arc<dyn Device>, sysregs: BTreeMap<InternedString, [u64; 5]>) {
-    let reg_map_device = ObjectStore::global()
-        .get_register_mapped_device(device.id())
-        .unwrap();
-
+fn attach_sysreg_device(
+    device: Arc<dyn RegisterMappedDevice>,
+    sysregs: BTreeMap<InternedString, [u64; 5]>,
+) {
     sysregs
         .iter()
         .map(|(_, [op0, op1, crn, crm, op2])| encode_sysreg_id(*op0, *op1, *crn, *crm, *op2))
         .for_each(|id| {
-            sysreg_helpers::register_device(id, reg_map_device.clone());
+            sysreg_helpers::register_device(id, device.clone());
         });
 }
 
