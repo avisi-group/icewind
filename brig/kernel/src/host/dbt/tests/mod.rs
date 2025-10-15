@@ -7529,8 +7529,6 @@ fn bitinsert_64() {
 
     register_file.write::<u64>("R0", 0x12345678);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
     assert_eq!(*boxed, 0x5678 << 32)

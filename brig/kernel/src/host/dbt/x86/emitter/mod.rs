@@ -208,6 +208,10 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         start: X86NodeRef<A>,
         length: X86NodeRef<A>,
     ) -> X86NodeRef<A> {
+        if source.typ().width() > 64 {
+            todo!()
+        }
+
         // let low_start = if start >= 64 { 0 } else { start };
         // let low_length = if start >= 64 {
         //     0
@@ -282,11 +286,16 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
             self.bit_insert(low_mask_128, high_mask, _64.clone(), _64) // should get emitted as pinsr or unpckl
         };
+
         let inverted_mask = self.unary_operation(UnaryOperationKind::Complement(mask.clone()));
 
         let target = self.binary_operation(BinaryOperationKind::And(target, inverted_mask));
 
         let source = {
+            // move source to 64 bits
+            // todo: 128 bit sources
+            let source = self.cast(source, Type::Unsigned(64), CastOperationKind::ZeroExtend);
+
             let low_source = self.shift(
                 source.clone(),
                 start.clone(),

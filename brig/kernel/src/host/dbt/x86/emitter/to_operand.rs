@@ -448,19 +448,12 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 if let NodeKind::Constant { value: start_c, .. } = start.kind()
                     && let NodeKind::Constant {
                         value: length_c, ..
-                    } = length.kind()
-                    && ((*start_c >= 64)
-                        || ((*start_c + *length_c) > 64)
-                        || (target.typ().width() == 128))
+                    } = length.kind() // start and length must be constant
+                    && matches!(length_c, 8 | 16 | 32 | 64)
+                    && start_c % length_c == 0 // indexed by the size of the elements, so for a given length, the start must be a multiple
+                    && target.typ().width() > 64
+                // pinsr can only be used on xmm registers
                 {
-                    if (target.typ().width() == 128)
-                        && !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0)
-                    {
-                        panic!(
-                            "unsupported vector stuff, curious if we ever hit this (we shouldnt): start: {start_c}, length: {length_c}"
-                        )
-                    }
-
                     let target = self.to_operand(target);
 
                     let index = Operand::imm(Width::_8, start_c / length_c);

@@ -9,7 +9,7 @@ use {
     alloc::{alloc::Global, format},
 };
 
-//mod generated;
+mod generated;
 
 pub fn fuzz_test(instruction: u32, _index: usize, input_state: &[u64], output_state: &[u64]) {
     let model = models::get("aarch64").unwrap();
