@@ -225,31 +225,3 @@ pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     }
     .into()
 }
-
-#[proc_macro_attribute]
-pub fn guest_device_factory(attribute: TokenStream, item: TokenStream) -> TokenStream {
-    let item: ItemFn = parse_macro_input!(item);
-    let fn_name = item.sig.ident.clone();
-    let proc_macro::TokenTree::Ident(device_kind) = attribute.into_iter().next().unwrap() else {
-        panic!("missing device kind");
-    };
-
-    let device_kind = device_kind.to_string();
-
-    let static_name = Ident::new(
-        &format!("GDF_{}", device_kind.to_ascii_uppercase()),
-        Span::call_site(),
-    );
-
-    quote! {
-        #[linkme::distributed_slice(crate::guest::devices::DEVICE_FACTORIES)]
-        static #static_name: (&'static str, fn(&BTreeMap<InternedString, InternedString>) -> Arc<dyn Device>) = (#device_kind, |config| {
-            let device = #fn_name(config);
-            ObjectStore::global().insert(device.clone());
-            device
-        });
-
-        #item
-    }
-    .into()
-}

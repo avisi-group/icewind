@@ -27,7 +27,6 @@ use {
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
 
-pub mod config;
 pub mod devices;
 pub mod memory;
 pub mod models;

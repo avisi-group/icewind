@@ -1,14 +1,11 @@
 use {
     crate::host::objects::{
-        Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
+        Object, ObjectId, ToIrqController, ToRegisterMappedDevice, ToTickable,
         device::{Device, MemoryMappedDevice},
         irq::IrqController,
     },
-    alloc::{collections::BTreeMap, sync::Arc},
-    common::intern::InternedString,
+    alloc::sync::Arc,
     core::sync::atomic::{AtomicU16, AtomicU32, Ordering},
-    proc_macro_lib::guest_device_factory,
-    spin::Mutex,
 };
 
 const IRQ_TXINTR: u32 = 1 << 5;

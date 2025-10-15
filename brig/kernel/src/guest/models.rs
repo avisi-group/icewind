@@ -19,19 +19,15 @@ use {
             fs::Filesystem,
             memory::bump::{BumpAllocator, BumpAllocatorRef},
             objects::{
-                Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
-                ToRegisterMappedDevice, ToTickable, device::Device,
+                Object, ObjectId, ToIrqController, ToMemoryMappedDevice, ToRegisterMappedDevice,
+                ToTickable, device::Device,
             },
         },
-        util::{get_current_device, parse_hex_prefix},
+        util::get_current_device,
     },
     alloc::{
-        alloc::alloc_zeroed,
-        borrow::ToOwned,
-        collections::btree_map::BTreeMap,
-        string::{String, ToString},
-        sync::Arc,
-        vec::Vec,
+        alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
+        sync::Arc, vec::Vec,
     },
     common::{
         hashmap::HashMap,
@@ -40,11 +36,10 @@ use {
     },
     core::{
         alloc::Layout,
-        fmt::{self, Debug, Write},
+        fmt::{self, Debug},
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::register_file::{RegisterFile, WellKnownRegister},
-    proc_macro_lib::guest_device_factory,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };
@@ -100,19 +95,6 @@ pub fn load_all<FS: Filesystem>(fs: &mut FS) {
             );
             register_model(name, model);
         });
-}
-
-#[guest_device_factory(core)]
-fn create_core(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    let model_name = config.get(&InternedString::from_static("model")).unwrap();
-    let model = get(model_name.as_ref()).unwrap();
-    let initial_pc = config
-        .get(&InternedString::from_static("initial_pc"))
-        .map(parse_hex_prefix)
-        .unwrap()
-        .unwrap();
-
-    Arc::new(ModelDevice::new(model_name.to_string(), model, initial_pc))
 }
 
 pub struct WellKnownRegisters {

@@ -1,6 +1,10 @@
 use {
     crate::{
-        guest::{devices::create_device, models},
+        guest::{
+            Nanoseconds,
+            devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
+            models,
+        },
         host::{
             dbt::{
                 Translation,
@@ -16,12 +20,11 @@ use {
                 },
             },
             memory::bump::{BumpAllocator, BumpAllocatorRef},
-            objects::ObjectStore,
             timer::GLOBAL_CLOCK,
         },
         timer::Measurement,
     },
-    alloc::{alloc::Global, boxed::Box, collections::BTreeMap},
+    alloc::{alloc::Global, boxed::Box, sync::Arc},
     common::{
         bits::{bit_insert, mask},
         hashmap::HashMap,
@@ -4582,11 +4585,10 @@ fn _mrs_timer() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let timer = create_device("generic_timer".into(), &BTreeMap::new()).unwrap();
-    let reg_map_dev = ObjectStore::global()
-        .get_register_mapped_device(timer.id())
-        .unwrap();
-    sysreg_helpers::register_device(0x1be040, reg_map_dev);
+    let gic = Arc::new(GlobalInterruptController::new());
+    let timer = Arc::new(GenericTimer::new(gic, 27, Nanoseconds::new(1_000)));
+
+    sysreg_helpers::register_device(0x1be040, timer);
 
     assert_eq!(register_file.read::<u64>("MPIDR_EL1_bits"), 0x80000000);
     register_file.write("SEE", -1i64);

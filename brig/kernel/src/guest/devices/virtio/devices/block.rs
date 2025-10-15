@@ -13,7 +13,6 @@ use {
     },
     alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
-    proc_macro_lib::guest_device_factory,
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
 };

@@ -2,25 +2,18 @@ use {
     crate::{
         guest::GuestExecutionContext,
         host::objects::{
-            Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
-            ToRegisterMappedDevice, ToTickable,
+            Object, ObjectId, ToIrqController, ToMemoryMappedDevice, ToRegisterMappedDevice,
+            ToTickable,
             device::{Device, MemoryMappedDevice},
             irq::IrqController,
         },
     },
-    alloc::{collections::BTreeMap, sync::Arc},
-    common::intern::InternedString,
+    alloc::sync::Arc,
     core::{
         sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
         u8,
     },
-    proc_macro_lib::guest_device_factory,
 };
-
-#[guest_device_factory(a9gic)]
-fn create_gic(_config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    Arc::new(GlobalInterruptController::new())
-}
 
 // Interrupt Controller Type Register
 const GICD_TYPER: u32 = 0b100_000_00111;
