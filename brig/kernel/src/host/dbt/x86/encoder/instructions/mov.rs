@@ -31,7 +31,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
             if src.is_xmm() {
                 assembler
-                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                     .unwrap();
             } else {
                 assembler
@@ -53,7 +53,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
 
             assembler
-                .movdqa::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
+                .movdqa::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -127,7 +130,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             if dst.is_xmm() {
                 assembler
                     .movq::<AsmRegisterXmm, AsmMemoryOperand>(
-                        dst.into(),
+                        dst.try_into().unwrap(),
                         qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
                     )
                     .unwrap();
@@ -695,7 +698,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             // todo: make this aligned!
             assembler
                 .movdqu(
-                    dst.into(),
+                    dst.try_into().unwrap(),
                     xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
                 )
                 .unwrap();
@@ -722,7 +725,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             assembler
                 .movdqu(
                     xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
-                    src.into(),
+                    src.try_into().unwrap(),
                 )
                 .unwrap();
         }
@@ -738,7 +741,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                 .unwrap();
             assembler
                 .movzx::<AsmRegister64, AsmRegister8>(dst.into(), dst.into())
@@ -756,7 +759,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                 .unwrap();
             assembler
                 .movzx::<AsmRegister64, AsmRegister16>(dst.into(), dst.into())
@@ -774,7 +777,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.into())
+                .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                 .unwrap();
         }
 
@@ -790,7 +793,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.into())
+                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                 .unwrap();
         }
 

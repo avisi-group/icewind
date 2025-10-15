@@ -111,9 +111,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 width_in_bits: Width::_128,
             },
         ) => {
-            assert!(amount % 8 == 0);
+            if amount % 8 != 0 {
+                panic!("cannot shift xmm register right by {amount} bits")
+            }
+
             assembler
-                .psrldq::<AsmRegisterXmm, u32>(value.into(), (amount / 8).try_into().unwrap())
+                .psrldq::<AsmRegisterXmm, u32>(
+                    value.try_into().unwrap(),
+                    (amount / 8).try_into().unwrap(),
+                )
                 .unwrap();
         }
         _ => todo!("shr {amount} {value}"),

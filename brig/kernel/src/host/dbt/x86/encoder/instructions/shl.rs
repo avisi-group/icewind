@@ -102,7 +102,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
         ) => {
             assert!(amount % 8 == 0);
             assembler
-                .pslldq::<AsmRegisterXmm, u32>(value.into(), (amount / 8).try_into().unwrap())
+                .pslldq::<AsmRegisterXmm, u32>(
+                    value.try_into().unwrap(),
+                    (amount / 8).try_into().unwrap(),
+                )
                 .unwrap();
         }
         (

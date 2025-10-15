@@ -175,7 +175,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .pand::<AsmRegisterXmm, AsmRegisterXmm>(right.into(), left.into())
+                .pand::<AsmRegisterXmm, AsmRegisterXmm>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
 

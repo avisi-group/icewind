@@ -7508,14 +7508,14 @@ fn bitinsert_64() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let _0 = emitter.constant(0, Type::Unsigned(16));
-    let _16 = emitter.constant(16, Type::Unsigned(16));
-    let _32 = emitter.constant(32, Type::Unsigned(16));
     let _64 = emitter.constant(64, Type::Unsigned(16));
 
     let source = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let target = emitter.create_bits(_0, _64);
 
-    let res = emitter.bit_insert(target, source, _32, _16);
+    let length = emitter.constant(16, Type::Unsigned(16));
+    let start = emitter.constant(32, Type::Unsigned(16));
+    let res = emitter.bit_insert(target, source, start, length);
 
     let mut boxed = Box::new(u64::MAX);
     let address = emitter.constant(&mut *boxed as *mut u64 as u64, Type::Unsigned(64));
@@ -7528,6 +7528,8 @@ fn bitinsert_64() {
     let translation = ctx.compile(num_regs);
 
     register_file.write::<u64>("R0", 0x12345678);
+
+    log::error!("{translation:?}");
 
     translation.execute(&register_file);
 

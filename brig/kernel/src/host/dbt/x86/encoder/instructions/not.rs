@@ -27,7 +27,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, dst: &Operand<A>) {
                 .unwrap();
             assembler
                 .pxor::<AsmRegisterXmm, AsmRegisterXmm>(
-                    value.into(),
+                    value.try_into().unwrap(),
                     iced_x86::code_asm::registers::xmm8,
                 )
                 .unwrap()

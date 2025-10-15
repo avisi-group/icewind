@@ -301,7 +301,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                             self.push_instruction(Instruction::movzx(src, dst).unwrap())
                         }
                         (ZeroExtend, Greater) => {
-                            panic!("cannot zero extend when dst ({dst}) is larger than src ({src})")
+                            // todo: fix this
+                            // panic!(
+                            //     "cannot zero extend when src ({src}) is larger than dst
+                            // ({dst})\ntarget type: {:?}\n{value:#?}",
+                            //     node.typ()
+                            // )
+                            self.push_instruction(Instruction::mov(src, dst).unwrap())
                         }
 
                         (SignExtend, Equal) => {
@@ -309,7 +315,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                         }
                         (SignExtend, Less) => self.push_instruction(Instruction::movsx(src, dst)),
                         (SignExtend, Greater) => {
-                            panic!("cannot sign extend when dst ({dst}) is larger than src ({src})")
+                            panic!("cannot zero extend when src ({src}) is larger than dst ({dst})")
                         }
 
                         (Convert, _) => {
@@ -347,9 +353,16 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                                 self.push_instruction(Instruction::movzx(src, dst).unwrap())
                             }
                             Ordering::Greater => {
-                                let mut src_trunc = src;
-                                src_trunc.set_width(dst.width());
-                                self.push_instruction(Instruction::mov(src_trunc, dst).unwrap())
+                                // same as truncate, todo: actually figure out how/why re-interpret
+                                // is different
+                                if src.width() > Width::_64 && dst.width() < Width::_128 {
+                                    self.push_instruction(Instruction::mov(src, dst).unwrap());
+                                } else {
+                                    // normal case, just access src as a smaller register
+                                    let mut src = src;
+                                    src.set_width(dst.width());
+                                    self.push_instruction(Instruction::mov(src, dst).unwrap());
+                                }
                             }
                         },
                         (Broadcast, _) => todo!(),
@@ -384,31 +397,41 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     return dst_hi;
                 }
 
-                let mut amount = self.to_operand(amount);
-                let value = self.to_operand(value);
+                let mut amount_op = self.to_operand(amount);
+                let value_op = self.to_operand(value);
 
-                let dst = Operand::vreg(value.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(value, dst).unwrap());
+                if value_op.width() == Width::_128
+                    && u32::from(value_op.width().as_u16()) > value.typ().width()
+                {
+                    panic!(
+                        "node type {:?}, op: {:?}\n{value:#?}",
+                        value.typ(),
+                        value_op
+                    )
+                }
 
-                if let OperandKind::Register(_) = amount.kind() {
+                let dst = Operand::vreg(value_op.width(), self.next_vreg());
+                self.push_instruction(Instruction::mov(value_op, dst).unwrap());
+
+                if let OperandKind::Register(_) = amount_op.kind() {
                     // truncate (high bits don't matter anyway)
-                    amount.set_width(Width::_8);
+                    amount_op.set_width(Width::_8);
                     let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
-                    self.push_instruction(Instruction::mov(amount, amount_dst).unwrap());
-                    amount = amount_dst;
+                    self.push_instruction(Instruction::mov(amount_op, amount_dst).unwrap());
+                    amount_op = amount_dst;
                 }
 
                 match kind {
                     ShiftOperationKind::LogicalShiftLeft => {
-                        self.push_instruction(Instruction::shl(amount, dst));
+                        self.push_instruction(Instruction::shl(amount_op, dst));
                     }
 
                     ShiftOperationKind::LogicalShiftRight => {
-                        self.push_instruction(Instruction::shr(amount, dst));
+                        self.push_instruction(Instruction::shr(amount_op, dst));
                     }
 
                     ShiftOperationKind::ArithmeticShiftRight => {
-                        self.push_instruction(Instruction::sar(amount, dst));
+                        self.push_instruction(Instruction::sar(amount_op, dst));
                     }
                     _ => todo!("{kind:?}"),
                 }
@@ -421,7 +444,55 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 source,
                 start,
                 length,
-            } => self.bit_insert_to_operand(target, source, start, length),
+            } => {
+                if let NodeKind::Constant { value: start_c, .. } = start.kind()
+                    && let NodeKind::Constant {
+                        value: length_c, ..
+                    } = length.kind()
+                    && ((*start_c >= 64)
+                        || ((*start_c + *length_c) > 64)
+                        || (target.typ().width() == 128))
+                {
+                    if (target.typ().width() == 128)
+                        && !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0)
+                    {
+                        panic!(
+                            "unsupported vector stuff, curious if we ever hit this (we shouldnt): start: {start_c}, length: {length_c}"
+                        )
+                    }
+
+                    let target = self.to_operand(target);
+
+                    let index = Operand::imm(Width::_8, start_c / length_c);
+
+                    // length encoded in source operand width
+                    let mut source = self.to_operand_reg_promote(source);
+                    source.set_width(Width::from_uncanonicalized(*length_c).unwrap());
+
+                    self.push_instruction(Instruction::pinsr(index, source, target));
+
+                    target
+                } else {
+                    let out = if target.typ().width() > 64 {
+                        self.bit_insert_128(
+                            target.clone(),
+                            source.clone(),
+                            start.clone(),
+                            length.clone(),
+                        )
+                    } else {
+                        self.bit_insert_64(
+                            target.clone(),
+                            source.clone(),
+                            start.clone(),
+                            length.clone(),
+                        )
+                    };
+
+                    self.to_operand(&out)
+                }
+            }
+
             NodeKind::BitReplicate { pattern, count } => {
                 let pattern_width = pattern.typ().width();
 
@@ -518,276 +589,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
         self.current_block_operands.insert(node.clone(), op);
         op
-    }
-
-    fn bit_insert_to_operand(
-        &mut self,
-        target: &X86NodeRef<A>,
-        source: &X86NodeRef<A>,
-        start: &X86NodeRef<A>,
-        length: &X86NodeRef<A>,
-    ) -> Operand<A> {
-        let target = self.to_operand(target);
-
-        if target.width() == Width::_128
-            && let NodeKind::Constant { value: start, .. } = start.kind()
-            && let NodeKind::Constant { value: length, .. } = length.kind()
-        {
-            let mut source = self.to_operand_reg_promote(source);
-
-            if *start == 0 && source.width() == target.width() {
-                self.push_instruction(Instruction::mov(source, target).unwrap());
-                return target;
-            } else {
-                if *start == 32 && *length == 64 {
-                    let source_lo = Operand::vreg(Width::_32, self.next_vreg());
-                    let mut source_hi_64 = Operand::vreg(Width::_64, self.next_vreg());
-                    let source_hi = Operand::vreg(Width::_32, self.next_vreg());
-
-                    let mut source_trunc = source.clone();
-                    source_trunc.set_width(Width::_32);
-
-                    self.push_instruction(Instruction::mov(source_trunc, source_lo).unwrap());
-                    self.push_instruction(Instruction::mov(source, source_hi_64).unwrap());
-                    self.push_instruction(Instruction::shr(
-                        Operand::imm(Width::_16, 32),
-                        source_hi_64,
-                    ));
-                    source_hi_64.set_width(Width::_32);
-                    self.push_instruction(Instruction::mov(source_hi_64, source_hi).unwrap());
-
-                    self.push_instruction(Instruction::pinsr(
-                        Operand::imm(Width::_8, 1),
-                        source_lo,
-                        target,
-                    ));
-                    self.push_instruction(Instruction::pinsr(
-                        Operand::imm(Width::_8, 2),
-                        source_hi,
-                        target,
-                    ));
-
-                    return target;
-                } else if start % length == 0 {
-                    let index = Operand::imm(Width::_8, start / length);
-
-                    // length encoded in source operand width
-                    source.set_width(Width::from_uncanonicalized(*length).unwrap());
-
-                    self.push_instruction(Instruction::pinsr(index, source, target));
-
-                    return target;
-                }
-            }
-        }
-
-        let source = self.to_operand(source);
-        let start = self.to_operand(start);
-        let length = self.to_operand(length);
-        let source = match source.width().cmp(&target.width()) {
-            Ordering::Equal => source,
-            Ordering::Greater => {
-                panic!("source width exceeds target")
-            }
-            Ordering::Less => {
-                if target.width() > Width::_64 {
-                    // reg promote any immediates
-                    let source_reg = Operand::vreg(source.width(), self.next_vreg());
-                    self.push_instruction(Instruction::mov(source, source_reg).unwrap());
-
-                    let wider_source = Operand::vreg(target.width(), self.next_vreg());
-                    self.push_instruction(Instruction::movzx(source_reg, wider_source).unwrap());
-
-                    wider_source
-                } else {
-                    let new_source = Operand::vreg(target.width(), self.next_vreg());
-                    self.push_instruction(Instruction::movzx(source, new_source).unwrap());
-                    new_source
-                }
-            }
-        };
-
-        let width = target.width();
-
-        // todo: optimize when entire target is being replaced by source
-        // let mask = if let OperandKind::Immediate(length) = length.kind()
-        //     && *length == u64::from(width.as_u16())
-        // {
-
-        //     let mask = Operand::vreg(width, self.next_vreg());
-        //     self.push_instruction(Instruction::mov(Operand::imm(width, 0),
-        // mask).unwrap());     mask
-
-        if width > Width::_64 {
-            self.emit_bit_insert_128(target, source, start, length)
-        } else {
-            self.emit_bit_insert_64(target, source, start, length)
-        }
-    }
-
-    fn emit_bit_insert_64(
-        &mut self,
-
-        target: Operand<A>,
-        source: Operand<A>,
-        start: Operand<A>,
-        length: Operand<A>,
-    ) -> Operand<A> {
-        let width = target.width();
-
-        let mask = self.emit_mask(start, length, width);
-
-        let masked_target = {
-            let op = Operand::vreg(width, self.next_vreg());
-            self.push_instruction(Instruction::mov(target, op).unwrap());
-            self.push_instruction(Instruction::and(mask, op));
-            op
-        };
-
-        let shifted_source = {
-            let op = Operand::vreg(width, self.next_vreg());
-            self.push_instruction(Instruction::mov(source, op).unwrap());
-            self.push_instruction(Instruction::shl(start, op));
-            op
-        };
-
-        {
-            let invert_mask = Operand::vreg(width, self.next_vreg());
-            self.push_instruction(Instruction::mov(mask, invert_mask).unwrap());
-            self.push_instruction(Instruction::not(invert_mask));
-            self.push_instruction(Instruction::and(invert_mask, shifted_source));
-        }
-
-        self.push_instruction(Instruction::or(shifted_source, masked_target));
-
-        masked_target
-    }
-
-    fn emit_mask(&mut self, start: Operand<A>, length: Operand<A>, width: Width) -> Operand<A> {
-        let mask = Operand::vreg(width, self.next_vreg());
-
-        self.push_instruction(Instruction::mov(Operand::imm(width, 1), mask).unwrap());
-
-        // mask = (1 << mask_length) - 1
-        self.push_instruction(Instruction::shl(length, mask));
-        self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask));
-
-        // then move into the correct place
-        self.push_instruction(Instruction::shl(start, mask));
-
-        // invert because we want to make an emply slot for the source value to be
-        // inserted into
-        self.push_instruction(Instruction::not(mask));
-
-        mask
-    }
-
-    fn emit_bit_insert_128(
-        &mut self,
-        target: Operand<A>,
-        source: Operand<A>,
-        start: Operand<A>,
-        length: Operand<A>,
-    ) -> Operand<A> {
-        let width = target.width();
-
-        let OperandKind::Immediate(start) = start.kind() else {
-            panic!("start: {:?}", start.kind());
-        };
-
-        let OperandKind::Immediate(length) = length.kind() else {
-            panic!("length: {:?}", length.kind());
-        };
-
-        assert!(start + length <= 127);
-
-        let mask = {
-            let SplitRange {
-                low_start,
-                low_length,
-                high_start,
-                high_length,
-            } = SplitRange::new(*start, *length);
-
-            let low_mask = self.emit_mask(
-                Operand::imm(Width::_16, low_start),
-                Operand::imm(Width::_16, low_length),
-                Width::_64,
-            );
-
-            let low_mask_128 = Operand::vreg(Width::_128, self.next_vreg());
-            self.push_instruction(Instruction::movzx(low_mask, low_mask_128).unwrap());
-
-            let high_mask = self.emit_mask(
-                Operand::imm(Width::_16, high_start),
-                Operand::imm(Width::_16, high_length),
-                Width::_64,
-            );
-
-            let high_mask_128 = Operand::vreg(Width::_128, self.next_vreg());
-            self.push_instruction(Instruction::movzx(high_mask, high_mask_128).unwrap());
-
-            self.push_instruction(Instruction::punpckl(high_mask_128, low_mask_128));
-            low_mask_128
-        };
-
-        // mask target
-        let target = {
-            let op = Operand::vreg(width, self.next_vreg());
-            self.push_instruction(Instruction::mov(target, op).unwrap());
-            self.push_instruction(Instruction::and(mask, op));
-            op
-        };
-
-        let shifted_source = {
-            let low_source = {
-                let op = Operand::vreg(Width::_64, self.next_vreg());
-                self.push_instruction(Instruction::mov(source, op).unwrap());
-                self.push_instruction(Instruction::shl(Operand::imm(Width::_8, *start), op));
-                op
-            };
-            let low_source_128 = Operand::vreg(Width::_128, self.next_vreg());
-            self.push_instruction(Instruction::movzx(low_source, low_source_128).unwrap());
-
-            // (source << start) >> 64
-            // = source >> (start - 64) ?
-            let high_source = {
-                let op = Operand::vreg(Width::_64, self.next_vreg());
-                self.push_instruction(Instruction::mov(source, op).unwrap());
-
-                let shr_amount = 64i64 - i64::try_from(*start).unwrap();
-
-                if shr_amount > 0 {
-                    self.push_instruction(Instruction::shr(
-                        Operand::imm(Width::_16, u64::try_from(shr_amount).unwrap()),
-                        op,
-                    ));
-                } else {
-                    self.push_instruction(Instruction::shl(
-                        Operand::imm(Width::_16, u64::try_from(shr_amount.abs()).unwrap()),
-                        op,
-                    ));
-                }
-
-                op
-            };
-            let high_source_128 = Operand::vreg(Width::_128, self.next_vreg());
-            self.push_instruction(Instruction::movzx(high_source, high_source_128).unwrap());
-
-            self.push_instruction(Instruction::punpckl(high_source_128, low_source_128));
-            low_source_128
-        };
-
-        {
-            let invert_mask = Operand::vreg(width, self.next_vreg());
-            self.push_instruction(Instruction::mov(mask, invert_mask).unwrap());
-            self.push_instruction(Instruction::not(invert_mask));
-            self.push_instruction(Instruction::and(invert_mask, shifted_source));
-        }
-
-        self.push_instruction(Instruction::or(shifted_source, target));
-
-        target
     }
 
     fn unary_operation_to_operand(&mut self, kind: &UnaryOperationKind<A>) -> Operand<A> {

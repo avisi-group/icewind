@@ -259,23 +259,26 @@ impl From<PhysicalRegister> for AsmRegister32 {
     }
 }
 
-impl From<&PhysicalRegister> for AsmRegisterXmm {
-    fn from(phys: &PhysicalRegister) -> Self {
+impl TryFrom<&PhysicalRegister> for AsmRegisterXmm {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: &PhysicalRegister) -> Result<Self, Self::Error> {
         use iced_x86::code_asm::{xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7};
 
         match phys {
-            PhysicalRegister::XMM0 => xmm0,
-            PhysicalRegister::XMM1 => xmm1,
-            PhysicalRegister::XMM2 => xmm2,
-            PhysicalRegister::XMM3 => xmm3,
-            PhysicalRegister::XMM4 => xmm4,
-            PhysicalRegister::XMM5 => xmm5,
-            PhysicalRegister::XMM6 => xmm6,
-            PhysicalRegister::XMM7 => xmm7,
-            _ => panic!(),
+            PhysicalRegister::XMM0 => Ok(xmm0),
+            PhysicalRegister::XMM1 => Ok(xmm1),
+            PhysicalRegister::XMM2 => Ok(xmm2),
+            PhysicalRegister::XMM3 => Ok(xmm3),
+            PhysicalRegister::XMM4 => Ok(xmm4),
+            PhysicalRegister::XMM5 => Ok(xmm5),
+            PhysicalRegister::XMM6 => Ok(xmm6),
+            PhysicalRegister::XMM7 => Ok(xmm7),
+            reg => Err(RegisterConversionError::InvalidGeneralAsXmm(*reg)),
         }
     }
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
     Physical(PhysicalRegister),
@@ -303,7 +306,7 @@ impl Into<iced_x86::Register> for PhysicalRegister {
 }
 
 #[derive(Debug, Clone, Copy, displaydoc::Display, thiserror::Error)]
-enum RegisterConversionError {
+pub enum RegisterConversionError {
     /// XMM register {0} cannot be converted to `AsmRegister64`
     InvalidXmmAs64(PhysicalRegister),
     /// General register {0} cannot be converted to `AsmRegisterXmm`

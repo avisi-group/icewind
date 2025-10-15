@@ -26,7 +26,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_128,
             },
         ) => assembler
-            .pxor::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), dst.into())
+            .pxor::<AsmRegisterXmm, AsmRegisterXmm>(
+                dst.try_into().unwrap(),
+                dst.try_into().unwrap(),
+            )
             .unwrap(),
 
         // MOVZX I -> R
@@ -97,7 +100,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .mov::<AsmRegister32, AsmRegister32>(dst_r.into(), src_r.into())
                 .unwrap(),
             (Width::_64, Width::_128) => assembler
-                .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
+                .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.try_into().unwrap(), src_r.into())
                 .unwrap(),
 
             (Width::_8, Width::_128) => {
@@ -105,7 +108,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .movzx::<AsmRegister64, AsmRegister8>(src_r.into(), src_r.into())
                     .unwrap();
                 assembler
-                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
+                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.try_into().unwrap(), src_r.into())
                     .unwrap()
             }
 
@@ -114,7 +117,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .movzx::<AsmRegister64, AsmRegister16>(src_r.into(), src_r.into())
                     .unwrap();
                 assembler
-                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
+                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.try_into().unwrap(), src_r.into())
                     .unwrap()
             }
 
@@ -123,7 +126,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .mov::<AsmRegister32, AsmRegister32>(src_r.into(), src_r.into())
                     .unwrap();
                 assembler
-                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.into(), src_r.into())
+                    .movq::<AsmRegisterXmm, AsmRegister64>(dst_r.try_into().unwrap(), src_r.into())
                     .unwrap()
             }
             (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),

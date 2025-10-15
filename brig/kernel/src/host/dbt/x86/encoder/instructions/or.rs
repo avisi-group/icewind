@@ -151,7 +151,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .por::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
+                .por::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         _ => todo!("or {src} {dst}"),

@@ -29,6 +29,7 @@ use {
         panic,
     },
     derive_where::derive_where,
+    elf::abi,
     proc_macro_lib::ktest,
 };
 
@@ -159,6 +160,181 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         for _ in 0..CALLER_SAVED.len() {
             self.push_instruction(Instruction(Opcode::DEAD));
         }
+    }
+
+    fn mask(&mut self, start: X86NodeRef<A>, length: X86NodeRef<A>, width: u32) -> X86NodeRef<A> {
+        let _1 = self.constant(1, Type::Unsigned(width));
+
+        // mask = (1 << mask_length) - 1
+        let shifted_1 = self.shift(_1.clone(), length, ShiftOperationKind::LogicalShiftLeft);
+        let mask = self.binary_operation(BinaryOperationKind::Sub(shifted_1, _1));
+
+        // then move into the correct place
+        let shifted_mask = self.shift(mask, start, ShiftOperationKind::LogicalShiftLeft);
+
+        shifted_mask
+    }
+
+    fn bit_insert_64(
+        &mut self,
+        target: X86NodeRef<A>,
+        source: X86NodeRef<A>,
+        start: X86NodeRef<A>,
+        length: X86NodeRef<A>,
+    ) -> X86NodeRef<A> {
+        let mask = self.mask(start.clone(), length, target.typ().width());
+
+        // invert because we want to make an emply slot for the source value to be
+        // inserted into
+        let inverted_mask = self.unary_operation(UnaryOperationKind::Complement(mask.clone()));
+
+        let cleared_target =
+            self.binary_operation(BinaryOperationKind::And(target.clone(), inverted_mask));
+
+        let shifted_source = {
+            let cast_source = self.cast(source, target.typ(), CastOperationKind::ZeroExtend);
+            self.shift(cast_source, start, ShiftOperationKind::LogicalShiftLeft)
+        };
+
+        let masked_source = self.binary_operation(BinaryOperationKind::And(shifted_source, mask));
+
+        self.binary_operation(BinaryOperationKind::Or(cleared_target, masked_source))
+    }
+
+    fn bit_insert_128(
+        &mut self,
+        target: X86NodeRef<A>,
+        source: X86NodeRef<A>,
+        start: X86NodeRef<A>,
+        length: X86NodeRef<A>,
+    ) -> X86NodeRef<A> {
+        // let low_start = if start >= 64 { 0 } else { start };
+        // let low_length = if start >= 64 {
+        //     0
+        // } else {
+        //     let end = min(start + length, 64);
+
+        //     end - start
+        // };
+
+        // let high_start = if start >= 64 { start - 64 } else { 0 };
+        // let high_length = length - low_length;
+        let start = self.cast(start, Type::Signed(64), CastOperationKind::Convert);
+        let length = self.cast(length, Type::Signed(64), CastOperationKind::Convert);
+
+        let low_start = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64,
+            ));
+            self.select(condition, _0, start.clone())
+        };
+
+        let low_length = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64,
+            ));
+
+            let capped_length = {
+                let _64 = self.constant(64, Type::Signed(64));
+                let end =
+                    self.binary_operation(BinaryOperationKind::Add(start.clone(), length.clone()));
+
+                let condition = self.binary_operation(
+                    BinaryOperationKind::CompareGreaterThanOrEqual(end.clone(), _64.clone()),
+                );
+
+                let capped_end = self.select(condition, _64, end);
+
+                self.binary_operation(BinaryOperationKind::Sub(capped_end, start.clone()))
+            };
+
+            self.select(condition, _0, capped_length)
+        };
+
+        let high_start = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64.clone(),
+            ));
+            let start_sub_64 = self.binary_operation(BinaryOperationKind::Sub(start.clone(), _64));
+            self.select(condition, start_sub_64, _0)
+        };
+
+        let high_length =
+            self.binary_operation(BinaryOperationKind::Sub(length.clone(), low_length.clone()));
+
+        let mask = {
+            let low_mask = self.mask(low_start, low_length, 64);
+            let low_mask_128 =
+                self.cast(low_mask, Type::Unsigned(128), CastOperationKind::ZeroExtend);
+
+            let high_mask = self.mask(high_start, high_length, 64);
+
+            let _64 = self.constant(64, Type::Signed(64));
+
+            self.bit_insert(low_mask_128, high_mask, _64.clone(), _64) // should get emitted as pinsr or unpckl
+        };
+        let inverted_mask = self.unary_operation(UnaryOperationKind::Complement(mask.clone()));
+
+        let target = self.binary_operation(BinaryOperationKind::And(target, inverted_mask));
+
+        let source = {
+            let low_source = self.shift(
+                source.clone(),
+                start.clone(),
+                ShiftOperationKind::LogicalShiftLeft,
+            );
+            let low_source_128 = self.cast(
+                low_source,
+                Type::Unsigned(128),
+                CastOperationKind::ZeroExtend,
+            );
+
+            // (source << start) >> 64
+            // = source >> (start - 64) ?
+            let high_source = {
+                let _0 = self.constant(0, Type::Signed(64));
+                let _64 = self.constant(64, Type::Signed(64));
+
+                let shr_amount = self.binary_operation(BinaryOperationKind::Sub(_64, start));
+
+                let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThan(
+                    shr_amount.clone(),
+                    _0,
+                ));
+
+                let abs_shift_amount =
+                    self.unary_operation(UnaryOperationKind::Absolute(shr_amount));
+
+                let shift_right = self.shift(
+                    source.clone(),
+                    abs_shift_amount.clone(),
+                    ShiftOperationKind::LogicalShiftRight,
+                );
+                let shift_left = self.shift(
+                    source,
+                    abs_shift_amount,
+                    ShiftOperationKind::LogicalShiftLeft,
+                );
+
+                self.select(condition, shift_right, shift_left)
+            };
+
+            let _64 = self.constant(64, Type::Signed(64));
+            let source = self.bit_insert(low_source_128, high_source, _64.clone(), _64); // should get emitted as a pinsr
+
+            self.binary_operation(BinaryOperationKind::And(source, mask))
+        };
+
+        self.binary_operation(BinaryOperationKind::Or(target, source))
     }
 }
 
@@ -344,6 +520,22 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 }),
             },
 
+            Absolute(value) => match value.kind() {
+                NodeKind::Constant {
+                    value: const_value,
+                    width: const_width,
+                } => match (value.typ(), const_width) {
+                    (Type::Signed(64), 64) => {
+                        let abs = u64::try_from((*const_value as i64).abs()).unwrap();
+                        self.constant(abs, Type::Signed(64))
+                    }
+                    _ => todo!("{:?} ({const_width})", value.typ()),
+                },
+                _ => self.node(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::UnaryOperation(op),
+                }),
+            },
             _ => {
                 todo!("{op:?}")
             }
@@ -565,10 +757,19 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         width: *width,
                     },
                 }),
-                _ => self.node(X86Node {
-                    typ: lhs.typ().clone(),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
+                _ => {
+                    // todo: assert this for all binary operations assert_eq!(lhs.typ(), rhs.typ());
+                    let typ = if rhs.typ().width() > lhs.typ().width() {
+                        rhs.typ()
+                    } else {
+                        lhs.typ()
+                    };
+
+                    self.node(X86Node {
+                        typ,
+                        kind: NodeKind::BinaryOperation(op),
+                    })
+                }
             },
             Xor(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
                 (
@@ -1037,7 +1238,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                     let c_start = *bitext_start;
                     let c_length = *bitext_length;
-                    let c_end = c_start + c_length;
+                    // -1 because we want the index of the last element of c, not the value we'd use
+                    // for `c_start..c_end`
+                    let c_end = c_start + c_length - 1;
 
                     log::trace!(
                         "(target[{bitins_start}/{bitins_length}]) = source)[{bitext_start}/{bitext_length}]",
@@ -1104,7 +1307,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                             combined
                         }
-                        x => todo!("unreachable I think??? {x:?}"),
+                        x => todo!(
+                            "unreachable I think??? {x:?}, a_range: {a_range:?}, b_range: {b_range:?}, c_start: {c_start:?}, c_end: {c_end:?}"
+                        ),
                     }
                 }
             }
@@ -1153,6 +1358,15 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                     _ => value.clone(),
                 };
 
+                // // if we're extracting from an XMM, but we're only working on the lower 64
+                // bits, // just truncate it first this was done to avoid issues
+                // with non % 8 amounts // on xmm registers being disallowed
+                // let value = if value.typ().width() > 64 && *start_value + *length_value <= 64
+                // {     self.cast(value, Type::Unsigned(64),
+                // CastOperationKind::Truncate) } else {
+                //     value
+                // };
+
                 // value >> start && mask(length)
                 // should emit fixed shift?
                 let shifted =
@@ -1171,6 +1385,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 self.binary_operation(BinaryOperationKind::And(cast, mask))
             }
+            // todo: handle this here, only pass down when we need bextr?
             _ => self.node(X86Node {
                 typ,
                 kind: NodeKind::BitExtract {
@@ -1190,132 +1405,54 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         length: Self::NodeRef,
     ) -> Self::NodeRef {
         let typ = target.typ().clone();
-        match (target.kind(), source.kind(), start.kind(), length.kind()) {
-            (
-                NodeKind::Constant {
-                    value: target_c,
-                    width: target_width_c,
-                },
-                NodeKind::Constant {
-                    value: source_c, ..
-                },
-                NodeKind::Constant { value: start_c, .. },
-                NodeKind::Constant {
-                    value: length_c, ..
-                },
-            ) => {
-                if *target_width_c <= 64 {
-                    self.constant(
-                        bit_insert(*target_c, *source_c, *start_c, *length_c),
-                        Type::Unsigned(*target_width_c),
-                    )
-                } else {
-                    self.node(X86Node {
-                        typ,
-                        kind: NodeKind::BitInsert {
-                            target,
-                            source,
-                            start,
-                            length,
-                        },
-                    })
-                }
-            }
-            // // constant start and length, and source
-            // (
-            //     _,
-            //     NodeKind::Constant {
-            //         value: source_value,
-            //         width: source_width,
-            //     },
-            //     NodeKind::Constant { value: start_c, .. },
-            //     NodeKind::Constant {
-            //         value: length_c, ..
-            //     },
-            // ) => {
-            //     if u64::from(*source_width) != *length_c {
-            //         panic!()
-            //     }
 
-            //     if *start_c == 0 {  } else { todo!() }
-            // }
-            // constant start and length
-            (
-                _,
-                _,
-                NodeKind::Constant { value: start_c, .. },
-                NodeKind::Constant {
-                    value: length_c, ..
-                },
-            ) => {
-                // if we're dealing with 128 bit stuff, and is valid for vector stuff, pass it
-                // down to the emitter
-                if (*start_c >= 64)
-                    || ((*start_c + *length_c) >= 64)
-                    || (target.typ().width() == 128)
-                {
-                    if (target.typ().width() == 128)
-                        && !(matches!(length_c, 8 | 16 | 32 | 64) && start_c % length_c == 0)
-                    {
-                        panic!(
-                            "unsupported vector stuff, curious if we ever hit this (we shouldnt)"
-                        )
-                    }
-
-                    return self.node(X86Node {
-                        typ,
-                        kind: NodeKind::BitInsert {
-                            target,
-                            source,
-                            start,
-                            length,
-                        },
-                    });
-                }
-
-                let length = u32::try_from(*length_c).unwrap();
-                let start = u32::try_from(*start_c).unwrap();
-
-                let cleared_target = {
-                    let mask = self.constant(
-                        (!(mask(length).checked_shl(start).unwrap_or_else(|| {
-                            panic!(
-                                "overflow in shl with {start:?} {length:?} {:?}",
-                                target.typ()
-                            )
-                        }))) & mask(target.typ().width()),
-                        target.typ(),
-                    );
-
-                    self.binary_operation(BinaryOperationKind::And(target.clone(), mask))
-                };
-
-                let shifted_source = {
-                    let cast_source =
-                        self.cast(source, target.typ(), CastOperationKind::ZeroExtend);
-
-                    let mask = self.constant(mask(length), cast_source.typ());
-
-                    let masked_source =
-                        self.binary_operation(BinaryOperationKind::And(cast_source, mask));
-
-                    let start = self.constant(start.into(), Type::Signed(64));
-
-                    self.shift(masked_source, start, ShiftOperationKind::LogicalShiftLeft)
-                };
-
-                self.binary_operation(BinaryOperationKind::Or(cleared_target, shifted_source))
-            }
-            _ => self.node(X86Node {
-                typ,
-                kind: NodeKind::BitInsert {
-                    target,
-                    source,
-                    start,
-                    length,
-                },
-            }),
+        // fully constant (can't do fully constant 128-bit though)
+        if let (
+            NodeKind::Constant {
+                value: target_c,
+                width: target_width_c,
+            },
+            NodeKind::Constant {
+                value: source_c, ..
+            },
+            NodeKind::Constant { value: start_c, .. },
+            NodeKind::Constant {
+                value: length_c, ..
+            },
+        ) = (target.kind(), source.kind(), start.kind(), length.kind())
+            && *target_width_c <= 64
+        {
+            return self.constant(
+                bit_insert(*target_c, *source_c, *start_c, *length_c),
+                Type::Unsigned(*target_width_c),
+            );
         }
+
+        // if we're replacing the entire target with source, return source
+        if let NodeKind::Constant { value: start_c, .. } = start.kind()
+            && let NodeKind::Constant {
+                value: length_c, ..
+            } = length.kind()
+            && ((*start_c == 0)
+                && Width::from_uncanonicalized(*length_c).unwrap()
+                    == Width::from_uncanonicalized(source.typ().width()).unwrap()
+                && Width::from_uncanonicalized(*length_c).unwrap()
+                    == Width::from_uncanonicalized(target.typ().width()).unwrap())
+        {
+            return source;
+        }
+
+        // leave as bitinsert node for now so any bitextracts can be optimized, logic
+        // now in to_operand
+        self.node(X86Node {
+            typ,
+            kind: NodeKind::BitInsert {
+                target,
+                source,
+                start,
+                length,
+            },
+        })
     }
 
     fn bit_replicate(&mut self, pattern: Self::NodeRef, count: Self::NodeRef) -> Self::NodeRef {
@@ -1562,20 +1699,20 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 todo!("this was handled in models.rs")
             }
             NodeKind::BinaryOperation(BinaryOperationKind::CompareEqual(left, right)) => {
-                let left = self.to_operand(left);
-                let right = self.to_operand(right);
+                let left_op = self.to_operand(left);
+                let right_op = self.to_operand(right);
 
-                match (left.kind(), right.kind()) {
+                match (left_op.kind(), right_op.kind()) {
                     (OperandKind::Immediate(_), OperandKind::Immediate(_)) => {
                         todo!()
                     }
                     (_, OperandKind::Immediate(0)) => {
-                        self.push_instruction(Instruction::test(left, left).unwrap())
+                        self.push_instruction(Instruction::test(left_op, left_op).unwrap())
                     }
                     (_, OperandKind::Immediate(_)) => {
-                        self.push_instruction(Instruction::cmp(right, left))
+                        self.push_instruction(Instruction::cmp(right_op, left_op))
                     }
-                    _ => self.push_instruction(Instruction::cmp(left, right)),
+                    _ => self.push_instruction(Instruction::cmp(left_op, right_op)),
                 }
 
                 self.push_instruction(Instruction::jne(false_target));

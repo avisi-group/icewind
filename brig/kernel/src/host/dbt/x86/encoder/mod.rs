@@ -539,18 +539,16 @@ impl<A: Alloc> Instruction<A> {
         // todo: remove these checks or enforce them earlier
         if src.width() == Width::_128
             && let OperandKind::Register(Register::Physical(phys)) = src.kind()
+            && phys.is_gpr()
         {
-            if phys.is_gpr() {
-                return Err(Error::OversizeGeneralRegister(src));
-            }
+            return Err(Error::OversizeGeneralRegister(src));
         }
 
         if dst.width() == Width::_128
             && let OperandKind::Register(Register::Physical(phys)) = dst.kind()
+            && phys.is_gpr()
         {
-            if phys.is_gpr() {
-                return Err(Error::OversizeGeneralRegister(dst));
-            }
+            return Err(Error::OversizeGeneralRegister(dst));
         }
 
         if src.width() != Width::_128 && src.width() != dst.width() {
@@ -623,6 +621,12 @@ impl<A: Alloc> Instruction<A> {
     }
 
     pub fn shr(amount: Operand<A>, op0: Operand<A>) -> Self {
+        if op0.width() > Width::_64
+            && let OperandKind::Immediate(amount) = amount.kind()
+            && amount % 8 != 0
+        {
+            panic!("{amount:?} {op0:?}")
+        }
         Self(Opcode::SHR(amount, op0))
     }
 
@@ -1229,9 +1233,33 @@ impl<A: Alloc> Instruction<A> {
                     width_in_bits: Width::_128,
                 },
             ) => {
+                // does the low word from an r32 so safe, todo check this
                 assembler
                     .pinsrw::<AsmRegisterXmm, AsmRegister32, i32>(
-                        dst.into(),
+                        dst.try_into().unwrap(),
+                        src.into(),
+                        i32::try_from(*index).unwrap(),
+                    )
+                    .unwrap();
+            }
+
+            PINSR(
+                Operand {
+                    kind: I(index),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => {
+                assembler
+                    .pinsrd::<AsmRegisterXmm, AsmRegister32, i32>(
+                        dst.try_into().unwrap(),
                         src.into(),
                         i32::try_from(*index).unwrap(),
                     )
@@ -1254,7 +1282,7 @@ impl<A: Alloc> Instruction<A> {
             ) => {
                 assembler
                     .pinsrq::<AsmRegisterXmm, AsmRegister64, i32>(
-                        dst.into(),
+                        dst.try_into().unwrap(),
                         src.into(),
                         i32::try_from(*index).unwrap(),
                     )
@@ -1271,7 +1299,10 @@ impl<A: Alloc> Instruction<A> {
                     width_in_bits: Width::_128,
                 },
             ) => assembler
-                .punpcklqdq::<AsmRegisterXmm, AsmRegisterXmm>(dst.into(), src.into())
+                .punpcklqdq::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             _ => panic!("cannot encode this instruction {}", self),
