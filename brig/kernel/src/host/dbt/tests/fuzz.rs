@@ -6,12 +6,32 @@ use {
         translate::translate_instruction,
         x86::{X86TranslationContext, emitter::X86Emitter},
     },
-    alloc::{alloc::Global, format},
+    alloc::{alloc::Global, format, vec::Vec},
+    common::fuzz_test::InstructionFuzzTest,
+    proc_macro_lib::ktest,
 };
 
-mod generated;
+const TEST_DATA: &[u8] = include_bytes!("fuzz_tests.postcard");
 
-pub fn fuzz_test(instruction: u32, _index: usize, input_state: &[u64], output_state: &[u64]) {
+#[ktest]
+fn fuzz() {
+    for test in postcard::from_bytes::<Vec<InstructionFuzzTest>>(TEST_DATA).unwrap() {
+        log::trace!(
+            "running fuzz test \"{:08x}\" {}",
+            test.instruction,
+            test.test_number
+        );
+
+        run_test(
+            test.instruction,
+            test.test_number,
+            &test.initial_state,
+            &test.post_state,
+        );
+    }
+}
+
+fn run_test(instruction: u32, _index: usize, initial_state: &[u64; 31], post_state: &[u64; 31]) {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
@@ -37,14 +57,14 @@ pub fn fuzz_test(instruction: u32, _index: usize, input_state: &[u64], output_st
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    input_state
+    initial_state
         .iter()
         .enumerate()
         .for_each(|(i, value)| register_file.write::<u64>(format!("R{i}"), *value));
 
     translation.execute(&register_file);
 
-    output_state.iter().enumerate().for_each(|(i, value)| {
+    post_state.iter().enumerate().for_each(|(i, value)| {
         let read = register_file.read::<u64>(format!("R{i}"));
         if read != *value {
             panic!("R{i} mismatch! expected {value}, got {}", read)

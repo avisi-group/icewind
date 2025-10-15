@@ -10,6 +10,7 @@ use {
 };
 
 pub mod arena;
+pub mod fuzz_test;
 pub mod hashmap;
 pub mod id;
 pub mod intern;
