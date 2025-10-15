@@ -9,7 +9,6 @@ use {
             dbt::{
                 Alloc, Translation,
                 emitter::{Emitter, Type},
-                register_file::{RegisterFile, WellKnownRegister},
                 translate::translate_instruction,
                 x86::{
                     X86TranslationContext,
@@ -44,6 +43,7 @@ use {
         fmt::{self, Debug, Write},
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
+    dbt::register_file::{RegisterFile, WellKnownRegister},
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},

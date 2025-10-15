@@ -1,0 +1,12 @@
+[package]
+name = "dbt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common = { path = "../../common", features = ["no-std"] }
+
+byteorder = { version = "1.5.0", default-features = false }
+itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
+paste = "1.0.15"
+log = { version = "0.4.27", default-features = false }

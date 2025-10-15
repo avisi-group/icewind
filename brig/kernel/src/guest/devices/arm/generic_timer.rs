@@ -9,12 +9,10 @@ use {
             tickable::Tickable,
         },
     },
-    alloc::{collections::BTreeMap, sync::Arc},
+    alloc::sync::Arc,
     bitfields::bitfield,
-    common::intern::InternedString,
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
     embedded_time::duration::Nanoseconds,
-    proc_macro_lib::guest_device_factory,
 };
 
 const CNTKCTL_EL1: u64 = encode_sysreg_id(3, 0, 14, 1, 0);

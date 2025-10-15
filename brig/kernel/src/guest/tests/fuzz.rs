@@ -3,13 +3,13 @@ use {
         guest::models,
         host::dbt::{
             emitter::Emitter,
-            register_file::RegisterFile,
             translate::translate_instruction,
             x86::{X86TranslationContext, emitter::X86Emitter},
         },
     },
     alloc::{alloc::Global, format, vec::Vec},
     common::fuzz_test::InstructionFuzzTest,
+    dbt::register_file::RegisterFile,
     proc_macro_lib::ktest,
 };
 

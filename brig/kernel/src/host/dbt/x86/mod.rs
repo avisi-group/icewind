@@ -3,7 +3,6 @@ use {
         host::dbt::{
             Alloc, Translation,
             emitter::Emitter,
-            register_file::GLOBAL_REGISTER_SIZE,
             x86::{
                 emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
                 encoder::{
@@ -28,6 +27,7 @@ use {
         rudder::Model,
     },
     core::{default, fmt::Debug, sync::atomic::AtomicUsize},
+    dbt::register_file::GLOBAL_REGISTER_SIZE,
     iced_x86::code_asm::CodeAssembler,
 };
 

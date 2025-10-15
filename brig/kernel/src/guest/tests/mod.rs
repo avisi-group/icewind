@@ -5,8 +5,6 @@ use {
             dbt::{
                 Translation,
                 emitter::{Emitter, Type},
-                interpret::{Value, interpret},
-                register_file::RegisterFile,
                 sysreg_helpers,
                 translate::{translate, translate_instruction},
                 x86::{
@@ -29,6 +27,10 @@ use {
         hashmap::HashMap,
     },
     core::{panic, u128},
+    dbt::{
+        interpret::{self, Value, interpret},
+        register_file::RegisterFile,
+    },
     proc_macro_lib::ktest,
 };
 
@@ -362,7 +364,7 @@ fn decodea64_addsub_interpret() {
     register_file.write::<u64>("R1", 5);
     register_file.write::<u64>("R2", 10);
 
-    let opcode = crate::host::dbt::interpret::Value::UnsignedInteger {
+    let opcode = interpret::Value::UnsignedInteger {
         value: 0x8b020020,
         width: 32,
     };

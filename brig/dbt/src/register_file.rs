@@ -1,5 +1,5 @@
 use {
-    crate::host::dbt::interpret::interpret,
+    crate::interpret::interpret,
     alloc::vec::Vec,
     byteorder::ByteOrder,
     common::{hashmap::HashMap, intern::InternedString, rudder::Model},

@@ -10,6 +10,8 @@ debug_translation = []
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
+dbt = { path = "../dbt" }
+
 
 bootloader_api = "0.11.11"
 x86_64 = "0.15.2"

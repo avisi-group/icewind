@@ -2,7 +2,6 @@ use {
     crate::host::dbt::{
         Alloc,
         emitter::{self, Emitter, Type},
-        register_file::{GLOBAL_REGISTER_SIZE, RegisterFile},
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         x86::{
             emitter::{CastOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
@@ -25,6 +24,7 @@ use {
         panic,
         sync::atomic::{AtomicUsize, Ordering},
     },
+    dbt::register_file::{GLOBAL_REGISTER_SIZE, RegisterFile},
     derive_where::derive_where,
     itertools::Itertools,
 };

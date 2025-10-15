@@ -241,6 +241,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dbt"
+version = "0.1.0"
+dependencies = [
+ "byteorder",
+ "common",
+ "itertools 0.14.0",
+ "log",
+ "paste",
+]
+
+[[package]]
 name = "deepsize"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -448,6 +459,7 @@ dependencies = [
  "byteorder",
  "common",
  "concat-idents",
+ "dbt",
  "derive-where",
  "disarm64",
  "displaydoc",

@@ -1,22 +1,18 @@
 use {
-    crate::host::{
-        arch::x86::memory::VirtualMemoryArea,
-        dbt::{register_file::RegisterFile, trampoline::ExecutionResult},
-    },
+    crate::host::{arch::x86::memory::VirtualMemoryArea, dbt::trampoline::ExecutionResult},
     alloc::{string::String, vec::Vec},
     common::bits::mask,
     core::{
         alloc::Allocator,
         fmt::{self, Debug},
     },
+    dbt::register_file::RegisterFile,
     iced_x86::{Formatter, Instruction},
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
 pub mod dag;
 pub mod emitter;
-pub mod interpret;
-pub mod register_file;
 pub mod sysreg_helpers;
 mod trampoline;
 pub mod translate;

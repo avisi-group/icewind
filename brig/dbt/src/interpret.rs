@@ -1,5 +1,5 @@
 use {
-    crate::host::dbt::register_file::RegisterFile,
+    crate::register_file::RegisterFile,
     alloc::vec::Vec,
     common::{
         arena::Ref,
