@@ -4,7 +4,7 @@ use {
         dbt::{register_file::RegisterFile, trampoline::ExecutionResult},
     },
     alloc::{string::String, vec::Vec},
-    common::mask::mask,
+    common::bits::mask,
     core::{
         alloc::Allocator,
         fmt::{self, Debug},
@@ -16,10 +16,8 @@ use {
 pub mod dag;
 pub mod emitter;
 pub mod interpret;
-pub mod models;
 pub mod register_file;
 pub mod sysreg_helpers;
-mod tests;
 mod trampoline;
 pub mod translate;
 pub mod x86;
@@ -90,38 +88,4 @@ impl Debug for Translation {
 
         Ok(())
     }
-}
-
-fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
-    // todo: hack
-    if start >= 64 {
-        if source == 0 {
-            return 0;
-        } else {
-            panic!("attempting to insert {length} bits of {source} into {target} at {start}");
-        }
-    }
-
-    let length = u32::try_from(length).unwrap();
-
-    let cleared_target = {
-        let mask = !(mask(length)
-            .checked_shl(u32::try_from(start).unwrap())
-            .unwrap_or_else(|| {
-                panic!("overflow in shl with {target:b} {source:?} {start:?} {length:?}")
-            }));
-        target & mask
-    };
-
-    let shifted_source = {
-        let mask = mask(length);
-        let masked_source = source & mask;
-        masked_source << start
-    };
-
-    cleared_target | shifted_source
-}
-
-fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
-    (value >> start) & mask(u32::try_from(length).unwrap())
 }

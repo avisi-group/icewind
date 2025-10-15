@@ -1,11 +1,11 @@
 use {
-    crate::host::dbt::{bit_extract, bit_insert, register_file::RegisterFile},
+    crate::host::dbt::register_file::RegisterFile,
     alloc::vec::Vec,
     common::{
         arena::Ref,
+        bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
         intern::InternedString,
-        mask::mask,
         rudder::{
             Model,
             block::Block,

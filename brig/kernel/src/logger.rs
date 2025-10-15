@@ -19,13 +19,13 @@ static LOGGER: &Logger = &Logger {
         ("tar_no_std", LevelFilter::Off), /* todo: find better way of silencing error
                                            * about empty file named "" at end of
                                            * archive */
-        ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
+        ("common::bits", LevelFilter::Off), // silencing overflows when generating masks
         (
             "kernel::host::dbt::x86::register_allocator",
             LevelFilter::Info,
         ),
+        ("kernel::guest::models", LevelFilter::Info),
         ("kernel::host::dbt::x86", LevelFilter::Info),
-        ("kernel::host::dbt::models", LevelFilter::Info),
         ("kernel::host::dbt::translate", LevelFilter::Info),
         ("kernel::host::dbt::interpret", LevelFilter::Info),
         ("kernel::host::arch::x86::irq", LevelFilter::Trace),

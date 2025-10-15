@@ -12,12 +12,12 @@ extern crate alloc;
 
 use {
     crate::{
+        guest::models,
         host::{
             arch::x86::memory::{
                 HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
                 VirtualMemoryArea,
             },
-            dbt::models,
             devices::manager::SharedDeviceManager,
             fs::{Filesystem, tar::TarFilesystem},
             memory::bytes,

@@ -1,7 +1,7 @@
 use {
     crate::{
+        bits::mask,
         intern::InternedString,
-        mask::mask,
         rudder::types::{PrimitiveType, Type},
     },
     alloc::{boxed::Box, vec::Vec},

@@ -1,14 +1,14 @@
 use {
     crate::{
-        guest::GuestExecutionContext,
+        guest::{
+            GuestExecutionContext,
+            models::{ModelDevice, write_to_el},
+        },
         host::{
             arch::x86::{
                 memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
             },
-            dbt::{
-                models::{ModelDevice, write_to_el},
-                sysreg_helpers::encode_sysreg_id,
-            },
+            dbt::sysreg_helpers::encode_sysreg_id,
         },
         util::get_current_device,
     },

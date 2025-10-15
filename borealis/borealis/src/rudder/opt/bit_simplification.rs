@@ -2,7 +2,7 @@ use {
     crate::rudder::opt::OptimizationContext,
     common::{
         arena::{Arena, Ref},
-        mask::mask,
+        bits::mask,
         rudder::{
             block::Block,
             constant::Constant,

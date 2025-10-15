@@ -7,12 +7,10 @@ use {
                 virtio::devices::block::VirtioBlock,
             },
             memory::{AddressSpace, AddressSpaceRegion},
+            models::ModelDevice,
         },
         host::{
-            dbt::{
-                models::{self, ModelDevice},
-                sysreg_helpers::{self, encode_sysreg_id},
-            },
+            dbt::sysreg_helpers::{self, encode_sysreg_id},
             fs::Filesystem,
             objects::{
                 Object, ObjectStore,
@@ -32,6 +30,8 @@ use {
 pub mod config;
 pub mod devices;
 pub mod memory;
+pub mod models;
+mod tests;
 
 pub static mut GUEST: Once<Guest> = Once::INIT;
 

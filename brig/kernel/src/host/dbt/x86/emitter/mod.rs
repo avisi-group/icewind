@@ -1,10 +1,12 @@
 use {
     crate::{
-        guest::GuestExecutionContext,
-        host::dbt::{
-            Alloc, bit_extract, bit_insert,
-            emitter::Type,
+        guest::{
+            GuestExecutionContext,
             models::{CHAIN_CACHE_ENTRY_COUNT, write_to_el},
+        },
+        host::dbt::{
+            Alloc,
+            emitter::Type,
             trampoline::ExecutionResult,
             x86::{
                 Emitter, X86TranslationContext,
@@ -19,7 +21,11 @@ use {
     },
     aarch64_paging::target,
     alloc::{rc::Rc, vec::Vec},
-    common::{arena::Ref, hashmap::HashMap, mask::mask},
+    common::{
+        arena::Ref,
+        bits::{bit_extract, bit_insert, mask},
+        hashmap::HashMap,
+    },
     core::{
         cmp::{Ordering, min},
         fmt::Debug,

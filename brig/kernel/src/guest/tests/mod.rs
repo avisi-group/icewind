@@ -1,12 +1,11 @@
 use {
     crate::{
-        guest::devices::create_device,
+        guest::{devices::create_device, models},
         host::{
             dbt::{
-                Translation, bit_insert,
+                Translation,
                 emitter::{Emitter, Type},
                 interpret::{Value, interpret},
-                models::{self},
                 register_file::RegisterFile,
                 sysreg_helpers,
                 translate::{translate, translate_instruction},
@@ -25,7 +24,10 @@ use {
         timer::Measurement,
     },
     alloc::{alloc::Global, boxed::Box, collections::BTreeMap},
-    common::{hashmap::HashMap, mask::mask},
+    common::{
+        bits::{bit_insert, mask},
+        hashmap::HashMap,
+    },
     core::{panic, u128},
     proc_macro_lib::ktest,
 };
