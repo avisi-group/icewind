@@ -15,7 +15,6 @@ use {
                     registers::{PhysicalRegister, Register, SegmentRegister},
                     width::Width,
                 },
-                register_allocator::RegisterAllocator,
             },
         },
     },
@@ -2366,10 +2365,6 @@ impl<A: Alloc> X86Block<A> {
 
     pub fn append(&mut self, instruction: Instruction<A>) {
         self.instructions.push(instruction);
-    }
-
-    pub fn allocate_registers<R: RegisterAllocator>(&mut self, allocator: &mut R) {
-        allocator.allocate(self.instructions_mut());
     }
 
     pub fn instructions(&self) -> &[Instruction<A>] {

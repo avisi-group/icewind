@@ -11,7 +11,6 @@ use {
                     registers::{PhysicalRegister, Register},
                     width::Width,
                 },
-                register_allocator::regalloc_ng,
             },
         },
         println,
@@ -230,7 +229,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         //     println!("{idx}: {instr}");
         // }
 
-        regalloc_ng::allocate(
+        register_allocator::allocate(
             &mut instructions,
             num_virtual_registers,
             self.global_register_offset,
