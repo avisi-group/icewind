@@ -1,6 +1,7 @@
 use {
-    crate::host::dbt::x86::{
-        emitter::{ARG_REGS, CALLER_SAVED},
+    alloc::vec::Vec,
+    dbt::x86::{
+        ARG_REGS, CALLER_SAVED,
         encoder::{
             Instruction, Opcode, Operand,
             OperandKind::{self},
@@ -9,11 +10,10 @@ use {
             width::Width,
         },
     },
-    alloc::vec::Vec,
     strum::EnumCount,
 };
 
-use crate::host::dbt::Alloc as MemAlloc;
+use shared::Alloc as MemAlloc;
 
 #[derive(Default, Clone, Debug)]
 struct RegisterTrack {

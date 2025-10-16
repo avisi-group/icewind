@@ -18,12 +18,6 @@ mod trampoline;
 pub mod translate;
 pub mod x86;
 
-/// Allocator convenience trait
-pub trait Alloc: Allocator + Clone + Copy + Debug {}
-
-// implement Alloc on everything that implements it's constituent traits
-impl<T: Allocator + Clone + Copy + Debug> Alloc for T {}
-
 pub struct Translation {
     // should be AlignedAllocator<4096> or ExecutableAllocator
     pub code: Vec<u8>,

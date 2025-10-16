@@ -1,27 +1,28 @@
 use {
-    crate::host::dbt::{
-        Alloc,
-        x86::{
-            emitter::{ARG_REGS, X86Block},
-            encoder::{
-                instructions::{
-                    adc, add, and, cmp, jne, lea, mov, movsx, movzx, not, or, setne, shl, shr, sub,
-                    test, xor,
-                },
-                registers::{PhysicalRegister, Register, SegmentRegister},
-                width::Width,
+    crate::x86::{
+        ARG_REGS, X86Block,
+        encoder::{
+            instructions::{
+                adc, add, and, cmp, jne, lea, mov, movsx, movzx, not, or, setne, shl, shr, sub,
+                test, xor,
             },
+            registers::{PhysicalRegister, Register, SegmentRegister},
+            width::Width,
         },
     },
     alloc::{string::String, vec::Vec},
     common::{arena::Ref, hashmap::HashMapA},
-    core::fmt::{Debug, Display, Formatter},
+    core::{
+        fmt::{Debug, Display, Formatter},
+        marker::PhantomData,
+    },
     derive_where::derive_where,
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
         AsmRegisterXmm, CodeAssembler, CodeLabel, qword_ptr,
     },
+    shared::Alloc,
 };
 
 mod instructions;

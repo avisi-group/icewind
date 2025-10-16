@@ -1,16 +1,9 @@
 use {
     crate::{
         host::dbt::{
-            Alloc, Translation,
+            Translation,
             emitter::Emitter,
-            x86::{
-                emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
-                encoder::{
-                    Instruction, Opcode, Operand, OperandKind,
-                    registers::{PhysicalRegister, Register},
-                    width::Width,
-                },
-            },
+            x86::emitter::{X86Emitter, X86NodeRef},
         },
         println,
     },
@@ -27,13 +20,23 @@ use {
         rudder::Model,
     },
     core::{default, fmt::Debug, sync::atomic::AtomicUsize},
-    dbt::register_file::GLOBAL_REGISTER_SIZE,
+    dbt::{
+        register_file::GLOBAL_REGISTER_SIZE,
+        x86::{
+            X86Block, X86BlockMark,
+            encoder::{
+                Instruction, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register},
+                width::Width,
+            },
+        },
+    },
     iced_x86::code_asm::CodeAssembler,
+    shared::Alloc,
 };
 
 pub mod dot;
 pub mod emitter;
-pub mod encoder;
 pub mod register_allocator;
 
 struct CachedFunction<A: Alloc> {

@@ -246,9 +246,17 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "common",
+ "derive-where",
+ "displaydoc",
+ "iced-x86",
  "itertools 0.14.0",
+ "linkme",
  "log",
  "paste",
+ "proc_macro_lib",
+ "shared",
+ "strum 0.27.2",
+ "thiserror",
 ]
 
 [[package]]
@@ -480,6 +488,7 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "serde_json",
+ "shared",
  "spin 0.10.0",
  "strum 0.27.2",
  "tar-no-std",
@@ -963,6 +972,10 @@ dependencies = [
  "ryu",
  "serde",
 ]
+
+[[package]]
+name = "shared"
+version = "0.1.0"
 
 [[package]]
 name = "shlex"

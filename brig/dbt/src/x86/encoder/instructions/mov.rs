@@ -1,18 +1,16 @@
 use {
-    crate::host::dbt::{
-        Alloc,
-        x86::encoder::{
-            Operand,
-            OperandKind::{Immediate as I, Memory as M, Register as R},
-            Width, memory_operand_to_iced,
-            registers::Register::Physical as PHYS,
-            segment_memory_operand_to_iced,
-        },
+    crate::x86::encoder::{
+        Operand,
+        OperandKind::{Immediate as I, Memory as M, Register as R},
+        Width, memory_operand_to_iced,
+        registers::Register::Physical as PHYS,
+        segment_memory_operand_to_iced,
     },
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
         AsmRegisterXmm, CodeAssembler, byte_ptr, dword_ptr, qword_ptr, word_ptr, xmmword_ptr,
     },
+    shared::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {

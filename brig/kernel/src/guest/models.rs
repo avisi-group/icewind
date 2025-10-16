@@ -7,7 +7,7 @@ use {
                 safepoint::record_safepoint,
             },
             dbt::{
-                Alloc, Translation,
+                Translation,
                 emitter::{Emitter, Type},
                 translate::translate_instruction,
                 x86::{
@@ -40,6 +40,7 @@ use {
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::register_file::{RegisterFile, WellKnownRegister},
+    shared::Alloc,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };

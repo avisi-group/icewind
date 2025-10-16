@@ -1,5 +1,4 @@
 use {
-    crate::host::dbt::{Alloc, x86::emitter::X86Block},
     alloc::{
         format,
         string::{String, ToString},
@@ -9,7 +8,9 @@ use {
         hashmap::HashSet,
     },
     core::fmt::Write,
+    dbt::x86::X86Block,
     itertools::Itertools,
+    shared::Alloc,
 };
 
 pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) -> String {

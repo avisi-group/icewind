@@ -1,14 +1,12 @@
 use {
-    crate::host::dbt::{
-        Alloc,
-        x86::encoder::{
-            Operand,
-            OperandKind::{Memory as M, Register as R},
-            Width, memory_operand_to_iced,
-            registers::Register::Physical as PHYS,
-        },
+    crate::x86::encoder::{
+        Operand,
+        OperandKind::{Memory as M, Register as R},
+        Width, memory_operand_to_iced,
+        registers::Register::Physical as PHYS,
     },
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},
+    shared::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {

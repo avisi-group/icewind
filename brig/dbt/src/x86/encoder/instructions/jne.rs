@@ -1,13 +1,11 @@
 use {
-    crate::host::dbt::{
-        Alloc,
-        x86::{
-            emitter::X86Block,
-            encoder::{Operand, OperandKind::Target as T},
-        },
+    crate::x86::{
+        X86Block,
+        encoder::{Operand, OperandKind::Target as T},
     },
     common::{arena::Ref, hashmap::HashMapA},
     iced_x86::code_asm::{CodeAssembler, CodeLabel},
+    shared::Alloc,
 };
 
 pub fn encode<A: Alloc>(

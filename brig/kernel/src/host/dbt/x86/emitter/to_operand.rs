@@ -1,6 +1,5 @@
 use {
     crate::host::dbt::{
-        Alloc,
         emitter::Type,
         x86::{
             Emitter,
@@ -8,15 +7,16 @@ use {
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
             },
-            encoder::{
-                Instruction, Opcode, Operand, OperandKind,
-                registers::{PhysicalRegister, Register},
-                width::Width,
-            },
         },
     },
     core::cmp::{Ordering, min},
+    dbt::x86::encoder::{
+        Instruction, Opcode, Operand, OperandKind,
+        registers::{PhysicalRegister, Register},
+        width::Width,
+    },
     proc_macro_lib::ktest,
+    shared::Alloc,
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -947,7 +947,7 @@ fn encode_compare<A: Alloc>(
                            * and left and fix the body of the function */
     left: X86NodeRef<A>,
 ) -> Operand<A> {
-    use crate::host::dbt::x86::encoder::OperandKind::*;
+    use dbt::x86::encoder::OperandKind::*;
 
     if let (NodeKind::Constant { .. }, NodeKind::Constant { .. })
     | (NodeKind::Tuple(_), NodeKind::Tuple(_)) = (left.kind(), right.kind())

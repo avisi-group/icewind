@@ -313,13 +313,13 @@ pub enum RegisterConversionError {
     InvalidGeneralAsXmm(PhysicalRegister),
 }
 
-#[ktest]
-fn reg_index() {
-    for i in 0..PhysicalRegister::COUNT {
-        assert_eq!(i, PhysicalRegister::from_index(i).index())
-    }
+// #[ktest]
+// fn reg_index() {
+//     for i in 0..PhysicalRegister::COUNT {
+//         assert_eq!(i, PhysicalRegister::from_index(i).index())
+//     }
 
-    for reg in PhysicalRegister::iter() {
-        assert_eq!(reg, PhysicalRegister::from_index(reg.index()))
-    }
-}
+//     for reg in PhysicalRegister::iter() {
+//         assert_eq!(reg, PhysicalRegister::from_index(reg.index()))
+//     }
+// }

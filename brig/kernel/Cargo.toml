@@ -11,6 +11,7 @@ debug_translation = []
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
 dbt = { path = "../dbt" }
+shared = { path = "../shared" }
 
 
 bootloader_api = "0.11.11"
@@ -46,14 +47,6 @@ fastrand = { version = "2.3.0", default-features = false, features = ["alloc"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.5.0", default-features = false }
 concat-idents = "1.1.5"
-iced-x86 = { version = "1.21.0", default-features = false, features = [
-    "decoder",
-    "encoder",
-    "block_encoder",
-    "gas",
-    "no_std",
-    "code_asm"
-] }
 elfloader = { git = "https://github.com/avisi-group/rust-elfloader", rev = "c7e6230" }
 bitset-core = { version = "0.1.1", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
@@ -68,3 +61,11 @@ embedded-time = "0.12.1"
 bitfields = "1.0.0"
 virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
 strum = { version = "0.27.2", features = ["derive"], default-features = false }
+iced-x86 = { version = "1.21.0", default-features = false, features = [
+    "decoder",
+    "encoder",
+    "block_encoder",
+    "gas",
+    "no_std",
+    "code_asm"
+] }

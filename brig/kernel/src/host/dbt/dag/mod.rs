@@ -1,6 +1,8 @@
-use core::{marker::PhantomData, sync::atomic::AtomicUsize};
-
-use crate::host::dbt::{Alloc, emitter::Emitter};
+use {
+    crate::host::dbt::emitter::Emitter,
+    core::{marker::PhantomData, sync::atomic::AtomicUsize},
+    shared::Alloc,
+};
 
 pub struct Dag<A> {
     alloc: PhantomData<A>,
