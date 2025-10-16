@@ -281,6 +281,11 @@ pub fn linux_platform() -> Guest {
 
     // timer
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));
+    kernel::host::timer::register_tickable(
+        //     // Nanoseconds(1_000_000_000),
+        timer.tick_interval(),
+        timer.clone(),
+    );
     guest.devices.insert("timer".into(), timer.clone());
 
     let sysregs = [

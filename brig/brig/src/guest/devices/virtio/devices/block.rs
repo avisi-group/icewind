@@ -1,23 +1,16 @@
 use {
     crate::{
         guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
-        host::{
-            devices::manager::SharedDeviceManager,
-            objects::{
-                Object, ObjectId, ObjectStore, ToIrqController, ToTickable, irq::IrqController,
-            },
-        },
+        host::devices::manager::SharedDeviceManager,
     },
-    alloc::{collections::BTreeMap, sync::Arc},
-    common::device::{Device, MemoryMappedDevice},
-    common::intern::InternedString,
+    alloc::sync::Arc,
+    common::device::{Device, IrqController, MemoryMappedDevice},
     kernel::util::any_as_u8_slice,
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
 };
 
 pub struct VirtioBlock {
-    id: ObjectId,
     virtio: Mutex<Virtio>,
     config: virtio_blk_config,
 }
@@ -25,7 +18,6 @@ pub struct VirtioBlock {
 impl VirtioBlock {
     pub fn new(irq_line: usize, controller: Arc<dyn IrqController>) -> Self {
         let mut celf = Self {
-            id: ObjectId::new(),
             virtio: Mutex::new(Virtio::new(
                 1,
                 VIRTIO_DEV_BLK,

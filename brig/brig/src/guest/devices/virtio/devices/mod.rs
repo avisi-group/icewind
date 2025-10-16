@@ -1,7 +1,8 @@
 use {
-    crate::{guest::devices::virtio::queue::VirtQueue, host::objects::irq::IrqController},
+    crate::guest::devices::virtio::queue::VirtQueue,
     alloc::{sync::Arc, vec::Vec},
     bitfields::bitfield,
+    common::device::IrqController,
     core::sync::atomic::AtomicU32,
     virtio_drivers::transport::pci::VIRTIO_VENDOR_ID,
 };

@@ -1,11 +1,11 @@
 use {
     crate::{
-        host::{arch::x86::irq::assign_irq, objects::tickable::Tickable},
+        host::arch::x86::irq::assign_irq,
         println,
         scheduler::{self, TIMER_FREQUENCY},
     },
     alloc::{sync::Arc, vec::Vec},
-    common::irq_handler,
+    common::{device::Tickable, irq_handler},
     core::sync::atomic::{AtomicU64, Ordering},
     embedded_time::{
         duration::Nanoseconds,

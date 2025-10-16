@@ -1,10 +1,7 @@
 use {
-    crate::{
-        guest::GuestExecutionContext,
-        host::objects::{Object, ObjectId, ToIrqController, ToTickable, irq::IrqController},
-    },
+    crate::guest::GuestExecutionContext,
     alloc::sync::Arc,
-    common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, IrqController, MemoryMappedDevice},
     core::{
         sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
         u8,
@@ -56,7 +53,6 @@ impl InterruptId {
 
 #[derive(Debug)]
 pub struct GlobalInterruptController {
-    id: ObjectId,
     lines: [IrqLine; 1020],
     distributor_enabled: AtomicBool,
     cpu_enabled: AtomicBool,
@@ -118,7 +114,6 @@ impl GlobalInterruptController {
         });
 
         Self {
-            id: ObjectId::new(),
             lines,
             distributor_enabled: AtomicBool::new(false),
             cpu_enabled: AtomicBool::new(false),
@@ -130,14 +125,8 @@ impl GlobalInterruptController {
 
     pub fn as_interfaces(celf: Arc<Self>) -> (Arc<CpuInterface>, Arc<DistributorInterface>) {
         (
-            Arc::new(CpuInterface {
-                id: ObjectId::new(),
-                irq: celf.clone(),
-            }),
-            Arc::new(DistributorInterface {
-                id: ObjectId::new(),
-                irq: celf,
-            }),
+            Arc::new(CpuInterface { irq: celf.clone() }),
+            Arc::new(DistributorInterface { irq: celf }),
         )
     }
 
@@ -388,18 +377,10 @@ impl GlobalInterruptController {
     }
 }
 
-impl Object for GlobalInterruptController {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
 impl Device for GlobalInterruptController {
     fn start(&self) {}
     fn stop(&self) {}
 }
-
-impl ToTickable for GlobalInterruptController {}
 
 impl IrqController for GlobalInterruptController {
     fn raise(&self, line: usize) {
@@ -449,23 +430,13 @@ fn cpu_irq_rescind() {
 }
 
 pub struct CpuInterface {
-    id: ObjectId,
     irq: Arc<GlobalInterruptController>,
-}
-
-impl Object for CpuInterface {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
 }
 
 impl Device for CpuInterface {
     fn start(&self) {}
     fn stop(&self) {}
 }
-
-impl ToTickable for CpuInterface {}
-impl ToIrqController for CpuInterface {}
 
 impl MemoryMappedDevice for CpuInterface {
     fn address_space_size(&self) -> u64 {
@@ -533,23 +504,13 @@ impl MemoryMappedDevice for CpuInterface {
 }
 
 pub struct DistributorInterface {
-    id: ObjectId,
     irq: Arc<GlobalInterruptController>,
-}
-
-impl Object for DistributorInterface {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
 }
 
 impl Device for DistributorInterface {
     fn start(&self) {}
     fn stop(&self) {}
 }
-
-impl ToTickable for DistributorInterface {}
-impl ToIrqController for DistributorInterface {}
 
 impl MemoryMappedDevice for DistributorInterface {
     fn address_space_size(&self) -> u64 {

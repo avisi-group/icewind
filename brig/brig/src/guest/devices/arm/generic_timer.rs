@@ -1,14 +1,8 @@
 use {
-    crate::host::{
-        self,
-        objects::{
-            Object, ObjectId, ObjectStore, ToIrqController, irq::IrqController, tickable::Tickable,
-        },
-    },
     alloc::sync::Arc,
     bitfields::bitfield,
     common::{
-        device::{Device, RegisterMappedDevice},
+        device::{Device, IrqController, RegisterMappedDevice, Tickable},
         sysreg_helpers::encode_sysreg_id,
     },
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -35,7 +29,7 @@ const CNTV_CTL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 1);
 const CNTV_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 2);
 
 pub struct GenericTimer {
-    id: ObjectId,
+    enabled: AtomicBool,
 
     irq_controller: Arc<dyn IrqController>,
     irq_line: usize,
@@ -63,7 +57,7 @@ impl GenericTimer {
         tick_interval: Nanoseconds<u64>,
     ) -> Self {
         Self {
-            id: ObjectId::new(),
+            enabled: AtomicBool::new(false),
             irq_line,
             irq_controller: controller,
             tick_interval,
@@ -85,50 +79,46 @@ impl GenericTimer {
     fn virtual_count(&self) -> u64 {
         self.counter.load(Ordering::Relaxed) - self.virtual_offset.load(Ordering::Relaxed)
     }
-}
 
-impl ToIrqController for GenericTimer {}
-
-impl Tickable for GenericTimer {
-    fn tick(&self, time_since_last_tick: Nanoseconds<u64>) {
-        let counts =
-            (time_since_last_tick.0 * self.frequency.load(Ordering::Relaxed)) / 1_000_000_000;
-
-        self.counter.fetch_add(counts, Ordering::Relaxed);
-
-        let interrupt_status = if self.timer_enabled.load(Ordering::Relaxed) {
-            self.virtual_count() as i64 - self.compare_value.load(Ordering::Relaxed) as i64 >= 0
-        } else {
-            false
-        };
-
-        self.timer_condition_met
-            .store(interrupt_status, Ordering::Relaxed);
-
-        if interrupt_status && !self.timer_interrupt_masked.load(Ordering::Relaxed) {
-            self.irq_controller.raise(self.irq_line);
-        } else {
-            self.irq_controller.rescind(self.irq_line);
-        }
+    pub fn tick_interval(&self) -> Nanoseconds<u64> {
+        self.tick_interval
     }
 }
 
-impl Object for GenericTimer {
-    fn id(&self) -> ObjectId {
-        self.id
+impl Tickable for GenericTimer {
+    fn tick(&self, time_since_last_tick: Nanoseconds<u64>) {
+        if self.enabled.load(Ordering::Relaxed) {
+            let counts =
+                (time_since_last_tick.0 * self.frequency.load(Ordering::Relaxed)) / 1_000_000_000;
+
+            self.counter.fetch_add(counts, Ordering::Relaxed);
+
+            let interrupt_status = if self.timer_enabled.load(Ordering::Relaxed) {
+                self.virtual_count() as i64 - self.compare_value.load(Ordering::Relaxed) as i64 >= 0
+            } else {
+                false
+            };
+
+            self.timer_condition_met
+                .store(interrupt_status, Ordering::Relaxed);
+
+            if interrupt_status && !self.timer_interrupt_masked.load(Ordering::Relaxed) {
+                self.irq_controller.raise(self.irq_line);
+            } else {
+                self.irq_controller.rescind(self.irq_line);
+            }
+        }
     }
 }
 
 impl Device for GenericTimer {
     fn start(&self) {
-        host::timer::register_tickable(
-            // Nanoseconds(1_000_000_000),
-            self.tick_interval,
-            ObjectStore::global().get_tickable(self.id()).unwrap(),
-        );
+        self.enabled.store(true, Ordering::Relaxed);
     }
 
-    fn stop(&self) {}
+    fn stop(&self) {
+        self.enabled.store(false, Ordering::Relaxed);
+    }
 }
 
 impl RegisterMappedDevice for GenericTimer {

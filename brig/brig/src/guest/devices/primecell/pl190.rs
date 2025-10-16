@@ -1,15 +1,13 @@
 use {
     crate::guest::devices::primecell::PRIMECELL_ID,
     alloc::sync::Arc,
-    common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, IrqController, MemoryMappedDevice},
     core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering},
-    kernel::host::objects::{ObjectId, irq::IrqController},
 };
 
 const PERIPHERAL_ID: u32 = 0x00041190;
 
 pub struct Pl190 {
-    id: ObjectId,
     irq_status: AtomicU32,
     soft_status: AtomicU32,
     mask: AtomicU32,
@@ -28,7 +26,6 @@ pub struct Pl190 {
 impl Pl190 {
     pub fn new(irq_line: usize, fiq_line: usize, controller: Arc<dyn IrqController>) -> Self {
         let celf = Self {
-            id: ObjectId::new(),
             irq_status: AtomicU32::new(0),
             soft_status: AtomicU32::new(0),
             mask: AtomicU32::new(0),

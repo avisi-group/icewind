@@ -259,6 +259,7 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "common 0.0.0",
+ "embedded-time",
  "linkme",
  "log",
  "proc_macro_lib",

@@ -34,7 +34,6 @@ use {
         devices::manager::SharedDeviceManager,
         fs::Filesystem,
         memory::bump::{BumpAllocator, BumpAllocatorRef},
-        objects::ObjectId,
     },
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
@@ -109,7 +108,6 @@ impl WellKnownRegisters {
 }
 
 pub struct ModelDevice {
-    id: ObjectId,
     name: String,
     model: Arc<Model>,
     pub register_file: RegisterFile,
@@ -172,7 +170,6 @@ impl ModelDevice {
         register_file.write("_PC", initial_pc);
 
         Self {
-            id: ObjectId::new(),
             name,
             model,
             register_file,

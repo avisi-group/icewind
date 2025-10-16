@@ -1,3 +1,5 @@
+use embedded_time::duration::Nanoseconds;
+
 /// Emulated guest device
 pub trait Device: Sync + Send {
     fn start(&self);
@@ -23,4 +25,13 @@ pub trait RegisterMappedDevice: Device {
 
     /// Write `value` bytes into the device at register `sys_reg_id`
     fn write(&self, sys_reg_id: u64, value: &[u8]);
+}
+
+pub trait Tickable: Device {
+    fn tick(&self, time_since_last_tick: Nanoseconds<u64>);
+}
+
+pub trait IrqController: Device {
+    fn raise(&self, line: usize);
+    fn rescind(&self, line: usize);
 }

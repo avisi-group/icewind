@@ -1,16 +1,13 @@
 use {
-    crate::host::objects::irq::IrqController,
     alloc::sync::Arc,
-    common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, IrqController, MemoryMappedDevice},
     core::sync::atomic::{AtomicU16, AtomicU32, Ordering},
-    kernel::host::objects::ObjectId,
 };
 
 const IRQ_TXINTR: u32 = 1 << 5;
 const IRQ_RXINTR: u32 = 1 << 4;
 
 pub struct Pl011 {
-    id: ObjectId,
     control_register: AtomicU16,
     baud_rate: AtomicU16,
     fractional_baud: AtomicU16,
@@ -25,8 +22,6 @@ pub struct Pl011 {
 impl Pl011 {
     pub fn new(irq_line: usize, controller: Arc<dyn IrqController>) -> Self {
         Self {
-            id: ObjectId::new(),
-
             baud_rate: AtomicU16::new(0),
             fractional_baud: AtomicU16::new(0),
             line_control: AtomicU16::new(0),
