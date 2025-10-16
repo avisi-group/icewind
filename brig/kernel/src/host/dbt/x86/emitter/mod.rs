@@ -6,12 +6,12 @@ use {
         },
         host::dbt::{
             emitter::Type,
-            trampoline::ExecutionResult,
             x86::{Emitter, X86TranslationContext},
         },
     },
     aarch64_paging::target,
     alloc::{rc::Rc, vec::Vec},
+    brig_common::Alloc,
     common::{
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
@@ -25,18 +25,20 @@ use {
         ops::RangeBounds,
         panic,
     },
-    dbt::x86::{
-        ARG_REGS, CALLER_SAVED, X86Block,
-        encoder::{
-            Instruction, MemoryScale, Opcode, Operand, OperandKind,
-            registers::{PhysicalRegister, Register, SegmentRegister},
-            width::Width,
+    dbt::{
+        trampoline::ExecutionResult,
+        x86::{
+            ARG_REGS, CALLER_SAVED, X86Block,
+            encoder::{
+                Instruction, MemoryScale, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register, SegmentRegister},
+                width::Width,
+            },
         },
     },
     derive_where::derive_where,
     elf::abi,
     proc_macro_lib::ktest,
- brig_common::Alloc,
 };
 
 mod to_operand;

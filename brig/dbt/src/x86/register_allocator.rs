@@ -1,7 +1,5 @@
 use {
-    alloc::vec::Vec,
-    brig_common::Alloc as MemAlloc,
-    dbt::x86::{
+    crate::x86::{
         ARG_REGS, CALLER_SAVED,
         encoder::{
             Instruction, Opcode, Operand,
@@ -11,6 +9,8 @@ use {
             width::Width,
         },
     },
+    alloc::vec::Vec,
+    brig_common::Alloc as MemAlloc,
     strum::EnumCount,
 };
 

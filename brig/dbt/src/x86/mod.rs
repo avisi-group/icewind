@@ -6,7 +6,9 @@ use {
     core::fmt::Debug,
 };
 
+pub mod dot;
 pub mod encoder;
+pub mod register_allocator;
 
 // sysv64 ABI
 pub const ARG_REGS: &[PhysicalRegister] = &[

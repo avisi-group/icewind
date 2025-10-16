@@ -6,4 +6,5 @@ extern crate alloc;
 
 pub mod interpret;
 pub mod register_file;
+pub mod trampoline;
 pub mod x86;

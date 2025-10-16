@@ -25,3 +25,4 @@ displaydoc = { version = "0.2.5", default-features = false }
 strum = { version = "0.27.2", features = ["derive"], default-features = false }
 linkme = "0.3.33"
 derive-where = "1.6.0"
+bitfields = "1.0.0"

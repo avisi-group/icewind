@@ -13,6 +13,7 @@ use {
         rc::Rc,
         vec::Vec,
     },
+    brig_common::Alloc,
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMap, HashMapA, HashSet, hashmap_in, hashset_in},
@@ -29,15 +30,13 @@ use {
                 registers::{PhysicalRegister, Register},
                 width::Width,
             },
+            register_allocator,
         },
     },
     iced_x86::code_asm::CodeAssembler,
- brig_common::Alloc,
 };
 
-pub mod dot;
 pub mod emitter;
-pub mod register_allocator;
 
 struct CachedFunction<A: Alloc> {
     entry_block: Ref<X86Block<A>>,

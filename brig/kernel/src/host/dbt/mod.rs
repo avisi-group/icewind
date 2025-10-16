@@ -1,8 +1,11 @@
 use {
-    crate::host::{arch::x86::memory::VirtualMemoryArea, dbt::trampoline::ExecutionResult},
+    crate::host::arch::x86::memory::VirtualMemoryArea,
     alloc::{string::String, vec::Vec},
     core::fmt::{self, Debug},
-    dbt::register_file::RegisterFile,
+    dbt::{
+        register_file::RegisterFile,
+        trampoline::{self, ExecutionResult},
+    },
     iced_x86::{Formatter, Instruction},
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
@@ -10,7 +13,6 @@ use {
 pub mod dag;
 pub mod emitter;
 pub mod sysreg_helpers;
-mod trampoline;
 pub mod translate;
 pub mod x86;
 

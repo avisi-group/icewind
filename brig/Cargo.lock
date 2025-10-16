@@ -259,6 +259,7 @@ dependencies = [
 name = "dbt"
 version = "0.1.0"
 dependencies = [
+ "bitfields",
  "brig_common",
  "byteorder",
  "common",

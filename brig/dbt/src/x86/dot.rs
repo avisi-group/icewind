@@ -1,16 +1,16 @@
 use {
+    crate::x86::X86Block,
     alloc::{
         format,
         string::{String, ToString},
     },
+    brig_common::Alloc,
     common::{
         arena::{Arena, Ref},
         hashmap::HashSet,
     },
     core::fmt::Write,
-    dbt::x86::X86Block,
     itertools::Itertools,
- brig_common::Alloc,
 };
 
 pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) -> String {

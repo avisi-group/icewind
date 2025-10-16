@@ -4,7 +4,8 @@ use {
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         x86::emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
     },
-    alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
+    alloc::{collections::BTreeMap, vec::Vec},
+    brig_common::Alloc,
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in},
@@ -18,15 +19,13 @@ use {
     core::{
         hash::{Hash, Hasher},
         panic,
-        sync::atomic::{AtomicUsize, Ordering},
     },
     dbt::{
-        register_file::{GLOBAL_REGISTER_SIZE, RegisterFile},
+        register_file::RegisterFile,
         x86::{X86Block, encoder::Instruction},
     },
     derive_where::derive_where,
     itertools::Itertools,
- brig_common::Alloc,
 };
 
 const BLOCK_QUEUE_LIMIT: usize = 1000;
