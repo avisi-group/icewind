@@ -32,11 +32,11 @@ use {
     x86::io::outw,
 };
 
-mod guest;
-mod host;
-mod logger;
-mod tests;
-mod util;
+pub mod guest;
+pub mod host;
+pub mod logger;
+pub mod tests;
+pub mod util;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -52,60 +52,6 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config
 };
 
-pub fn start(boot_info: &'static mut BootInfo) -> ! {
-    // note: logging device initialized internally before platform
-    logger::init();
-
-    VirtualMemoryArea::current().opt.level_4_table_mut()[0].set_unused();
-
-    host::arch::CoreStorage::init_self();
-
-    // required for generating UUIDs
-    rand::init();
-
-    // Host machine initialisation
-    host::arch::platform_init(boot_info);
-    timer::init();
-    tasks::init();
-
-    // occurs per core
-    tasks::register_scheduler();
-
-    {
-        let continue_start_task = tasks::create_task(continue_start);
-        continue_start_task.start();
-    }
-
-    scheduler::local_run();
-}
-
-fn continue_start() {
-    // let serial_in_task = tasks::create_task(serial_in);
-    // serial_in_task.start();
-
-    let device_manager = SharedDeviceManager::get();
-    let device = device_manager
-        .get_device_by_alias("disk00:03.0")
-        .expect("disk not found");
-
-    let mut dev = device.lock();
-    let mut fs = TarFilesystem::mount(dev.as_block());
-
-    models::load_all(&mut fs);
-
-    let test_config = {
-        let file = fs
-            .read_to_vec("test_config.postcard")
-            .expect("failed to load test configuration file");
-        postcard::from_bytes::<TestConfig>(&file).unwrap()
-    };
-
-    if test_config == TestConfig::None {
-        guest::start(&mut fs);
-    } else {
-        guest::tests(test_config)
-    }
-}
 
 fn _serial_in() {
     let mut buf = [0u8; 64];

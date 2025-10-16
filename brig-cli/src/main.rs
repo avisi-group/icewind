@@ -218,7 +218,7 @@ fn build_guest_tar<P: AsRef<Path>>(
         .find(|a| {
             matches!(
                 a.executable.as_ref().and_then(|p| p.file_name()),
-                Some("kernel")
+                Some("brig")
             )
         })
         .unwrap()
@@ -440,7 +440,7 @@ fn get_kernel_from_artifacts(artifacts: &[Artifact]) -> PathBuf {
     artifacts
         .iter()
         .filter_map(|a| a.executable.as_ref())
-        .filter(|p| matches!(p.file_name(), Some("kernel")))
+        .filter(|p| matches!(p.file_name(), Some("brig")))
         .exactly_one()
         .unwrap()
         .canonicalize()

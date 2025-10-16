@@ -3,16 +3,12 @@ name = "kernel"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-no_logging = ["log/release_max_level_error", "log/max_level_error"]
-debug_translation = []
 
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
 dbt = { path = "../dbt" }
 brig_common = { path = "../brig_common" }
-
 
 bootloader_api = "0.11.11"
 x86_64 = "0.15.2"

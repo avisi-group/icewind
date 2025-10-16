@@ -1,0 +1,15 @@
+[package]
+name = "brig"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+no_logging = ["log/release_max_level_error", "log/max_level_error"]
+
+[dependencies]
+kernel = { path = "../kernel" }
+common = { path = "../../common" }
+
+bootloader_api = "0.11.11"
+log = { version = "0.4.27", default-features = false }
+postcard = { version = "1.1.3", features = ["alloc"], default-features = false }

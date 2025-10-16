@@ -1,11 +1,7 @@
 use {
     crate::host::{arch::x86::memory::VirtualMemoryArea, dbt::trampoline::ExecutionResult},
     alloc::{string::String, vec::Vec},
-    common::bits::mask,
-    core::{
-        alloc::Allocator,
-        fmt::{self, Debug},
-    },
+    core::fmt::{self, Debug},
     dbt::register_file::RegisterFile,
     iced_x86::{Formatter, Instruction},
     x86_64::{VirtAddr, structures::paging::PageTableFlags},

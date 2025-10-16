@@ -29,6 +29,7 @@ use {
         alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
         sync::Arc, vec::Vec,
     },
+    brig_common::Alloc,
     common::{
         hashmap::HashMap,
         intern::InternedString,
@@ -40,7 +41,6 @@ use {
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::register_file::{RegisterFile, WellKnownRegister},
- brig_common::Alloc,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };
