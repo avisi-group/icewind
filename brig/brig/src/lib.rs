@@ -5,12 +5,9 @@
 extern crate alloc;
 
 use {
-    crate::{
-        guest::{linux_platform, models, run_guest, try_get_current_guest},
-        host::memory::bytes,
-    },
+    crate::guest::{linux_platform, models, run_guest, try_get_current_guest},
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    common::TestConfig,
+    common::{TestConfig, bytes},
     core::{panic::PanicInfo, sync::atomic::Ordering},
     kernel::{
         host::{

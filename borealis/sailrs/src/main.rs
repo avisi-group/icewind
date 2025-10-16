@@ -1,10 +1,11 @@
 use {
     clap::Parser,
     color_eyre::Result,
+    common::bytes,
     deepsize::DeepSizeOf,
     log::info,
     rkyv::{api::high::to_bytes_with_alloc, ser::allocator::Arena},
-    sailrs::{bytes, create_file_buffered, init_logger, load_from_config},
+    sailrs::{create_file_buffered, init_logger, load_from_config},
     std::{io::Write, path::PathBuf},
 };
 

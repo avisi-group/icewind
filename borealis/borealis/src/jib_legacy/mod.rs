@@ -1,10 +1,10 @@
 use {
     crate::fn_is_allowlisted,
+    common::bytes,
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::info,
     sailrs::{
-        bytes,
         jib_ast::{self, Definition, DefinitionAux, Instruction},
         sail_ast::Location,
         types::{ArchivedListVec, ListVec},

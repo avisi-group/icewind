@@ -1,8 +1,8 @@
 use {
-    crate::host::memory::bytes,
     alloc::alloc::{Global, alloc_zeroed},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
+    common::bytes,
     core::{
         alloc::{AllocError, Allocator, Layout},
         ops::{Deref, Range},

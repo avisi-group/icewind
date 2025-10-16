@@ -12,9 +12,10 @@ use {
     },
     clap::Parser,
     color_eyre::eyre::Result,
+    common::bytes,
     errctx::PathCtx,
     log::{debug, info},
-    sailrs::{bytes, create_file_buffered, init_logger},
+    sailrs::{create_file_buffered, init_logger},
     std::{
         fs::{self, File, create_dir_all},
         io::Write as _,

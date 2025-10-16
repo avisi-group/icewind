@@ -4,8 +4,10 @@
 extern crate alloc;
 
 pub use hashbrown::hash_map::Entry;
+
 use {
     alloc::{string::String, vec::Vec},
+    byte_unit::{AdjustedByte, Byte, UnitType},
     serde::{Deserialize, Serialize},
 };
 
@@ -29,4 +31,11 @@ pub enum TestConfig {
     Exclude(Vec<String>),
     // Run all tests
     All,
+}
+
+pub fn bytes<T>(n: T) -> AdjustedByte
+where
+    Byte: From<T>,
+{
+    Byte::from(n).get_appropriate_unit(UnitType::Binary)
 }

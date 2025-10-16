@@ -461,6 +461,7 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 name = "common"
 version = "0.0.0"
 dependencies = [
+ "byte-unit",
  "deepsize",
  "hashbrown 0.15.5",
  "itertools 0.14.0",

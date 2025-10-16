@@ -5,10 +5,12 @@ use {
             Device, MemDevice, SharedDevice, TransportDevice, manager::SharedDeviceManager,
             pcie::bar::allocate_bars,
         },
-        memory::bytes,
     },
     alloc::{boxed::Box, format},
-    common::ringbuffer::{Producer, RingBuffer},
+    common::{
+        bytes,
+        ringbuffer::{Producer, RingBuffer},
+    },
     core::fmt::{self, Debug},
     log::trace,
     virtio_drivers::transport::pci::bus::{
