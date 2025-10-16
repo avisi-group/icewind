@@ -5,8 +5,8 @@ use {
         Width,
         registers::Register::Physical as PHYS,
     },
+    brig_common::Alloc,
     iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
-    shared::Alloc,
 };
 
 pub fn encode<A: Alloc>(

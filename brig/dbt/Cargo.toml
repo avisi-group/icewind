@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
-shared = { path = "../shared" }
+brig_common = { path = "../brig_common" }
 
 byteorder = { version = "1.5.0", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }

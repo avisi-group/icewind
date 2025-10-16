@@ -1,9 +1,9 @@
 use {
     crate::x86::encoder::{Instruction, registers::PhysicalRegister},
     alloc::vec::Vec,
+    brig_common::Alloc,
     common::arena::Ref,
     core::fmt::Debug,
-    shared::Alloc,
 };
 
 pub mod encoder;

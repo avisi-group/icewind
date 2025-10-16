@@ -1,5 +1,6 @@
 use {
     alloc::vec::Vec,
+    brig_common::Alloc as MemAlloc,
     dbt::x86::{
         ARG_REGS, CALLER_SAVED,
         encoder::{
@@ -12,8 +13,6 @@ use {
     },
     strum::EnumCount,
 };
-
-use shared::Alloc as MemAlloc;
 
 #[derive(Default, Clone, Debug)]
 struct RegisterTrack {

@@ -32,7 +32,7 @@ use {
         },
     },
     iced_x86::code_asm::CodeAssembler,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 pub mod dot;

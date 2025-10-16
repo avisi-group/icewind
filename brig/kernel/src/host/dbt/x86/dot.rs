@@ -10,7 +10,7 @@ use {
     core::fmt::Write,
     dbt::x86::X86Block,
     itertools::Itertools,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) -> String {

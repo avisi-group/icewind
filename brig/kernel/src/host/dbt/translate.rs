@@ -26,7 +26,7 @@ use {
     },
     derive_where::derive_where,
     itertools::Itertools,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 const BLOCK_QUEUE_LIMIT: usize = 1000;

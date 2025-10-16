@@ -16,7 +16,7 @@ use {
         width::Width,
     },
     proc_macro_lib::ktest,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {

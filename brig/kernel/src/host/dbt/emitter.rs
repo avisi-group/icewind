@@ -4,7 +4,7 @@ use {
         UnaryOperationKind,
     },
     alloc::vec::Vec,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 pub trait Emitter<A: Alloc> {

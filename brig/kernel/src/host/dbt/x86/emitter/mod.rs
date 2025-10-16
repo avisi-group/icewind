@@ -36,7 +36,7 @@ use {
     derive_where::derive_where,
     elf::abi,
     proc_macro_lib::ktest,
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 mod to_operand;

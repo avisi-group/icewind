@@ -40,7 +40,7 @@ use {
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::register_file::{RegisterFile, WellKnownRegister},
-    shared::Alloc,
+ brig_common::Alloc,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };

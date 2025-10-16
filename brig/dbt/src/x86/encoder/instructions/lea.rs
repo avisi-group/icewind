@@ -6,7 +6,7 @@ use {
         registers::Register::Physical as PHYS,
     },
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {

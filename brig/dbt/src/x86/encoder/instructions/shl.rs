@@ -8,7 +8,7 @@ use {
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
-    shared::Alloc,
+ brig_common::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, value: &Operand<A>) {

@@ -2,10 +2,10 @@ use {
     crate::x86::encoder::{
         Operand, OperandKind::Register as R, Width, registers::Register::Physical as PHYS,
     },
+    brig_common::Alloc,
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
-    shared::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, dst: &Operand<A>) {

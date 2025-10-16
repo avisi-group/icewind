@@ -11,6 +11,7 @@ use {
         },
     },
     alloc::{string::String, vec::Vec},
+    brig_common::Alloc,
     common::{arena::Ref, hashmap::HashMapA},
     core::{
         fmt::{Debug, Display, Formatter},
@@ -22,7 +23,6 @@ use {
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
         AsmRegisterXmm, CodeAssembler, CodeLabel, qword_ptr,
     },
-    shared::Alloc,
 };
 
 mod instructions;
