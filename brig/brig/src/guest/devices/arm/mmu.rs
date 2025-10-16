@@ -1,32 +1,26 @@
 use {
     crate::{
-        guest::{
-            GuestExecutionContext,
-            models::{ModelDevice, write_to_el},
+        guest::{GuestExecutionContext, get_current_guest, models::ModelDevice},
+        host::arch::x86::{
+            memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
         },
-        host::{
-            arch::x86::{
-                memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
-            },
-            dbt::sysreg_helpers::encode_sysreg_id,
-        },
-        util::get_current_device,
     },
     aarch64_paging::paging::{Attributes, Descriptor},
+    brig_common::sysreg_helpers::encode_sysreg_id,
+    dbt::x86::emitter::write_to_el,
 };
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);
 pub const DC_ZVA: u64 = encode_sysreg_id(0b01, 0b011, 0b0111, 0b0100, 0b001);
 
 pub fn at_s1e1r_handler(addr: u64) {
-    let device = get_current_device();
+    let device = &get_current_guest().core;
 
     let _translated_address = guest_translate(device, addr, TranslationType::Translate);
 }
 
 pub fn dc_zva_handler(addr: u64) {
-    let device = get_current_device();
-
+    let device = &get_current_guest().core;
     //let _translated_address = guest_translate(device, addr,
     // TranslationType::Translate);
     //panic!("ZVA {addr:#018x}");

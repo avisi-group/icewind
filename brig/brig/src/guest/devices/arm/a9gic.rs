@@ -1,14 +1,10 @@
 use {
     crate::{
         guest::GuestExecutionContext,
-        host::objects::{
-            Object, ObjectId, ToIrqController, ToMemoryMappedDevice, ToRegisterMappedDevice,
-            ToTickable,
-            device::{Device, MemoryMappedDevice},
-            irq::IrqController,
-        },
+        host::objects::{Object, ObjectId, ToIrqController, ToTickable, irq::IrqController},
     },
     alloc::sync::Arc,
+    brig_common::device::{Device, MemoryMappedDevice},
     core::{
         sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
         u8,
@@ -404,8 +400,6 @@ impl Device for GlobalInterruptController {
 }
 
 impl ToTickable for GlobalInterruptController {}
-impl ToRegisterMappedDevice for GlobalInterruptController {}
-impl ToMemoryMappedDevice for GlobalInterruptController {}
 
 impl IrqController for GlobalInterruptController {
     fn raise(&self, line: usize) {
@@ -472,7 +466,6 @@ impl Device for CpuInterface {
 
 impl ToTickable for CpuInterface {}
 impl ToIrqController for CpuInterface {}
-impl ToRegisterMappedDevice for CpuInterface {}
 
 impl MemoryMappedDevice for CpuInterface {
     fn address_space_size(&self) -> u64 {
@@ -557,7 +550,6 @@ impl Device for DistributorInterface {
 
 impl ToTickable for DistributorInterface {}
 impl ToIrqController for DistributorInterface {}
-impl ToRegisterMappedDevice for DistributorInterface {}
 
 impl MemoryMappedDevice for DistributorInterface {
     fn address_space_size(&self) -> u64 {

@@ -1,5 +1,4 @@
 pub mod arch;
-pub mod dbt;
 pub mod devices;
 pub mod fs;
 pub mod memory;

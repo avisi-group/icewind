@@ -1,16 +1,16 @@
 use {
     crate::host::{
         self,
-        dbt::sysreg_helpers::encode_sysreg_id,
         objects::{
-            Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
-            device::{Device, RegisterMappedDevice},
-            irq::IrqController,
-            tickable::Tickable,
+            Object, ObjectId, ObjectStore, ToIrqController, irq::IrqController, tickable::Tickable,
         },
     },
     alloc::sync::Arc,
     bitfields::bitfield,
+    brig_common::{
+        device::{Device, RegisterMappedDevice},
+        sysreg_helpers::encode_sysreg_id,
+    },
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
     embedded_time::duration::Nanoseconds,
 };
@@ -87,7 +87,6 @@ impl GenericTimer {
     }
 }
 
-impl ToMemoryMappedDevice for GenericTimer {}
 impl ToIrqController for GenericTimer {}
 
 impl Tickable for GenericTimer {

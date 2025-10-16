@@ -1,8 +1,5 @@
 use {
-    crate::host::{
-        arch::x86::aarch64_mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
-        objects::device::RegisterMappedDevice,
-    },
+    crate::device::RegisterMappedDevice,
     alloc::sync::Arc,
     common::hashmap::HashMap,
     spin::{Lazy, Mutex},
@@ -19,17 +16,15 @@ enum Handler {
     // ttbr0
 }
 
-static SYSREG_HANDLERS: Lazy<Mutex<HashMap<u64, Handler>>> = Lazy::new(|| {
-    let mut map = HashMap::default();
-
-    map.insert(AT_S1E1R, Handler::Fn(at_s1e1r_handler));
-    map.insert(DC_ZVA, Handler::Fn(dc_zva_handler));
-
-    Mutex::new(map)
-});
+static SYSREG_HANDLERS: Lazy<Mutex<HashMap<u64, Handler>>> =
+    Lazy::new(|| Mutex::new(HashMap::default()));
 
 pub fn register_device(id: u64, device: Arc<dyn RegisterMappedDevice>) {
     SYSREG_HANDLERS.lock().insert(id, Handler::Device(device));
+}
+
+pub fn register_fn(id: u64, f: fn(u64)) {
+    SYSREG_HANDLERS.lock().insert(id, Handler::Fn(f));
 }
 
 pub fn handler_exists(reg: u64) -> bool {

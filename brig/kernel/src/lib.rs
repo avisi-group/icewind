@@ -12,7 +12,6 @@ extern crate alloc;
 
 use {
     crate::{
-        guest::models,
         host::{
             arch::x86::memory::{
                 HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
@@ -24,7 +23,6 @@ use {
             rand, scheduler, tasks, timer,
         },
         logger::WRITER,
-        util::try_get_current_device,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     common::TestConfig,
@@ -32,10 +30,8 @@ use {
     x86::io::outw,
 };
 
-pub mod guest;
 pub mod host;
 pub mod logger;
-pub mod tests;
 pub mod util;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
@@ -51,7 +47,6 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config.kernel_stack_size = 0x10_0000;
     config
 };
-
 
 fn _serial_in() {
     let mut buf = [0u8; 64];
@@ -78,38 +73,8 @@ fn _serial_in() {
     }
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    host::arch::x86::irq::local_disable();
-    let (used, total) = host::arch::x86::memory::stats();
-
-    log::error!("{info}");
-    log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
-
-    if let Some(device) = try_get_current_device() {
-        log::error!(
-            "Guest PC = {:#018x}, EL = {}",
-            device.register_file.read::<u64>("_PC"),
-            device.register_file.read::<u8>("PSTATE_EL")
-        );
-
-        log::error!(
-            "Last executed opcode = {:#010x}",
-            models::LAST_EXECUTED_OPCODE.load(Ordering::Relaxed)
-        );
-        log::error!(
-            "Last translated opcode = {:#010x}",
-            models::LAST_TRANSLATED_OPCODE.load(Ordering::Relaxed)
-        );
-    };
-
-    // backtrace();
-
-    qemu_exit();
-}
-
 /// Exits QEMU
-fn qemu_exit() -> ! {
+pub fn qemu_exit() -> ! {
     unsafe { outw(0x604, 0x2000) };
     loop {
         x86_64::instructions::hlt();

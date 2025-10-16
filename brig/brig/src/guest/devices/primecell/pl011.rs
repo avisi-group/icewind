@@ -1,11 +1,9 @@
 use {
-    crate::host::objects::{
-        Object, ObjectId, ToIrqController, ToRegisterMappedDevice, ToTickable,
-        device::{Device, MemoryMappedDevice},
-        irq::IrqController,
-    },
+    crate::host::objects::irq::IrqController,
     alloc::sync::Arc,
+    brig_common::device::{Device, MemoryMappedDevice},
     core::sync::atomic::{AtomicU16, AtomicU32, Ordering},
+    kernel::host::objects::ObjectId,
 };
 
 const IRQ_TXINTR: u32 = 1 << 5;
@@ -50,21 +48,6 @@ impl Pl011 {
         }
     }
 }
-
-impl Object for Pl011 {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
-// not tickable
-impl ToTickable for Pl011 {}
-
-// not a register mapped device
-impl ToRegisterMappedDevice for Pl011 {}
-
-// not an irq controller
-impl ToIrqController for Pl011 {}
 
 impl Device for Pl011 {
     fn start(&self) {}
@@ -169,7 +152,7 @@ impl MemoryMappedDevice for Pl011 {
         match offset {
             // data register
             0x000 => {
-                crate::print!("{}", src[0] as char);
+                kernel::print!("{}", src[0] as char);
                 self.irq_status
                     .fetch_or(IRQ_TXINTR, core::sync::atomic::Ordering::Relaxed);
                 self.update_irq();

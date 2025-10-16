@@ -1,14 +1,9 @@
 use {
-    crate::{
-        guest::devices::primecell::PRIMECELL_ID,
-        host::objects::{
-            Object, ObjectId, ToIrqController, ToRegisterMappedDevice, ToTickable,
-            device::{Device, MemoryMappedDevice},
-            irq::IrqController,
-        },
-    },
+    crate::guest::devices::primecell::PRIMECELL_ID,
     alloc::sync::Arc,
+    brig_common::device::{Device, MemoryMappedDevice},
     core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering},
+    kernel::host::objects::{ObjectId, irq::IrqController},
 };
 
 const PERIPHERAL_ID: u32 = 0x00041190;
@@ -141,21 +136,6 @@ impl Pl190 {
         self.update_lines();
     }
 }
-
-impl Object for Pl190 {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
-// not tickable
-impl ToTickable for Pl190 {}
-
-// not a register mapped device
-impl ToRegisterMappedDevice for Pl190 {}
-
-// not an irq controller
-impl ToIrqController for Pl190 {}
 
 impl Device for Pl190 {
     fn start(&self) {}

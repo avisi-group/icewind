@@ -1,4 +1,4 @@
-use {crate::guest::models::ModelDevice, core::num::ParseIntError};
+use core::num::ParseIntError;
 
 /// Parses `0x`-prefixed, underscore separated hexadecimal values (like a memory
 /// address)
@@ -21,19 +21,4 @@ pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe {
         core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
     }
-}
-
-/// Super hacky way of getting the currently executing `ModelDevice`
-pub fn get_current_device() -> &'static ModelDevice {
-    try_get_current_device().unwrap()
-}
-
-/// Super hacky way of getting the currently executing `ModelDevice`
-///
-/// "and_then" version breaks:(
-pub fn try_get_current_device() -> Option<&'static ModelDevice> {
-    ((&**unsafe { crate::guest::GUEST.get()? }
-        .devices
-        .get(&("core0".into()))?) as &dyn core::any::Any)
-        .downcast_ref::<ModelDevice>()
 }

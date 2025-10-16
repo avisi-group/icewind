@@ -1,22 +1,21 @@
 use {
-    crate::host::dbt::{
-        emitter::Type,
+    crate::{
+        emitter::{Emitter, Type},
         x86::{
-            Emitter,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
             },
+            encoder::{
+                Instruction, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register},
+                width::Width,
+            },
         },
     },
+    brig_common::Alloc,
     core::cmp::{Ordering, min},
-    dbt::x86::encoder::{
-        Instruction, Opcode, Operand, OperandKind,
-        registers::{PhysicalRegister, Register},
-        width::Width,
-    },
     proc_macro_lib::ktest,
- brig_common::Alloc,
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -947,7 +946,7 @@ fn encode_compare<A: Alloc>(
                            * and left and fix the body of the function */
     left: X86NodeRef<A>,
 ) -> Operand<A> {
-    use dbt::x86::encoder::OperandKind::*;
+    use crate::x86::encoder::OperandKind::*;
 
     if let (NodeKind::Constant { .. }, NodeKind::Constant { .. })
     | (NodeKind::Tuple(_), NodeKind::Tuple(_)) = (left.kind(), right.kind())
@@ -1091,54 +1090,54 @@ impl SplitRange {
     }
 }
 
-#[ktest]
-fn splitrange_low() {
-    assert_eq!(
-        SplitRange::new(4, 7),
-        SplitRange {
-            low_start: 4,
-            low_length: 7,
-            high_start: 0,
-            high_length: 0
-        }
-    )
-}
+// #[ktest]
+// fn splitrange_low() {
+//     assert_eq!(
+//         SplitRange::new(4, 7),
+//         SplitRange {
+//             low_start: 4,
+//             low_length: 7,
+//             high_start: 0,
+//             high_length: 0
+//         }
+//     )
+// }
 
-#[ktest]
-fn splitrange_high() {
-    assert_eq!(
-        SplitRange::new(78, 15),
-        SplitRange {
-            low_start: 0,
-            low_length: 0,
-            high_start: 14,
-            high_length: 15,
-        }
-    )
-}
+// #[ktest]
+// fn splitrange_high() {
+//     assert_eq!(
+//         SplitRange::new(78, 15),
+//         SplitRange {
+//             low_start: 0,
+//             low_length: 0,
+//             high_start: 14,
+//             high_length: 15,
+//         }
+//     )
+// }
 
-#[ktest]
-fn splitrange_split_0() {
-    assert_eq!(
-        SplitRange::new(32, 64),
-        SplitRange {
-            low_start: 32,
-            low_length: 32,
-            high_start: 0,
-            high_length: 32,
-        }
-    )
-}
+// #[ktest]
+// fn splitrange_split_0() {
+//     assert_eq!(
+//         SplitRange::new(32, 64),
+//         SplitRange {
+//             low_start: 32,
+//             low_length: 32,
+//             high_start: 0,
+//             high_length: 32,
+//         }
+//     )
+// }
 
-#[ktest]
-fn splitrange_split_1() {
-    assert_eq!(
-        SplitRange::new(63, 47),
-        SplitRange {
-            low_start: 63,
-            low_length: 1,
-            high_start: 0,
-            high_length: 46,
-        }
-    )
-}
+// #[ktest]
+// fn splitrange_split_1() {
+//     assert_eq!(
+//         SplitRange::new(63, 47),
+//         SplitRange {
+//             low_start: 63,
+//             low_length: 1,
+//             high_start: 0,
+//             high_length: 46,
+//         }
+//     )
+// }

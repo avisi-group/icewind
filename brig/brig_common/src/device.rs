@@ -1,7 +1,5 @@
-use crate::host::objects::Object;
-
 /// Emulated guest device
-pub trait Device: Object {
+pub trait Device: Sync + Send {
     fn start(&self);
     fn stop(&self);
 }

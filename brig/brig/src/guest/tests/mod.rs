@@ -6,38 +6,41 @@ use {
             models,
         },
         host::{
-            dbt::{
-                Translation,
-                emitter::{Emitter, Type},
-                sysreg_helpers,
-                translate::{translate, translate_instruction},
-                x86::{
-                    X86TranslationContext,
-                    emitter::{
-                        BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
-                        UnaryOperationKind, X86Emitter, X86Node,
-                    },
-                },
-            },
             memory::bump::{BumpAllocator, BumpAllocatorRef},
             timer::GLOBAL_CLOCK,
         },
         timer::Measurement,
     },
     alloc::{alloc::Global, boxed::Box, sync::Arc},
+    brig_common::sysreg_helpers,
     common::{
         bits::{bit_insert, mask},
         hashmap::HashMap,
     },
     core::{panic, u128},
     dbt::{
+        Translation,
+        emitter::{Emitter, Type},
         interpret::{self, Value, interpret},
         register_file::RegisterFile,
+        translate::{translate, translate_instruction},
+        x86::{
+            X86TranslationContext,
+            emitter::{
+                BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
+                UnaryOperationKind, X86Emitter, X86Node,
+            },
+        },
     },
     proc_macro_lib::ktest,
 };
 
 mod fuzz;
+
+#[ktest]
+fn smoke() {
+    assert!(1 + 1 == 2);
+}
 
 #[ktest]
 fn init_system() {

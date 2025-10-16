@@ -156,16 +156,39 @@ checksum = "59ff573fa7860861814a9b05db8a254dc1fe433699d8e66ae3dd00d7cce3f7b4"
 name = "brig"
 version = "0.1.0"
 dependencies = [
+ "aarch64-paging",
+ "bitfields",
  "bootloader_api",
+ "brig_common",
  "common",
+ "dbt",
+ "disarm64",
+ "elfloader",
+ "embedded-time",
+ "iced-x86",
  "kernel",
+ "linkme",
  "log",
  "postcard",
+ "proc_macro_lib",
+ "spin 0.10.0",
+ "virtio-bindings",
+ "virtio-drivers",
+ "x86",
+ "x86_64",
 ]
 
 [[package]]
 name = "brig_common"
 version = "0.1.0"
+dependencies = [
+ "common",
+ "linkme",
+ "log",
+ "proc_macro_lib",
+ "spin 0.10.0",
+ "x86",
+]
 
 [[package]]
 name = "buddy_system_allocator"
@@ -259,20 +282,25 @@ dependencies = [
 name = "dbt"
 version = "0.1.0"
 dependencies = [
+ "aarch64-paging",
  "bitfields",
  "brig_common",
  "byteorder",
  "common",
  "derive-where",
  "displaydoc",
+ "elf",
  "iced-x86",
  "itertools 0.14.0",
+ "kernel",
  "linkme",
  "log",
  "paste",
  "proc_macro_lib",
  "strum 0.27.2",
  "thiserror",
+ "x86",
+ "x86_64",
 ]
 
 [[package]]
@@ -484,7 +512,6 @@ dependencies = [
  "byteorder",
  "common",
  "concat-idents",
- "dbt",
  "derive-where",
  "disarm64",
  "displaydoc",

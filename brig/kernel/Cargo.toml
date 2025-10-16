@@ -7,7 +7,6 @@ edition = "2024"
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
-dbt = { path = "../dbt" }
 brig_common = { path = "../brig_common" }
 
 bootloader_api = "0.11.11"

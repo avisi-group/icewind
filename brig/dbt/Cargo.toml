@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib = { path = "../proc_macro_lib" }
+kernel = { path = "../kernel" }
 brig_common = { path = "../brig_common" }
 
 byteorder = { version = "1.5.0", default-features = false }
@@ -26,3 +27,7 @@ strum = { version = "0.27.2", features = ["derive"], default-features = false }
 linkme = "0.3.33"
 derive-where = "1.6.0"
 bitfields = "1.0.0"
+x86_64 = "0.15.2"
+x86 = "0.52.0"
+aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
+elf = { version = "0.8.0", default-features = false }

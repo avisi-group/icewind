@@ -1,10 +1,46 @@
 #![no_std]
 #![feature(allocator_api)]
+#![feature(btree_cursors)]
 
-use core::{alloc::Allocator, fmt::Debug};
+extern crate alloc;
+
+use {
+    crate::memory::AddressSpace,
+    alloc::boxed::Box,
+    core::{alloc::Allocator, fmt::Debug, sync::atomic::AtomicU64},
+    x86::current::segmentation::{rdfsbase, wrfsbase},
+};
+
+pub mod device;
+pub mod memory;
+pub mod sysreg_helpers;
+pub mod tests;
 
 /// Allocator convenience trait
 pub trait Alloc: Allocator + Clone + Copy + Debug {}
 
 // implement Alloc on everything that implements it's constituent traits
 impl<T: Allocator + Clone + Copy + Debug> Alloc for T {}
+
+#[repr(C)]
+pub struct GuestExecutionContext {
+    pub current_address_space: *mut AddressSpace,
+    pub interrupt_pending: AtomicU64,
+    pub unprivileged_access: u64,
+}
+
+impl GuestExecutionContext {
+    pub fn activate(self: Box<Self>) {
+        unsafe {
+            wrfsbase(Box::into_raw(self) as u64);
+        }
+    }
+
+    pub fn current() -> &'static Self {
+        unsafe { &*(rdfsbase() as *const Self) }
+    }
+
+    pub fn current_mut() -> &'static mut Self {
+        unsafe { &mut *(rdfsbase() as *mut Self) }
+    }
+}

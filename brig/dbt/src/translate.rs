@@ -1,11 +1,18 @@
 use {
-    crate::host::dbt::{
+    crate::{
         emitter::{self, Emitter, Type},
-        sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
-        x86::emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
+        register_file::RegisterFile,
+        x86::{
+            X86Block,
+            emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
+            encoder::Instruction,
+        },
     },
     alloc::{collections::BTreeMap, vec::Vec},
-    brig_common::Alloc,
+    brig_common::{
+        Alloc,
+        sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
+    },
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in},
@@ -19,10 +26,6 @@ use {
     core::{
         hash::{Hash, Hasher},
         panic,
-    },
-    dbt::{
-        register_file::RegisterFile,
-        x86::{X86Block, encoder::Instruction},
     },
     derive_where::derive_where,
     itertools::Itertools,
@@ -1056,7 +1059,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::UnaryOperation { kind, value } => {
                 use {
-                    crate::host::dbt::x86::emitter::UnaryOperationKind as EmitterOp,
+                    crate::x86::emitter::UnaryOperationKind as EmitterOp,
                     rudder::statement::UnaryOperationKind as RudderOp,
                 };
 
@@ -1077,7 +1080,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::BinaryOperation { kind, lhs, rhs } => {
                 use {
-                    crate::host::dbt::x86::emitter::BinaryOperationKind as EmitterOp,
+                    crate::x86::emitter::BinaryOperationKind as EmitterOp,
                     rudder::statement::BinaryOperationKind as RudderOp,
                 };
 
@@ -1114,7 +1117,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::TernaryOperation { kind, a, b, c } => {
                 use {
-                    crate::host::dbt::x86::emitter::TernaryOperationKind as EmitterOp,
+                    crate::x86::emitter::TernaryOperationKind as EmitterOp,
                     rudder::statement::TernaryOperationKind as RudderOp,
                 };
 
@@ -1134,7 +1137,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 amount,
             } => {
                 use {
-                    crate::host::dbt::x86::emitter::ShiftOperationKind as EmitterOp,
+                    crate::x86::emitter::ShiftOperationKind as EmitterOp,
                     rudder::statement::ShiftOperationKind as RudderOp,
                 };
 
@@ -1285,7 +1288,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::Cast { kind, typ, value } => {
                 use {
-                    crate::host::dbt::x86::emitter::CastOperationKind as EmitterOp,
+                    crate::x86::emitter::CastOperationKind as EmitterOp,
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 
@@ -1310,7 +1313,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 width,
             } => {
                 use {
-                    crate::host::dbt::x86::emitter::CastOperationKind as EmitterOp,
+                    crate::x86::emitter::CastOperationKind as EmitterOp,
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 

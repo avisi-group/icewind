@@ -13,7 +13,6 @@ use {
     },
 };
 
-pub mod aarch64_mmu;
 pub mod backtrace;
 mod dbg;
 mod gdt;
@@ -31,6 +30,7 @@ pub fn init(
         kernel_image_offset,
         ..
     }: &BootInfo,
+    page_fault_exception: unsafe extern "C" fn(),
 ) {
     // if physical memory offset was wrong, all phys-virt conversions would be wrong
     assert_eq!(
@@ -59,7 +59,7 @@ pub fn init(
 
     // initialize global descriptor table and interrupts
     gdt::init();
-    irq::init();
+    irq::init(page_fault_exception);
     dbg::init();
 
     // initialize device manager ready to register detected devices

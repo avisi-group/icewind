@@ -1,9 +1,5 @@
 use {
-    crate::host::objects::{
-        device::{Device, MemoryMappedDevice, RegisterMappedDevice},
-        irq::IrqController,
-        tickable::Tickable,
-    },
+    crate::host::objects::{irq::IrqController, tickable::Tickable},
     alloc::{fmt, sync::Arc},
     common::{
         hashmap::{HashMap, HashSet},
@@ -13,7 +9,6 @@ use {
     spin::{Lazy, Mutex},
 };
 
-pub mod device;
 pub mod irq;
 pub mod object_store;
 pub mod tickable;
@@ -40,9 +35,9 @@ impl ObjectId {
 pub trait Object:
     Send
     + Sync
-    + ToDevice
-    + ToMemoryMappedDevice
-    + ToRegisterMappedDevice
+    // + ToDevice
+    // + ToMemoryMappedDevice
+    // + ToRegisterMappedDevice
     + ToTickable
     + ToIrqController
     + Any
@@ -50,59 +45,59 @@ pub trait Object:
     fn id(&self) -> ObjectId;
 }
 
-pub trait ToDevice {
-    fn to_device<'a>(self: Arc<Self>) -> Option<Arc<dyn Device + 'a>>
-    where
-        Self: 'a,
-    {
-        None
-    }
-}
+// pub trait ToDevice {
+//     fn to_device<'a>(self: Arc<Self>) -> Option<Arc<dyn Device + 'a>>
+//     where
+//         Self: 'a,
+//     {
+//         None
+//     }
+// }
 
-impl<T: Device> ToDevice for T {
-    fn to_device<'a>(self: Arc<Self>) -> Option<Arc<dyn Device + 'a>>
-    where
-        Self: 'a,
-    {
-        Some(self)
-    }
-}
+// impl<T: Device> ToDevice for T {
+//     fn to_device<'a>(self: Arc<Self>) -> Option<Arc<dyn Device + 'a>>
+//     where
+//         Self: 'a,
+//     {
+//         Some(self)
+//     }
+// }
 
-pub trait ToMemoryMappedDevice {
-    fn to_memory_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn MemoryMappedDevice + 'a>>
-    where
-        Self: 'a,
-    {
-        None
-    }
-}
+// pub trait ToMemoryMappedDevice {
+//     fn to_memory_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn
+// MemoryMappedDevice + 'a>>     where
+//         Self: 'a,
+//     {
+//         None
+//     }
+// }
 
-impl<T: MemoryMappedDevice> ToMemoryMappedDevice for T {
-    fn to_memory_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn MemoryMappedDevice + 'a>>
-    where
-        Self: 'a,
-    {
-        Some(self)
-    }
-}
+// impl<T: MemoryMappedDevice> ToMemoryMappedDevice for T {
+//     fn to_memory_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn
+// MemoryMappedDevice + 'a>>     where
+//         Self: 'a,
+//     {
+//         Some(self)
+//     }
+// }
 
-pub trait ToRegisterMappedDevice {
-    fn to_register_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn RegisterMappedDevice + 'a>>
-    where
-        Self: 'a,
-    {
-        None
-    }
-}
+// pub trait ToRegisterMappedDevice {
+//     fn to_register_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn
+// RegisterMappedDevice + 'a>>     where
+//         Self: 'a,
+//     {
+//         None
+//     }
+// }
 
-impl<T: RegisterMappedDevice> ToRegisterMappedDevice for T {
-    fn to_register_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn RegisterMappedDevice + 'a>>
-    where
-        Self: 'a,
-    {
-        Some(self)
-    }
-}
+// impl<T: RegisterMappedDevice> ToRegisterMappedDevice for T {
+//     fn to_register_mapped_device<'a>(self: Arc<Self>) -> Option<Arc<dyn
+// RegisterMappedDevice + 'a>>     where
+//         Self: 'a,
+//     {
+//         Some(self)
+//     }
+// }
 
 pub trait ToTickable {
     fn to_tickable<'a>(self: Arc<Self>) -> Option<Arc<dyn Tickable + 'a>>
@@ -186,16 +181,16 @@ impl ObjectStore {
     pub fn insert(&self, object: Arc<dyn Object>) {
         let mut guard = self.state.lock();
 
-        if object.clone().to_device().is_some() {
-            guard.devices.insert(object.id());
-        }
-        if object.clone().to_memory_mapped_device().is_some() {
-            guard.memory_mapped_devices.insert(object.id());
-        }
+        // if object.clone().to_device().is_some() {
+        //     guard.devices.insert(object.id());
+        // }
+        // if object.clone().to_memory_mapped_device().is_some() {
+        //     guard.memory_mapped_devices.insert(object.id());
+        // }
 
-        if object.clone().to_register_mapped_device().is_some() {
-            guard.register_mapped_devices.insert(object.id());
-        }
+        // if object.clone().to_register_mapped_device().is_some() {
+        //     guard.register_mapped_devices.insert(object.id());
+        // }
 
         if object.clone().to_tickable().is_some() {
             guard.tickables.insert(object.id());
@@ -212,54 +207,54 @@ impl ObjectStore {
         self.state.lock().objects.get(&id).cloned()
     }
 
-    pub fn get_device(&self, id: ObjectId) -> Option<Arc<dyn Device>> {
-        let state = self.state.lock();
+    // pub fn get_device(&self, id: ObjectId) -> Option<Arc<dyn Device>> {
+    //     let state = self.state.lock();
 
-        if state.devices.contains(&id) {
-            Some(state.objects.get(&id).unwrap().clone().to_device().unwrap())
-        } else {
-            None
-        }
-    }
+    //     if state.devices.contains(&id) {
+    //         Some(state.objects.get(&id).unwrap().clone().to_device().unwrap())
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    pub fn get_memory_mapped_device(&self, id: ObjectId) -> Option<Arc<dyn MemoryMappedDevice>> {
-        let state = self.state.lock();
+    // pub fn get_memory_mapped_device(&self, id: ObjectId) -> Option<Arc<dyn
+    // MemoryMappedDevice>> {     let state = self.state.lock();
 
-        if state.memory_mapped_devices.contains(&id) {
-            Some(
-                state
-                    .objects
-                    .get(&id)
-                    .unwrap()
-                    .clone()
-                    .to_memory_mapped_device()
-                    .unwrap(),
-            )
-        } else {
-            None
-        }
-    }
+    //     if state.memory_mapped_devices.contains(&id) {
+    //         Some(
+    //             state
+    //                 .objects
+    //                 .get(&id)
+    //                 .unwrap()
+    //                 .clone()
+    //                 .to_memory_mapped_device()
+    //                 .unwrap(),
+    //         )
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    pub fn get_register_mapped_device(
-        &self,
-        id: ObjectId,
-    ) -> Option<Arc<dyn RegisterMappedDevice>> {
-        let state = self.state.lock();
+    // pub fn get_register_mapped_device(
+    //     &self,
+    //     id: ObjectId,
+    // ) -> Option<Arc<dyn RegisterMappedDevice>> {
+    //     let state = self.state.lock();
 
-        if state.register_mapped_devices.contains(&id) {
-            Some(
-                state
-                    .objects
-                    .get(&id)
-                    .unwrap()
-                    .clone()
-                    .to_register_mapped_device()
-                    .unwrap(),
-            )
-        } else {
-            None
-        }
-    }
+    //     if state.register_mapped_devices.contains(&id) {
+    //         Some(
+    //             state
+    //                 .objects
+    //                 .get(&id)
+    //                 .unwrap()
+    //                 .clone()
+    //                 .to_register_mapped_device()
+    //                 .unwrap(),
+    //         )
+    //     } else {
+    //         None
+    //     }
+    // }
 
     pub fn get_tickable(&self, id: ObjectId) -> Option<Arc<dyn Tickable>> {
         let state = self.state.lock();

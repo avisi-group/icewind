@@ -4,15 +4,14 @@ use {
         host::{
             devices::manager::SharedDeviceManager,
             objects::{
-                Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
-                device::{Device, MemoryMappedDevice},
-                irq::IrqController,
+                Object, ObjectId, ObjectStore, ToIrqController, ToTickable, irq::IrqController,
             },
         },
-        util::any_as_u8_slice,
     },
     alloc::{collections::BTreeMap, sync::Arc},
+    brig_common::device::{Device, MemoryMappedDevice},
     common::intern::InternedString,
+    kernel::util::any_as_u8_slice,
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
 };
@@ -50,16 +49,6 @@ impl VirtioBlock {
         celf
     }
 }
-
-impl Object for VirtioBlock {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
-impl ToTickable for VirtioBlock {}
-impl ToRegisterMappedDevice for VirtioBlock {}
-impl ToIrqController for VirtioBlock {}
 
 impl Device for VirtioBlock {
     fn start(&self) {}

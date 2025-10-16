@@ -148,7 +148,7 @@ pub fn irq_handler(args: TokenStream, input: TokenStream) -> TokenStream {
     // new outer function created with original function name
     let outer_fn = quote!(
         #[unsafe(naked)]
-        unsafe extern "C" fn #outer_fn_ident() {
+        pub unsafe extern "C" fn #outer_fn_ident() {
             // original user-supplied function definition
             #inner_fn
 
@@ -218,7 +218,7 @@ pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     );
 
     quote! {
-        #[linkme::distributed_slice(crate::tests::TESTS)]
+        #[linkme::distributed_slice(brig_common::tests::TESTS)]
         static #static_name: (&'static str, fn()) = (#fn_name_str, #fn_name);
 
         #item

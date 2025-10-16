@@ -1,24 +1,42 @@
 #![no_std]
 #![no_main]
+#![feature(allocator_api)]
+
+extern crate alloc;
 
 use {
+    crate::{
+        guest::{
+            linux_platform,
+            models::{self, ModelDevice},
+            run_guest, try_get_current_guest,
+        },
+        host::memory::bytes,
+    },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     common::TestConfig,
+    core::{panic::PanicInfo, sync::atomic::Ordering},
     kernel::{
-        guest::{self, models},
         host::{
             self,
-            arch::x86::memory::{
-                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
-                VirtualMemoryArea,
+            arch::x86::{
+                MachineContext,
+                memory::{
+                    HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
+                    VirtualMemoryArea,
+                },
             },
             devices::manager::SharedDeviceManager,
             fs::{Filesystem, tar::TarFilesystem},
             rand, scheduler, tasks, timer,
         },
-        logger,
+        logger, qemu_exit,
     },
+    page_fault_handler::page_fault_exception,
 };
+
+pub mod guest;
+pub mod page_fault_handler;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -46,7 +64,7 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     rand::init();
 
     // Host machine initialisation
-    host::arch::platform_init(boot_info);
+    host::arch::platform_init(boot_info, page_fault_exception);
     timer::init();
     tasks::init();
 
@@ -83,8 +101,42 @@ fn continue_start() {
     };
 
     if test_config == TestConfig::None {
-        guest::start(&mut fs);
+        // simbench_platform
+        run_guest(linux_platform(), || guest::start(&mut fs));
     } else {
-        guest::tests(test_config)
+        run_guest(linux_platform(), || {
+            brig_common::tests::run(test_config);
+            qemu_exit();
+        });
     }
+}
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    host::arch::x86::irq::local_disable();
+    let (used, total) = host::arch::x86::memory::stats();
+
+    log::error!("{info}");
+    log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
+
+    if let Some(device) = try_get_current_guest() {
+        log::error!(
+            "Guest PC = {:#018x}, EL = {}",
+            device.core.register_file.read::<u64>("_PC"),
+            device.core.register_file.read::<u8>("PSTATE_EL")
+        );
+
+        log::error!(
+            "Last executed opcode = {:#010x}",
+            models::LAST_EXECUTED_OPCODE.load(Ordering::Relaxed)
+        );
+        log::error!(
+            "Last translated opcode = {:#010x}",
+            models::LAST_TRANSLATED_OPCODE.load(Ordering::Relaxed)
+        );
+    };
+
+    // backtrace();
+
+    qemu_exit();
 }

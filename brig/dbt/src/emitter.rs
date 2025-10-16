@@ -1,10 +1,10 @@
 use {
-    crate::host::dbt::x86::emitter::{
+    crate::x86::emitter::{
         BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
         UnaryOperationKind,
     },
     alloc::vec::Vec,
- brig_common::Alloc,
+    brig_common::Alloc,
 };
 
 pub trait Emitter<A: Alloc> {

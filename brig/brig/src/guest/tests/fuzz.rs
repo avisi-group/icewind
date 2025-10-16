@@ -1,15 +1,13 @@
 use {
-    crate::{
-        guest::models,
-        host::dbt::{
-            emitter::Emitter,
-            translate::translate_instruction,
-            x86::{X86TranslationContext, emitter::X86Emitter},
-        },
-    },
+    crate::guest::models,
     alloc::{alloc::Global, format, vec::Vec},
     common::fuzz_test::InstructionFuzzTest,
-    dbt::register_file::RegisterFile,
+    dbt::{
+        emitter::Emitter,
+        register_file::RegisterFile,
+        translate::translate_instruction,
+        x86::{X86TranslationContext, emitter::X86Emitter},
+    },
     proc_macro_lib::ktest,
 };
 

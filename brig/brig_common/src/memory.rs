@@ -1,5 +1,5 @@
 use {
-    crate::host::objects::device::MemoryMappedDevice,
+    crate::device::MemoryMappedDevice,
     alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
     core::{

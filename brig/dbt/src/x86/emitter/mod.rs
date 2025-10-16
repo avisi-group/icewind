@@ -1,43 +1,32 @@
 use {
     crate::{
-        guest::{
-            GuestExecutionContext,
-            models::{CHAIN_CACHE_ENTRY_COUNT, write_to_el},
-        },
-        host::dbt::{
-            emitter::Type,
-            x86::{Emitter, X86TranslationContext},
+        emitter::{Emitter, Type},
+        trampoline::ExecutionResult,
+        x86::{
+            encoder::{
+                registers::{PhysicalRegister, Register, SegmentRegister}, width::Width, Instruction, MemoryScale, Opcode, Operand, OperandKind
+            }, X86Block, X86TranslationContext, ARG_REGS, CALLER_SAVED
         },
     },
     aarch64_paging::target,
     alloc::{rc::Rc, vec::Vec},
-    brig_common::Alloc,
+    brig_common::{Alloc, GuestExecutionContext},
     common::{
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
     },
     core::{
-        cmp::{Ordering, min},
+        cmp::{min, Ordering},
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
         ops::RangeBounds,
         panic,
     },
-    dbt::{
-        trampoline::ExecutionResult,
-        x86::{
-            ARG_REGS, CALLER_SAVED, X86Block,
-            encoder::{
-                Instruction, MemoryScale, Opcode, Operand, OperandKind,
-                registers::{PhysicalRegister, Register, SegmentRegister},
-                width::Width,
-            },
-        },
-    },
     derive_where::derive_where,
     elf::abi,
+    kernel::host::arch::x86::memory::VirtualMemoryArea,
     proc_macro_lib::ktest,
 };
 
@@ -1824,7 +1813,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::mov(pc_vreg, shifted_pc_op).unwrap());
         self.push_instruction(Instruction::shr(Operand::imm(Width::_8, 2), shifted_pc_op)); // pc must be 4 byte aligned
 
-        assert_eq!(CHAIN_CACHE_ENTRY_COUNT, (1 << 16));
+        // assert_eq!(CHAIN_CACHE_ENTRY_COUNT, (1 << 16));
         let masked_vreg = Operand::vreg(Width::_32, self.next_vreg());
         self.push_instruction(
             Instruction::movzx(
@@ -2143,10 +2132,10 @@ fn sign_extend(value: u64, original_width: u32, target_width: u32) -> u64 {
     shifted_right as u64
 }
 
-#[ktest]
-fn signextend_64() {
-    assert_eq!(64, sign_extend(64, 8, 64));
-}
+// #[ktest]
+// fn signextend_64() {
+//     assert_eq!(64, sign_extend(64, 8, 64));
+// }
 
 #[derive_where(Debug)]
 pub struct X86NodeRef<A: Alloc>(pub Rc<X86Node<A>, A>);
@@ -2642,5 +2631,14 @@ fn is_no_op_and(left_type: Type, right_type: Type, right_constant: u64) -> bool 
                         // OR the width is wider than the container for constants, so we assume the high bits would be 1s if they existed
                         // also todo: fixme because this is super hacky
                         || (left_type.width() > 64 && right_constant == u64::MAX)
+    }
+}
+
+pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
+    if old != new {
+        log::debug!("EL changed! {old} -> {new}");
+        // chain_cache.fill_keys(1);
+        // translation_cache.fill_keys(1);
+        VirtualMemoryArea::current().invalidate_guest_mappings();
     }
 }

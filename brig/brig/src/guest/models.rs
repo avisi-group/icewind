@@ -1,35 +1,13 @@
 use {
-    crate::{
-        host::{
-            arch::x86::{
-                aarch64_mmu::{self, TranslationType, take_arm_exception},
-                memory::VirtualMemoryArea,
-                safepoint::record_safepoint,
-            },
-            dbt::{
-                Translation,
-                emitter::{Emitter, Type},
-                translate::translate_instruction,
-                x86::{
-                    X86TranslationContext,
-                    emitter::{BinaryOperationKind, X86Emitter},
-                },
-            },
-            devices::manager::SharedDeviceManager,
-            fs::Filesystem,
-            memory::bump::{BumpAllocator, BumpAllocatorRef},
-            objects::{
-                Object, ObjectId, ToIrqController, ToMemoryMappedDevice, ToRegisterMappedDevice,
-                ToTickable, device::Device,
-            },
-        },
-        util::get_current_device,
+    crate::guest::{
+        devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
+        get_current_guest,
     },
     alloc::{
         alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
         sync::Arc, vec::Vec,
     },
-    brig_common::Alloc,
+    brig_common::{Alloc, device::Device},
     common::{
         hashmap::HashMap,
         intern::InternedString,
@@ -40,7 +18,23 @@ use {
         fmt::{self, Debug},
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
-    dbt::register_file::{RegisterFile, WellKnownRegister},
+    dbt::{
+        Translation,
+        emitter::{Emitter, Type},
+        register_file::{RegisterFile, WellKnownRegister},
+        translate::translate_instruction,
+        x86::{
+            X86TranslationContext,
+            emitter::{BinaryOperationKind, X86Emitter},
+        },
+    },
+    kernel::host::{
+        arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
+        devices::manager::SharedDeviceManager,
+        fs::Filesystem,
+        memory::bump::{BumpAllocator, BumpAllocatorRef},
+        objects::{Object, ObjectId, ToIrqController, ToTickable},
+    },
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };
@@ -126,17 +120,6 @@ impl Debug for ModelDevice {
         write!(f, "ModelDevice({})", self.name)
     }
 }
-
-impl Object for ModelDevice {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
-impl ToTickable for ModelDevice {}
-impl ToRegisterMappedDevice for ModelDevice {}
-impl ToMemoryMappedDevice for ModelDevice {}
-impl ToIrqController for ModelDevice {}
 
 impl Device for ModelDevice {
     fn start(&self) {
@@ -235,11 +218,7 @@ impl ModelDevice {
                 if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
                     pc
                 } else {
-                    let pc = aarch64_mmu::guest_translate(
-                        self,
-                        block_start_virtual_pc,
-                        TranslationType::Fetch,
-                    );
+                    let pc = guest_translate(self, block_start_virtual_pc, TranslationType::Fetch);
 
                     translation_cache.insert(block_start_virtual_pc as usize, pc);
                     pc
@@ -568,15 +547,6 @@ impl<const N: usize, V: Copy> DirectMappedCache<N, V> {
     }
 }
 
-pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
-    if old != new {
-        log::debug!("EL changed! {old} -> {new}");
-        // chain_cache.fill_keys(1);
-        // translation_cache.fill_keys(1);
-        VirtualMemoryArea::current().invalidate_guest_mappings();
-    }
-}
-
 pub extern "sysv64" fn svc_debug(value: u64) {
     log::error!("SVC: {value}");
 }
@@ -591,7 +561,10 @@ pub extern "sysv64" fn prelude_debug(pc: u64, opcode: u64) {
     if ENABLED.load(Ordering::Relaxed) {
         log::error!(
             "{pc:#x}: opcode: {opcode:x}, EL: {}",
-            get_current_device().register_file.read::<u8>("PSTATE_EL")
+            get_current_guest()
+                .core
+                .register_file
+                .read::<u8>("PSTATE_EL")
         )
     }
 }

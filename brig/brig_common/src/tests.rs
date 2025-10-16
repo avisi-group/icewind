@@ -1,7 +1,4 @@
-use {
-    crate::qemu_exit, alloc::vec::Vec, common::TestConfig, linkme::distributed_slice,
-    proc_macro_lib::ktest,
-};
+use {alloc::vec::Vec, common::TestConfig, linkme::distributed_slice, proc_macro_lib::ktest};
 
 #[distributed_slice]
 pub static TESTS: [(&str, fn())];
@@ -53,10 +50,4 @@ pub fn run(config: TestConfig) {
     }
 
     log::info!("all {} tests ran successfully", tests.len());
-    qemu_exit();
-}
-
-#[ktest]
-fn smoke() {
-    assert!(1 + 1 == 2);
 }
