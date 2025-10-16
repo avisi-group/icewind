@@ -4,7 +4,7 @@ use {
         host::objects::{Object, ObjectId, ToIrqController, ToTickable, irq::IrqController},
     },
     alloc::sync::Arc,
-    brig_common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, MemoryMappedDevice},
     core::{
         sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
         u8,

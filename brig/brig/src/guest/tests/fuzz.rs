@@ -1,14 +1,13 @@
 use {
     crate::guest::models,
     alloc::{alloc::Global, format, vec::Vec},
-    common::fuzz_test::InstructionFuzzTest,
+    common::{fuzz_test::InstructionFuzzTest, ktest},
     dbt::{
         emitter::Emitter,
         register_file::RegisterFile,
         translate::translate_instruction,
         x86::{X86TranslationContext, emitter::X86Emitter},
     },
-    proc_macro_lib::ktest,
 };
 
 const TEST_DATA: &[u8] = include_bytes!("fuzz_tests.postcard");

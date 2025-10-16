@@ -5,7 +5,7 @@ use {
         Width, memory_operand_to_iced,
         registers::Register::Physical as PHYS,
     },
-    brig_common::Alloc,
+    common::Alloc,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
         qword_ptr,

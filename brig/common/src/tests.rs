@@ -1,4 +1,4 @@
-use {alloc::vec::Vec, common::TestConfig, linkme::distributed_slice, proc_macro_lib::ktest};
+use {alloc::vec::Vec, common::TestConfig, linkme::distributed_slice};
 
 #[distributed_slice]
 pub static TESTS: [(&str, fn())];

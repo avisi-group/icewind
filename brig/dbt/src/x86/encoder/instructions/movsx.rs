@@ -5,7 +5,7 @@ use {
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
     },
- brig_common::Alloc,
+ common::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {

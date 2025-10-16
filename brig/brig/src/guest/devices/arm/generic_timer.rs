@@ -7,7 +7,7 @@ use {
     },
     alloc::sync::Arc,
     bitfields::bitfield,
-    brig_common::{
+    common::{
         device::{Device, RegisterMappedDevice},
         sysreg_helpers::encode_sysreg_id,
     },

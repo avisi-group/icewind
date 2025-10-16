@@ -15,17 +15,17 @@ use {
         host::fs::Filesystem,
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
-    brig_common::{
+    common::{
         GuestExecutionContext,
         device::{Device, MemoryMappedDevice, RegisterMappedDevice},
+        intern::InternedString,
         memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
         sysreg_helpers::{self, encode_sysreg_id},
     },
-    common::{TestConfig, intern::InternedString},
     core::{panic, ptr, sync::atomic::AtomicU64},
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
-    spin::{Mutex, Once},
+    spin::Mutex,
 };
 
 pub mod devices;

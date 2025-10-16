@@ -9,7 +9,7 @@ use {
         },
     },
     alloc::{alloc::Global, collections::vec_deque::VecDeque, vec::Vec},
-    brig_common::Alloc,
+    common::Alloc,
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},

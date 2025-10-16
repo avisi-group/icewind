@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["dbt", "kernel", "proc_macro_lib", "brig_common", "brig"]
+members = ["dbt", "kernel", "proc_macro_lib", "common", "brig"]
 
 [profile.release]
 debug = true

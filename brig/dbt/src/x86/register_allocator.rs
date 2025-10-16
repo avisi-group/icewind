@@ -10,7 +10,7 @@ use {
         },
     },
     alloc::vec::Vec,
-    brig_common::Alloc as MemAlloc,
+    common::Alloc as MemAlloc,
     strum::EnumCount,
 };
 

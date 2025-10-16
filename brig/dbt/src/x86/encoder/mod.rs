@@ -10,18 +10,14 @@ use {
             width::Width,
         },
     },
-    alloc::{string::String, vec::Vec},
-    brig_common::Alloc,
-    common::{arena::Ref, hashmap::HashMapA},
-    core::{
-        fmt::{Debug, Display, Formatter},
-        marker::PhantomData,
-    },
+    alloc::vec::Vec,
+    common::{Alloc, arena::Ref, hashmap::HashMapA},
+    core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
     displaydoc::Display,
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
-        AsmRegisterXmm, CodeAssembler, CodeLabel, qword_ptr,
+        AsmMemoryOperand, AsmRegister8, AsmRegister32, AsmRegister64, AsmRegisterXmm,
+        CodeAssembler, CodeLabel, qword_ptr,
     },
 };
 

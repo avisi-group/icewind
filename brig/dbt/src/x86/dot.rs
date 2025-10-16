@@ -4,8 +4,8 @@ use {
         format,
         string::{String, ToString},
     },
-    brig_common::Alloc,
     common::{
+        Alloc,
         arena::{Arena, Ref},
         hashmap::HashSet,
     },

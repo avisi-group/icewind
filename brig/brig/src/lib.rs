@@ -6,11 +6,7 @@ extern crate alloc;
 
 use {
     crate::{
-        guest::{
-            linux_platform,
-            models::{self, ModelDevice},
-            run_guest, try_get_current_guest,
-        },
+        guest::{linux_platform, models, run_guest, try_get_current_guest},
         host::memory::bytes,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
@@ -19,12 +15,9 @@ use {
     kernel::{
         host::{
             self,
-            arch::x86::{
-                MachineContext,
-                memory::{
-                    HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
-                    VirtualMemoryArea,
-                },
+            arch::x86::memory::{
+                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
+                VirtualMemoryArea,
             },
             devices::manager::SharedDeviceManager,
             fs::{Filesystem, tar::TarFilesystem},
@@ -105,7 +98,7 @@ fn continue_start() {
         run_guest(linux_platform(), || guest::start(&mut fs));
     } else {
         run_guest(linux_platform(), || {
-            brig_common::tests::run(test_config);
+            common::tests::run(test_config);
             qemu_exit();
         });
     }

@@ -218,7 +218,7 @@ pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     );
 
     quote! {
-        #[linkme::distributed_slice(brig_common::tests::TESTS)]
+        #[linkme::distributed_slice(common::tests::TESTS)]
         static #static_name: (&'static str, fn()) = (#fn_name_str, #fn_name);
 
         #item

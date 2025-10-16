@@ -1,7 +1,7 @@
 use {
     crate::host::objects::irq::IrqController,
     alloc::sync::Arc,
-    brig_common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, MemoryMappedDevice},
     core::sync::atomic::{AtomicU16, AtomicU32, Ordering},
     kernel::host::objects::ObjectId,
 };

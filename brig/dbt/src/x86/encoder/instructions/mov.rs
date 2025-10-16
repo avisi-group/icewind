@@ -10,7 +10,7 @@ use {
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
         AsmRegisterXmm, CodeAssembler, byte_ptr, dword_ptr, qword_ptr, word_ptr, xmmword_ptr,
     },
- brig_common::Alloc,
+ common::Alloc,
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {

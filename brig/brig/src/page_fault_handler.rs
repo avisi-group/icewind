@@ -4,7 +4,7 @@ use {
         get_current_guest,
     },
     alloc::alloc::alloc_zeroed,
-    brig_common::{GuestExecutionContext, memory::AddressSpaceRegionKind},
+    common::{GuestExecutionContext, irq_handler, memory::AddressSpaceRegionKind},
     core::alloc::Layout,
     iced_x86::{Code, OpKind, Register},
     kernel::host::arch::x86::{
@@ -14,7 +14,6 @@ use {
             VirtualMemoryArea,
         },
     },
-    proc_macro_lib::irq_handler,
     x86_64::{
         VirtAddr,
         registers::control::Cr2,

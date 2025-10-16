@@ -6,7 +6,7 @@ use {
         },
     },
     aarch64_paging::paging::{Attributes, Descriptor},
-    brig_common::sysreg_helpers::encode_sysreg_id,
+    common::sysreg_helpers::encode_sysreg_id,
     dbt::x86::emitter::write_to_el,
 };
 

@@ -12,10 +12,10 @@ use {
         timer::Measurement,
     },
     alloc::{alloc::Global, boxed::Box, sync::Arc},
-    brig_common::sysreg_helpers,
     common::{
         bits::{bit_insert, mask},
         hashmap::HashMap,
+        ktest, sysreg_helpers,
     },
     core::{panic, u128},
     dbt::{
@@ -32,7 +32,6 @@ use {
             },
         },
     },
-    proc_macro_lib::ktest,
 };
 
 mod fuzz;

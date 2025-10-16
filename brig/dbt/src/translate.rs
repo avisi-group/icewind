@@ -9,11 +9,8 @@ use {
         },
     },
     alloc::{collections::BTreeMap, vec::Vec},
-    brig_common::{
-        Alloc,
-        sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
-    },
     common::{
+        Alloc,
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in},
         intern::InternedString,
@@ -21,6 +18,7 @@ use {
             self, Model, RegisterCacheType, block::Block, constant::Constant, function::Function,
             statement::Statement, types::PrimitiveType,
         },
+        sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{

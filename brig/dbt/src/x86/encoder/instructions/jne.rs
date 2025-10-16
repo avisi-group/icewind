@@ -5,7 +5,7 @@ use {
     },
     common::{arena::Ref, hashmap::HashMapA},
     iced_x86::code_asm::{CodeAssembler, CodeLabel},
- brig_common::Alloc,
+ common::Alloc,
 };
 
 pub fn encode<A: Alloc>(

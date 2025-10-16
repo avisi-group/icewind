@@ -159,8 +159,7 @@ dependencies = [
  "aarch64-paging",
  "bitfields",
  "bootloader_api",
- "brig_common",
- "common",
+ "common 0.1.0",
  "dbt",
  "disarm64",
  "elfloader",
@@ -170,24 +169,11 @@ dependencies = [
  "linkme",
  "log",
  "postcard",
- "proc_macro_lib",
  "spin 0.10.0",
  "virtio-bindings",
  "virtio-drivers",
  "x86",
  "x86_64",
-]
-
-[[package]]
-name = "brig_common"
-version = "0.1.0"
-dependencies = [
- "common",
- "linkme",
- "log",
- "proc_macro_lib",
- "spin 0.10.0",
- "x86",
 ]
 
 [[package]]
@@ -269,6 +255,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "common 0.0.0",
+ "linkme",
+ "log",
+ "proc_macro_lib",
+ "spin 0.10.0",
+ "x86",
+]
+
+[[package]]
 name = "concat-idents"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,9 +282,8 @@ version = "0.1.0"
 dependencies = [
  "aarch64-paging",
  "bitfields",
- "brig_common",
  "byteorder",
- "common",
+ "common 0.1.0",
  "derive-where",
  "displaydoc",
  "elf",
@@ -296,7 +293,6 @@ dependencies = [
  "linkme",
  "log",
  "paste",
- "proc_macro_lib",
  "strum 0.27.2",
  "thiserror",
  "x86",
@@ -506,11 +502,10 @@ dependencies = [
  "bitfields",
  "bitset-core",
  "bootloader_api",
- "brig_common",
  "buddy_system_allocator",
  "byte-unit",
  "byteorder",
- "common",
+ "common 0.1.0",
  "concat-idents",
  "derive-where",
  "disarm64",
@@ -528,7 +523,6 @@ dependencies = [
  "paste",
  "phf",
  "postcard",
- "proc_macro_lib",
  "rustc-demangle",
  "serde",
  "serde_json",

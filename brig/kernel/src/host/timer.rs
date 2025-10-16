@@ -5,12 +5,12 @@ use {
         scheduler::{self, TIMER_FREQUENCY},
     },
     alloc::{sync::Arc, vec::Vec},
+    common::irq_handler,
     core::sync::atomic::{AtomicU64, Ordering},
     embedded_time::{
         duration::Nanoseconds,
         rate::{Hertz, Rate},
     },
-    proc_macro_lib::irq_handler,
     spin::{Lazy, Mutex},
     x86::time::rdtscp,
 };

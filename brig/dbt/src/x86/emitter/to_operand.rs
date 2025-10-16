@@ -7,15 +7,14 @@ use {
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
             },
             encoder::{
-                Instruction, Opcode, Operand, OperandKind,
+                Instruction, Operand, OperandKind,
                 registers::{PhysicalRegister, Register},
                 width::Width,
             },
         },
     },
-    brig_common::Alloc,
+    common::{Alloc, ktest},
     core::cmp::{Ordering, min},
-    proc_macro_lib::ktest,
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -1090,54 +1089,54 @@ impl SplitRange {
     }
 }
 
-// #[ktest]
-// fn splitrange_low() {
-//     assert_eq!(
-//         SplitRange::new(4, 7),
-//         SplitRange {
-//             low_start: 4,
-//             low_length: 7,
-//             high_start: 0,
-//             high_length: 0
-//         }
-//     )
-// }
+#[ktest]
+fn splitrange_low() {
+    assert_eq!(
+        SplitRange::new(4, 7),
+        SplitRange {
+            low_start: 4,
+            low_length: 7,
+            high_start: 0,
+            high_length: 0
+        }
+    )
+}
 
-// #[ktest]
-// fn splitrange_high() {
-//     assert_eq!(
-//         SplitRange::new(78, 15),
-//         SplitRange {
-//             low_start: 0,
-//             low_length: 0,
-//             high_start: 14,
-//             high_length: 15,
-//         }
-//     )
-// }
+#[ktest]
+fn splitrange_high() {
+    assert_eq!(
+        SplitRange::new(78, 15),
+        SplitRange {
+            low_start: 0,
+            low_length: 0,
+            high_start: 14,
+            high_length: 15,
+        }
+    )
+}
 
-// #[ktest]
-// fn splitrange_split_0() {
-//     assert_eq!(
-//         SplitRange::new(32, 64),
-//         SplitRange {
-//             low_start: 32,
-//             low_length: 32,
-//             high_start: 0,
-//             high_length: 32,
-//         }
-//     )
-// }
+#[ktest]
+fn splitrange_split_0() {
+    assert_eq!(
+        SplitRange::new(32, 64),
+        SplitRange {
+            low_start: 32,
+            low_length: 32,
+            high_start: 0,
+            high_length: 32,
+        }
+    )
+}
 
-// #[ktest]
-// fn splitrange_split_1() {
-//     assert_eq!(
-//         SplitRange::new(63, 47),
-//         SplitRange {
-//             low_start: 63,
-//             low_length: 1,
-//             high_start: 0,
-//             high_length: 46,
-//         }
-//     )
-// }
+#[ktest]
+fn splitrange_split_1() {
+    assert_eq!(
+        SplitRange::new(63, 47),
+        SplitRange {
+            low_start: 63,
+            low_length: 1,
+            high_start: 0,
+            high_length: 46,
+        }
+    )
+}

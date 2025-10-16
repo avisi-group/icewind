@@ -1,10 +1,10 @@
 use {
+    common::ktest,
     core::fmt::{Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm,
     },
-    proc_macro_lib::ktest,
     strum::{EnumCount, EnumIter, IntoEnumIterator},
 };
 
@@ -313,13 +313,13 @@ pub enum RegisterConversionError {
     InvalidGeneralAsXmm(PhysicalRegister),
 }
 
-// #[ktest]
-// fn reg_index() {
-//     for i in 0..PhysicalRegister::COUNT {
-//         assert_eq!(i, PhysicalRegister::from_index(i).index())
-//     }
+#[ktest]
+fn reg_index() {
+    for i in 0..PhysicalRegister::COUNT {
+        assert_eq!(i, PhysicalRegister::from_index(i).index())
+    }
 
-//     for reg in PhysicalRegister::iter() {
-//         assert_eq!(reg, PhysicalRegister::from_index(reg.index()))
-//     }
-// }
+    for reg in PhysicalRegister::iter() {
+        assert_eq!(reg, PhysicalRegister::from_index(reg.index()))
+    }
+}

@@ -12,41 +12,15 @@ extern crate alloc;
 
 use {
     crate::{
-        host::{
-            arch::x86::memory::{
-                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
-                VirtualMemoryArea,
-            },
-            devices::manager::SharedDeviceManager,
-            fs::{Filesystem, tar::TarFilesystem},
-            memory::bytes,
-            rand, scheduler, tasks, timer,
-        },
+        host::{rand, scheduler, tasks},
         logger::WRITER,
     },
-    bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    common::TestConfig,
-    core::{panic::PanicInfo, sync::atomic::Ordering},
     x86::io::outw,
 };
 
 pub mod host;
 pub mod logger;
 pub mod util;
-
-pub static BOOTLOADER_CONFIG: BootloaderConfig = {
-    let mut config = BootloaderConfig::new_default();
-    config.mappings.physical_memory = Some(Mapping::FixedAddress(PHYSICAL_MEMORY_OFFSET.as_u64()));
-    config.mappings.dynamic_range_start = Some(HIGH_HALF_CANONICAL_START.as_u64());
-    config.mappings.dynamic_range_end = Some(HIGH_HALF_CANONICAL_END.as_u64());
-    config.mappings.framebuffer = Mapping::Dynamic;
-    config.mappings.kernel_stack = Mapping::Dynamic;
-    config.mappings.ramdisk_memory = Mapping::Dynamic;
-    config.mappings.boot_info = Mapping::Dynamic;
-    config.mappings.aslr = false;
-    config.kernel_stack_size = 0x10_0000;
-    config
-};
 
 fn _serial_in() {
     let mut buf = [0u8; 64];

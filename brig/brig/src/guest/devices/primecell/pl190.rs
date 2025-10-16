@@ -1,7 +1,7 @@
 use {
     crate::guest::devices::primecell::PRIMECELL_ID,
     alloc::sync::Arc,
-    brig_common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, MemoryMappedDevice},
     core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering},
     kernel::host::objects::{ObjectId, irq::IrqController},
 };

@@ -3,31 +3,31 @@ use {
         emitter::{Emitter, Type},
         trampoline::ExecutionResult,
         x86::{
+            ARG_REGS, CALLER_SAVED, X86Block, X86TranslationContext,
             encoder::{
-                registers::{PhysicalRegister, Register, SegmentRegister}, width::Width, Instruction, MemoryScale, Opcode, Operand, OperandKind
-            }, X86Block, X86TranslationContext, ARG_REGS, CALLER_SAVED
+                Instruction, MemoryScale, Opcode, Operand, OperandKind,
+                registers::{PhysicalRegister, Register, SegmentRegister},
+                width::Width,
+            },
         },
     },
-    aarch64_paging::target,
     alloc::{rc::Rc, vec::Vec},
-    brig_common::{Alloc, GuestExecutionContext},
     common::{
+        Alloc, GuestExecutionContext,
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
+        ktest,
     },
     core::{
-        cmp::{min, Ordering},
+        cmp::{Ordering, min},
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
-        ops::RangeBounds,
         panic,
     },
     derive_where::derive_where,
-    elf::abi,
     kernel::host::arch::x86::memory::VirtualMemoryArea,
-    proc_macro_lib::ktest,
 };
 
 mod to_operand;
@@ -2132,10 +2132,10 @@ fn sign_extend(value: u64, original_width: u32, target_width: u32) -> u64 {
     shifted_right as u64
 }
 
-// #[ktest]
-// fn signextend_64() {
-//     assert_eq!(64, sign_extend(64, 8, 64));
-// }
+#[ktest]
+fn signextend_64() {
+    assert_eq!(64, sign_extend(64, 8, 64));
+}
 
 #[derive_where(Debug)]
 pub struct X86NodeRef<A: Alloc>(pub Rc<X86Node<A>, A>);

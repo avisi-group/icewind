@@ -9,7 +9,7 @@ use {
         },
     },
     alloc::{collections::BTreeMap, sync::Arc},
-    brig_common::device::{Device, MemoryMappedDevice},
+    common::device::{Device, MemoryMappedDevice},
     common::intern::InternedString,
     kernel::util::any_as_u8_slice,
     spin::Mutex,

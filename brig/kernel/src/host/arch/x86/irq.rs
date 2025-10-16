@@ -1,33 +1,13 @@
 use {
-    crate::{
-        host::arch::x86::{
-            MachineContext, dbg,
-            memory::{
-                GUEST_PHYSICAL_END, GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt,
-                VirtualMemoryArea,
-            },
-        },
-        qemu_exit,
-    },
-    alloc::alloc::alloc_zeroed,
+    crate::host::arch::x86::{MachineContext, dbg},
     bitset_core::BitSet,
-    common::intern::InternedString,
-    core::alloc::Layout,
-    iced_x86::{Code, OpKind, Register},
-    proc_macro_lib::irq_handler,
+    common::{intern::InternedString, irq_handler},
     spin::Once,
     x86::irq::{
         BREAKPOINT_VECTOR, DEBUG_VECTOR, DIVIDE_ERROR_VECTOR, DOUBLE_FAULT_VECTOR,
         GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
     },
-    x86_64::{
-        VirtAddr,
-        registers::control::Cr2,
-        structures::{
-            idt::{InterruptDescriptorTable, PageFaultErrorCode},
-            paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate},
-        },
-    },
+    x86_64::{VirtAddr, structures::idt::InterruptDescriptorTable},
 };
 
 static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;

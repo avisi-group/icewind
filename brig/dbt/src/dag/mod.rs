@@ -1,7 +1,7 @@
 use {
     crate::host::dbt::emitter::Emitter,
     core::{marker::PhantomData, sync::atomic::AtomicUsize},
- brig_common::Alloc,
+ common::Alloc,
 };
 
 pub struct Dag<A> {
