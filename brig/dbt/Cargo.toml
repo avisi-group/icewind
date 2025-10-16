@@ -10,7 +10,7 @@ kernel = { path = "../kernel" }
 byteorder = { version = "1.5.0", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 paste = "1.0.15"
-log = { version = "0.4.27", default-features = false }
+log = { version = "0.4.28", default-features = false }
 iced-x86 = { version = "1.21.0", default-features = false, features = [
     "decoder",
     "encoder",
@@ -19,10 +19,10 @@ iced-x86 = { version = "1.21.0", default-features = false, features = [
     "no_std",
     "code_asm"
 ] }
-thiserror = { version = "2.0.12", default-features = false }
+thiserror = { version = "2.0.17", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
 strum = { version = "0.27.2", features = ["derive"], default-features = false }
-linkme = "0.3.33"
+linkme = "0.3.35"
 derive-where = "1.6.0"
 bitfields = "1.0.0"
 x86_64 = "0.15.2"

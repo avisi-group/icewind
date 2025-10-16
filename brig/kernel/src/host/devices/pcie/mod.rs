@@ -4,7 +4,7 @@ use {
         arch::x86::memory::PhysAddrExt,
         devices::{ivshmem::probe_ivshmem, virtio::probe_virtio_block},
     },
-    acpi::{PciConfigRegions, mcfg::PciConfigEntry},
+    acpi::{platform::PciConfigRegions, sdt::mcfg::McfgEntry},
     common::hashmap::HashMap,
     core::fmt::{self, Display},
     log::trace,
@@ -18,21 +18,24 @@ pub mod bar;
 
 pub struct PCIEBus;
 
-impl Bus<PciConfigRegions<'_, alloc::alloc::Global>> for PCIEBus {
-    fn probe(&self, probe_data: PciConfigRegions<'_, alloc::alloc::Global>) {
-        probe_data.iter().for_each(enumerate);
+impl Bus<PciConfigRegions> for PCIEBus {
+    fn probe(&self, probe_data: PciConfigRegions) {
+        probe_data.regions.into_iter().for_each(enumerate);
     }
 }
 
 type ProbeFn = fn(&mut PciRoot<MmioCam>, DeviceFunction);
 
 pub fn enumerate(
-    PciConfigEntry {
-        bus_range,
-        physical_address,
+    McfgEntry {
+        base_address,
+        bus_number_start,
+        bus_number_end,
         ..
-    }: PciConfigEntry,
+    }: McfgEntry,
 ) {
+    let bus_range = bus_number_start..=bus_number_end;
+
     // todo: load me from plugins?
     let pci_driver_map = [
         (PciId::new(0x1af4, 0x1001), probe_virtio_block as ProbeFn),
@@ -42,7 +45,7 @@ pub fn enumerate(
     .into_iter()
     .collect::<HashMap<_, _>>();
 
-    let physical_address = PhysAddr::new(u64::try_from(physical_address).unwrap());
+    let physical_address = PhysAddr::new(u64::try_from(base_address).unwrap());
     log::debug!("enumerating pcie {:?} {:x}", bus_range, physical_address);
 
     let mut root =

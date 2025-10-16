@@ -9,47 +9,13 @@ use {
     },
 };
 
-/// Iterator over BARs in a device
-pub struct BarIter<'root, 'mmio> {
-    root: &'root mut PciRoot<MmioCam<'mmio>>,
-    dev_fn: DeviceFunction,
-    current_index: u8,
-}
-
-impl<'root, 'mmio> BarIter<'root, 'mmio> {
-    pub fn new(root: &'root mut PciRoot<MmioCam<'mmio>>, dev_fn: DeviceFunction) -> Self {
-        Self {
-            root,
-            dev_fn,
-            current_index: 0,
-        }
-    }
-}
-
-impl<'root, 'mmio> Iterator for BarIter<'root, 'mmio> {
-    type Item = BarInfo;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // BAR array is length 6
-        if self.current_index >= 6 {
-            return None;
-        }
-
-        let info = self.root.bar_info(self.dev_fn, self.current_index).unwrap();
-
-        if info.takes_two_entries() {
-            self.current_index += 2;
-        } else {
-            self.current_index += 1;
-        }
-
-        Some(info)
-    }
-}
-
 /// Map all 64-bit memory BARs of a device to virtual memory
 pub fn allocate_bars(root: &mut PciRoot<MmioCam>, device_function: DeviceFunction) {
-    BarIter::new(root, device_function)
+    root.bars(device_function)
+        .unwrap()
+        .into_iter()
+        // remove None's
+        .flatten()
         // remove IO and 32-bit memory BARs
         .filter_map(|bar| match bar {
             BarInfo::Memory {

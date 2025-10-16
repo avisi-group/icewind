@@ -11,8 +11,8 @@ kernel = { path = "../kernel" }
 dbt = { path = "../dbt" }
 common = { path = "../common" }
 
-bootloader_api = "0.11.11"
-log = { version = "0.4.27", default-features = false }
+bootloader_api = "0.11.12"
+log = { version = "0.4.28", default-features = false }
 postcard = { version = "1.1.3", features = ["alloc"], default-features = false }
 x86_64 = "0.15.2"
 iced-x86 = { version = "1.21.0", default-features = false, features = [
@@ -28,8 +28,8 @@ spin = "0.10.0"
 embedded-time = "0.12.1"
 disarm64 = "0.1.25"
 x86 = "0.52.0"
-linkme = "0.3.33"
+linkme = "0.3.35"
 virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
-virtio-drivers = { version = "0.10.0", features = ["alloc"] }
+virtio-drivers = { version = "0.12.0", features = ["alloc"] }
 bitfields = "1.0.0"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }

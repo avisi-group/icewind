@@ -37,12 +37,12 @@ pub fn probe_ivshmem(root: &mut PciRoot<MmioCam>, device_function: DeviceFunctio
 
     let info = root.bar_info(device_function, 2).unwrap();
 
-    let BarInfo::Memory {
+    let Some(BarInfo::Memory {
         address_type: MemoryBarType::Width64,
         address: phys_addr,
         size,
         ..
-    } = info
+    }) = info
     else {
         panic!()
     };
