@@ -804,6 +804,7 @@ impl Instruction {
             MOVZX(src, dst) => movzx::encode(assembler, src, dst),
             MOVSX(src, dst) => movsx::encode(assembler, src, dst),
             SHL(amount, value) => shl::encode(assembler, amount, value),
+
             SHR(amount, value) => shr::encode(assembler, amount, value),
             AND(src, dst) => and::encode(assembler, src, dst),
             SETNE(dst) => setne::encode(assembler, dst),
@@ -860,6 +861,26 @@ impl Instruction {
             RET => {
                 assembler.ret().unwrap();
             }
+
+            SHRD(
+                Operand {
+                    kind: I(amount), ..
+                },
+                Operand {
+                    kind: R(PHYS(hi)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(lo)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .shrd::<AsmRegister64, AsmRegister64, i32>(
+                    lo.into(),
+                    hi.into(),
+                    i32::try_from(*amount).unwrap(),
+                )
+                .unwrap(),
 
             SETA(Operand {
                 kind: R(PHYS(dst)), ..
@@ -1323,6 +1344,29 @@ impl Instruction {
                     .pinsrb::<AsmRegisterXmm, AsmRegister32, i32>(
                         dst.try_into().unwrap(),
                         src.into(),
+                        i32::try_from(*index).unwrap(),
+                    )
+                    .unwrap();
+            }
+
+            PEXTR(
+                Operand {
+                    kind: I(index),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .pextrq::<AsmRegister64, AsmRegisterXmm, i32>(
+                        dst.into(),
+                        src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
                     .unwrap();

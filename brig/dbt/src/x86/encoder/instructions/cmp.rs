@@ -29,6 +29,20 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
         (
             Operand {
                 kind: R(PHYS(left)),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .cmp::<AsmRegister16, AsmRegister16>(right.into(), left.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(left)),
                 width_in_bits: Width::_32,
             },
             Operand {
