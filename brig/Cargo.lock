@@ -282,7 +282,6 @@ dependencies = [
  "displaydoc",
  "iced-x86",
  "itertools 0.14.0",
- "kernel",
  "linkme",
  "log",
  "paste",

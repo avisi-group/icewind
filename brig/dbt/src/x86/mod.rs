@@ -1,6 +1,5 @@
 use {
     crate::{
-        Translation,
         emitter::Emitter,
         register_file::GLOBAL_REGISTER_SIZE,
         x86::{
@@ -9,8 +8,8 @@ use {
         },
     },
     alloc::{alloc::Global, collections::vec_deque::VecDeque, vec::Vec},
-    common::Alloc,
     common::{
+        Alloc,
         arena::{Arena, Ref},
         hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},
         intern::InternedString,
@@ -151,6 +150,8 @@ pub struct X86TranslationContext<A: Alloc> {
     c_offset: u64,
     v_offset: u64,
 
+    el_changed_callback: extern "sysv64" fn(u8, u8),
+
     global_register_offset: usize,
 
     /// Counter for allocating variable ids
@@ -191,8 +192,19 @@ impl<A: Alloc> Debug for X86TranslationContext<A> {
 }
 
 impl X86TranslationContext<Global> {
-    pub fn new(model: &Model, memory_mask: bool, global_register_offset: usize) -> Self {
-        Self::new_with_allocator(Global, model, memory_mask, global_register_offset)
+    pub fn new(
+        model: &Model,
+        memory_mask: bool,
+        global_register_offset: usize,
+        el_changed_callback: extern "sysv64" fn(u8, u8),
+    ) -> Self {
+        Self::new_with_allocator(
+            Global,
+            model,
+            memory_mask,
+            global_register_offset,
+            el_changed_callback,
+        )
     }
 }
 
@@ -202,6 +214,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         model: &Model,
         memory_mask: bool,
         global_register_offset: usize,
+        el_changed_callback: extern "sysv64" fn(u8, u8),
     ) -> Self {
         let mut arena = Arena::new_in(allocator.clone());
 
@@ -228,6 +241,8 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             global_register_offset,
             memory_mask,
             current_variable_id: 0,
+
+            el_changed_callback,
         };
 
         // add panic to the panic block
@@ -260,7 +275,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         self.panic_block
     }
 
-    pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
+    pub fn compile(mut self, num_virtual_registers: usize) -> Vec<u8> {
         let mut assembler = CodeAssembler::new(64).unwrap();
 
         //let mut label_map = hashmap_in(self.allocator());
@@ -454,15 +469,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         log::trace!("assembling");
         let code = assembler.assemble(0).unwrap();
 
-        log::trace!("making executable");
-
-        let res = Translation::new(code);
-
-        //panic!("{res:?}");
-
-        log::trace!("done");
-
-        res
+        code
     }
 
     pub fn create_block(&mut self) -> Ref<X86Block<A>> {

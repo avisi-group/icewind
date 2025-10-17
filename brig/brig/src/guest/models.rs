@@ -1,7 +1,8 @@
 use {
     crate::guest::{
+        Translation,
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
-        get_current_guest,
+        get_current_guest, write_to_el,
     },
     alloc::{
         alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
@@ -20,7 +21,6 @@ use {
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::{
-        Translation,
         emitter::{Emitter, Type},
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
@@ -321,6 +321,7 @@ impl ModelDevice {
             &self.model,
             true,
             self.register_file.global_register_offset(),
+            write_to_el,
         );
         let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -413,7 +414,7 @@ impl ModelDevice {
         emitter.leave_with_cache(chain_cache);
         let num_regs = emitter.next_vreg();
 
-        let translation = ctx.compile(num_regs);
+        let translation = Translation::new(ctx.compile(num_regs));
 
         // if block_start_pc == 0xffffffc00811c584 {
         //     log::error!("WARNING! Large block @ {block_start_pc:x}");

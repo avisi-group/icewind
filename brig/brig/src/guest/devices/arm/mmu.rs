@@ -1,13 +1,10 @@
 use {
     crate::{
-        guest::{GuestExecutionContext, get_current_guest, models::ModelDevice},
-        arch::x86::{
-            memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
-        },
+        arch::x86::{memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint},
+        guest::{GuestExecutionContext, get_current_guest, models::ModelDevice, write_to_el},
     },
     aarch64_paging::paging::{Attributes, Descriptor},
     common::sysreg_helpers::encode_sysreg_id,
-    dbt::x86::emitter::write_to_el,
 };
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);

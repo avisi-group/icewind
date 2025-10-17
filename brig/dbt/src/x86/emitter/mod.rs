@@ -20,14 +20,13 @@ use {
         ktest,
     },
     core::{
-        cmp::{Ordering, min},
+        cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
         panic,
     },
     derive_where::derive_where,
-    kernel::arch::x86::memory::VirtualMemoryArea,
 };
 
 mod to_operand;
@@ -1549,7 +1548,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         }
 
         if offset == self.ctx().el_offset {
-            let function = self.function_ptr(write_to_el as u64);
+            let function = self.function_ptr(self.ctx().el_changed_callback as u64);
 
             let old = self.read_register(self.ctx().el_offset, Type::Unsigned(64));
             let new = self.cast(
@@ -2631,14 +2630,5 @@ fn is_no_op_and(left_type: Type, right_type: Type, right_constant: u64) -> bool 
                         // OR the width is wider than the container for constants, so we assume the high bits would be 1s if they existed
                         // also todo: fixme because this is super hacky
                         || (left_type.width() > 64 && right_constant == u64::MAX)
-    }
-}
-
-pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
-    if old != new {
-        log::debug!("EL changed! {old} -> {new}");
-        // chain_cache.fill_keys(1);
-        // translation_cache.fill_keys(1);
-        VirtualMemoryArea::current().invalidate_guest_mappings();
     }
 }

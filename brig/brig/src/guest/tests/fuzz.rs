@@ -1,5 +1,5 @@
 use {
-    crate::guest::models,
+    crate::guest::{Translation, models, write_to_el},
     alloc::{alloc::Global, format, vec::Vec},
     common::{fuzz_test::InstructionFuzzTest, ktest},
     dbt::{
@@ -34,7 +34,12 @@ fn run_test(instruction: u32, _index: usize, initial_state: &[u64; 31], post_sta
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut ctx = X86TranslationContext::new(
+        &model,
+        false,
+        register_file.global_register_offset(),
+        write_to_el,
+    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write::<u8>("PSTATE_EL", 1);
@@ -54,7 +59,7 @@ fn run_test(instruction: u32, _index: usize, initial_state: &[u64; 31], post_sta
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+    let translation = Translation::new(ctx.compile(num_regs));
 
     initial_state
         .iter()
