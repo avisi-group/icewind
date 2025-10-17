@@ -319,6 +319,124 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
         self.binary_operation(BinaryOperationKind::Or(target, source))
     }
+
+    fn bit_extract_128(
+        &mut self,
+        value: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
+    ) -> X86NodeRef {
+        let NodeKind::Constant {
+            value: length_c, ..
+        } = length.kind()
+        else {
+            panic!()
+        };
+        let length_c = *length_c;
+
+        if length_c > 64 {
+            panic!()
+        }
+
+        // let low_start = if start >= 64 { 0 } else { start };
+        // let low_length = if start >= 64 {
+        //     0
+        // } else {
+        //     let end = min(start + length, 64);
+
+        //     end - start
+        // };
+
+        // let high_start = if start >= 64 { start - 64 } else { 0 };
+        // let high_length = length - low_length;
+        let start = self.cast(start, Type::Signed(64), CastOperationKind::Convert);
+        let length = self.cast(length, Type::Signed(64), CastOperationKind::Convert);
+
+        let low_start = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64,
+            ));
+            self.select(condition, _0, start.clone())
+        };
+
+        let low_length = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64,
+            ));
+
+            let capped_length = {
+                let _64 = self.constant(64, Type::Signed(64));
+                let end =
+                    self.binary_operation(BinaryOperationKind::Add(start.clone(), length.clone()));
+
+                let condition = self.binary_operation(
+                    BinaryOperationKind::CompareGreaterThanOrEqual(end.clone(), _64.clone()),
+                );
+
+                let capped_end = self.select(condition, _64, end);
+
+                self.binary_operation(BinaryOperationKind::Sub(capped_end, start.clone()))
+            };
+
+            self.select(condition, _0, capped_length)
+        };
+
+        let high_start = {
+            let _0 = self.constant(0, Type::Signed(64));
+            let _64 = self.constant(64, Type::Signed(64));
+            let condition = self.binary_operation(BinaryOperationKind::CompareGreaterThanOrEqual(
+                start.clone(),
+                _64.clone(),
+            ));
+            let start_sub_64 = self.binary_operation(BinaryOperationKind::Sub(start.clone(), _64));
+            self.select(condition, start_sub_64, _0)
+        };
+
+        let high_length =
+            self.binary_operation(BinaryOperationKind::Sub(length.clone(), low_length.clone()));
+
+        let _0 = self.constant(0, Type::Signed(64));
+        let _64 = self.constant(64, Type::Signed(64));
+
+        // won't recurse because we're supplying constant, safe values that will be
+        // emitted as pextrq instructions
+        let value_low = self.bit_extract(value.clone(), _0, _64.clone());
+        let value_high = self.bit_extract(value, _64.clone(), _64);
+
+        // now do 64-bit bit extracts
+        let extracted_low = self.bit_extract(value_low, low_start, low_length.clone());
+        let extracted_high = self.bit_extract(value_high, high_start, high_length);
+
+        // cast to final length
+        let extracted_low = self.cast(
+            extracted_low,
+            Type::Unsigned(u32::try_from(length_c).unwrap()),
+            CastOperationKind::ZeroExtend,
+        );
+        let extracted_high = self.cast(
+            extracted_high,
+            Type::Unsigned(u32::try_from(length_c).unwrap()),
+            CastOperationKind::ZeroExtend,
+        );
+
+        // todo: maybe make this a bit insert?
+        let shifted_extracted_high = self.shift(
+            extracted_high,
+            low_length,
+            ShiftOperationKind::LogicalShiftLeft,
+        );
+
+        self.binary_operation(BinaryOperationKind::Or(
+            shifted_extracted_high,
+            extracted_low,
+        ))
+    }
 }
 
 impl<'ctx> Emitter for X86Emitter<'ctx> {

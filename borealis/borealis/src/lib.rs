@@ -24,6 +24,7 @@ pub const DELETED_CALLS: &[&str] = &[
     "Z_set",
     "MaybeZeroSVEUppers",
     "ResetSVEState",
+    "execute_aarch64_instrs_integer_crc",
 ];
 
 pub fn fn_is_allowlisted(name: InternedString) -> bool {

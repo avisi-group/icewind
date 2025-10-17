@@ -227,58 +227,91 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     return result;
                 }
 
-                let mut value = if let NodeKind::Constant { .. } = value.kind() {
-                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
-                    let value_reg = Operand::vreg(width, self.next_vreg());
-                    let value_imm = self.to_operand(value);
-                    self.push_instruction(Instruction::mov(value_imm, value_reg).unwrap());
-                    value_reg
+                if value.typ().width() > 64 {
+                    if let NodeKind::Constant { value: start_c, .. } = start.kind()
+                        && let NodeKind::Constant {
+                            value: length_c, ..
+                        } = length.kind()
+                        && matches!(length_c, 8 | 16 | 32 | 64)
+                        && start_c % length_c == 0
+                    // indexed by the size of the elements, so for a given length, the start must be
+                    // a multiple
+                    {
+                        let src = self.to_operand(value);
+
+                        let index = Operand::imm(Width::_8, start_c / length_c);
+
+                        let dst = Operand::vreg(
+                            Width::from_uncanonicalized(*length_c).unwrap(),
+                            self.next_vreg(),
+                        );
+
+                        self.push_instruction(Instruction::pextr(index, src, dst));
+
+                        dst
+                    } else {
+                        let out =
+                            self.bit_extract_128(value.clone(), start.clone(), length.clone());
+
+                        self.to_operand(&out)
+                    }
                 } else {
-                    self.to_operand(value)
-                };
+                    let mut value = if let NodeKind::Constant { .. } = value.kind() {
+                        let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
+                        let value_reg = Operand::vreg(width, self.next_vreg());
+                        let value_imm = self.to_operand(value);
+                        self.push_instruction(Instruction::mov(value_imm, value_reg).unwrap());
+                        value_reg
+                    } else {
+                        self.to_operand(value)
+                    };
 
-                if value.width() < Width::_64 {
-                    let tmp = Operand::vreg(Width::_64, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(value, tmp).unwrap());
-                    value = tmp;
-                }
+                    if value.width() < Width::_64 {
+                        let tmp = Operand::vreg(Width::_64, self.next_vreg());
+                        self.push_instruction(Instruction::movzx(value, tmp).unwrap());
+                        value = tmp;
+                    }
 
-                let start = self.to_operand(start);
-                let length = self.to_operand(length);
+                    let start = self.to_operand(start);
+                    let length = self.to_operand(length);
 
-                //  start[0..8] ++ length[0..8];
-                let control_byte = {
-                    let mask = Operand::imm(Width::_64, 0xff);
+                    //  start[0..8] ++ length[0..8];
+                    let control_byte = {
+                        let mask = Operand::imm(Width::_64, 0xff);
 
-                    let start = {
+                        let start = {
+                            let dst = Operand::vreg(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::mov(start, dst).unwrap());
+                            self.push_instruction(Instruction::and(mask, dst));
+                            dst
+                        };
+
+                        let length = {
+                            let dst = Operand::vreg(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::mov(length, dst).unwrap());
+                            self.push_instruction(Instruction::and(mask, dst));
+                            self.push_instruction(Instruction::shl(
+                                Operand::imm(Width::_8, 8),
+                                dst,
+                            ));
+                            dst
+                        };
+
                         let dst = Operand::vreg(Width::_64, self.next_vreg());
+
                         self.push_instruction(Instruction::mov(start, dst).unwrap());
-                        self.push_instruction(Instruction::and(mask, dst));
+                        self.push_instruction(Instruction::or(length, dst));
+
                         dst
                     };
 
-                    let length = {
-                        let dst = Operand::vreg(Width::_64, self.next_vreg());
-                        self.push_instruction(Instruction::mov(length, dst).unwrap());
-                        self.push_instruction(Instruction::and(mask, dst));
-                        self.push_instruction(Instruction::shl(Operand::imm(Width::_8, 8), dst));
-                        dst
-                    };
-
+                    // todo: this 64 should be the value of `length`
                     let dst = Operand::vreg(Width::_64, self.next_vreg());
 
-                    self.push_instruction(Instruction::mov(start, dst).unwrap());
-                    self.push_instruction(Instruction::or(length, dst));
+                    self.push_instruction(Instruction::bextr(control_byte, value, dst));
 
                     dst
-                };
-
-                // todo: this 64 should be the value of `length`
-                let dst = Operand::vreg(Width::_64, self.next_vreg());
-
-                self.push_instruction(Instruction::bextr(control_byte, value, dst));
-
-                dst
+                }
             }
             NodeKind::Cast { value, kind } => {
                 let target_width = Width::from_uncanonicalized(node.typ().width()).unwrap();
@@ -398,43 +431,42 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 let mut amount_op = self.to_operand(amount);
                 let value_op = self.to_operand(value);
 
-                if value_op.width() == Width::_128
-                    && u32::from(value_op.width().as_u16()) > value.typ().width()
-                {
-                    panic!(
-                        "node type {:?}, op: {:?}\n{value:#?}",
-                        value.typ(),
-                        value_op
-                    )
-                }
+                if value_op.width() == Width::_128 {
+                    match kind {
+                        ShiftOperationKind::LogicalShiftRight => {
+                            self.shift_right_128(value_op, amount_op)
+                        }
+                        _ => todo!("{kind:?}"),
+                    }
+                } else {
+                    let dst = Operand::vreg(value_op.width(), self.next_vreg());
+                    self.push_instruction(Instruction::mov(value_op, dst).unwrap());
 
-                let dst = Operand::vreg(value_op.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(value_op, dst).unwrap());
-
-                if let OperandKind::Register(_) = amount_op.kind() {
-                    // truncate (high bits don't matter anyway)
-                    amount_op.set_width(Width::_8);
-                    let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
-                    self.push_instruction(Instruction::mov(amount_op, amount_dst).unwrap());
-                    amount_op = amount_dst;
-                }
-
-                match kind {
-                    ShiftOperationKind::LogicalShiftLeft => {
-                        self.push_instruction(Instruction::shl(amount_op, dst));
+                    if let OperandKind::Register(_) = amount_op.kind() {
+                        // truncate (high bits don't matter anyway)
+                        amount_op.set_width(Width::_8);
+                        let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
+                        self.push_instruction(Instruction::mov(amount_op, amount_dst).unwrap());
+                        amount_op = amount_dst;
                     }
 
-                    ShiftOperationKind::LogicalShiftRight => {
-                        self.push_instruction(Instruction::shr(amount_op, dst));
+                    match kind {
+                        ShiftOperationKind::LogicalShiftLeft => {
+                            self.push_instruction(Instruction::shl(amount_op, dst));
+                        }
+
+                        ShiftOperationKind::LogicalShiftRight => {
+                            self.push_instruction(Instruction::shr(amount_op, dst));
+                        }
+
+                        ShiftOperationKind::ArithmeticShiftRight => {
+                            self.push_instruction(Instruction::sar(amount_op, dst));
+                        }
+                        _ => todo!("{kind:?}"),
                     }
 
-                    ShiftOperationKind::ArithmeticShiftRight => {
-                        self.push_instruction(Instruction::sar(amount_op, dst));
-                    }
-                    _ => todo!("{kind:?}"),
+                    dst
                 }
-
-                dst
             }
 
             NodeKind::BitInsert {
@@ -935,6 +967,37 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
             op => todo!("{op:#?}"),
         }
+    }
+
+    fn shift_right_128(&mut self, value: Operand, amount: Operand) -> Operand {
+        let low_half = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(Instruction::mov(value, low_half).unwrap());
+
+        // pextrq  rdx,  xmm0, 1   # high qword
+        let _1 = Operand::imm(Width::_8, 1);
+        let high_half = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(Instruction::pextr(_1, value, high_half));
+
+        let amount = if let OperandKind::Register(_) = amount.kind() {
+            let cl = Operand::preg(Width::_8, PhysicalRegister::RCX);
+            self.push_instruction(Instruction::mov(amount, cl).unwrap());
+            cl
+        } else {
+            amount
+        };
+
+        self.push_instruction(Instruction::shrd(amount, high_half, low_half));
+
+        // low half now correct, need to shift high half
+        self.push_instruction(Instruction::shr(amount, high_half));
+
+        // recombine
+        let result = Operand::vreg(Width::_128, self.next_vreg());
+        self.push_instruction(Instruction::movzx(low_half, result).unwrap());
+
+        self.push_instruction(Instruction::pinsr(_1, high_half, result));
+
+        result
     }
 }
 

@@ -46,6 +46,10 @@ pub enum Opcode {
     SHL(Operand, Operand),
     /// shr {0}, {1}
     SHR(Operand, Operand),
+    /// shld {0}, {1}, {2}
+    SHLD(Operand, Operand, Operand),
+    /// shrd {0}, {1}, {2}
+    SHRD(Operand, Operand, Operand),
     /// sar {0}, {1}
     SAR(Operand, Operand),
     /// add {0}, {1}
@@ -78,6 +82,8 @@ pub enum Opcode {
     NEG(Operand),
     /// bextr {0}, {1}, {2}
     BEXTR(Operand, Operand, Operand),
+    /// pextr {0}, {1}, {2}
+    PEXTR(Operand, Operand, Operand),
     /// pinsr {0}, {1}, {2}
     PINSR(Operand, Operand, Operand),
     /// punpckl {0}, {1}
@@ -628,6 +634,14 @@ impl Instruction {
         Self(Opcode::SHR(amount, op0))
     }
 
+    pub fn shld(amount: Operand, hi: Operand, lo: Operand) -> Self {
+        Self(Opcode::SHLD(amount, hi, lo))
+    }
+
+    pub fn shrd(amount: Operand, hi: Operand, lo: Operand) -> Self {
+        Self(Opcode::SHRD(amount, hi, lo))
+    }
+
     pub fn sar(amount: Operand, op0: Operand) -> Self {
         Self(Opcode::SAR(amount, op0))
     }
@@ -642,6 +656,10 @@ impl Instruction {
 
     pub fn pinsr(index: Operand, src: Operand, dst: Operand) -> Self {
         Self(Opcode::PINSR(index, src, dst))
+    }
+
+    pub fn pextr(index: Operand, src: Operand, dst: Operand) -> Self {
+        Self(Opcode::PEXTR(index, src, dst))
     }
 
     pub fn jmp(block: Ref<X86Block>) -> Self {
@@ -1287,6 +1305,29 @@ impl Instruction {
                     .unwrap();
             }
 
+            PINSR(
+                Operand {
+                    kind: I(index),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => {
+                assembler
+                    .pinsrb::<AsmRegisterXmm, AsmRegister32, i32>(
+                        dst.try_into().unwrap(),
+                        src.into(),
+                        i32::try_from(*index).unwrap(),
+                    )
+                    .unwrap();
+            }
+
             PUNPCKL(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1349,6 +1390,12 @@ impl Instruction {
                 Some((OperandDirection::Out, dst_hi)),
             ]
             .into_iter(),
+            Opcode::SHRD(amount, hi, lo) | Opcode::SHLD(amount, hi, lo) => [
+                Some((OperandDirection::In, amount)),
+                Some((OperandDirection::In, lo)),
+                Some((OperandDirection::InOut, hi)),
+            ]
+            .into_iter(),
             Opcode::IDIV(divisor) => {
                 [Some((OperandDirection::In, divisor)), None, None].into_iter()
             }
@@ -1402,6 +1449,12 @@ impl Instruction {
                 Some((OperandDirection::InOut, dst)),
             ]
             .into_iter(),
+            Opcode::PEXTR(index, src, dst) => [
+                Some((OperandDirection::In, index)),
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::Out, dst)),
+            ]
+            .into_iter(),
             Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
             Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
             Opcode::DEAD => panic!(),
@@ -1453,6 +1506,13 @@ impl Instruction {
                 (OperandDirection::In, src),
                 (OperandDirection::InOut, dst_lo),
                 (OperandDirection::Out, dst_hi),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::SHRD(amount, hi, lo) | Opcode::SHLD(amount, hi, lo) => [
+                (OperandDirection::In, amount),
+                (OperandDirection::In, lo),
+                (OperandDirection::InOut, hi),
             ]
             .into_iter()
             .collect(),
@@ -1525,6 +1585,13 @@ impl Instruction {
                 ((OperandDirection::In, index)),
                 ((OperandDirection::In, src)),
                 ((OperandDirection::InOut, dst)),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::PEXTR(index, src, dst) => [
+                ((OperandDirection::In, index)),
+                ((OperandDirection::In, src)),
+                ((OperandDirection::Out, dst)),
             ]
             .into_iter()
             .collect(),
