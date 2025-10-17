@@ -1,5 +1,5 @@
 use {
-    crate::host::{
+    crate::{
         arch::x86::memory::PhysAddrExt,
         devices::pit::{self, PIT_FREQUENCY},
     },

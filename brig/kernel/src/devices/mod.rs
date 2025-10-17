@@ -135,7 +135,7 @@ impl BlockDevice for Box<dyn BlockDevice> {
         &mut self,
         buf: &mut [u8],
         start_block_index: usize,
-    ) -> Result<(), crate::host::devices::IoError> {
+    ) -> Result<(), crate::devices::IoError> {
         self.deref_mut().read(buf, start_block_index)
     }
 
@@ -143,7 +143,7 @@ impl BlockDevice for Box<dyn BlockDevice> {
         &mut self,
         buf: &[u8],
         start_block_index: usize,
-    ) -> Result<(), crate::host::devices::IoError> {
+    ) -> Result<(), crate::devices::IoError> {
         self.deref_mut().write(buf, start_block_index)
     }
 }

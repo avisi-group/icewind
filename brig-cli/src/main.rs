@@ -476,7 +476,7 @@ fn gdb_cli(artifacts: &[Artifact]) {
 
                     target remote :1234
 
-                    hbreak kernel::host::dbt::trampoline::trampoline
+                    hbreak kernel::dbt::trampoline::trampoline
                 "#,
                 kernel_path.to_string_lossy(),
                 offset,

@@ -1,7 +1,7 @@
 use {
     crate::{
         guest::{GuestExecutionContext, get_current_guest, models::ModelDevice},
-        host::arch::x86::{
+        arch::x86::{
             memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint,
         },
     },

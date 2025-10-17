@@ -1,5 +1,5 @@
 use {
-    crate::host::{
+    crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
         devices::{
             BlockDevice, Device, SharedDevice, manager::SharedDeviceManager,

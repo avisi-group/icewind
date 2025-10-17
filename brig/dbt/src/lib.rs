@@ -10,7 +10,7 @@ use {
     alloc::{fmt, string::String, vec::Vec},
     core::fmt::Debug,
     iced_x86::{Formatter, Instruction},
-    kernel::host::arch::x86::memory::VirtualMemoryArea,
+    kernel::arch::x86::memory::VirtualMemoryArea,
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 

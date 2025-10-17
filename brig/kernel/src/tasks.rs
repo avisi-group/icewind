@@ -1,6 +1,6 @@
 use {
     crate::{
-        host::arch::{PAGE_SIZE, x86::MachineContext},
+        arch::{PAGE_SIZE, x86::MachineContext},
         scheduler::Scheduler,
     },
     alloc::{
@@ -191,12 +191,12 @@ pub fn create_idle_task() -> Task {
 pub fn register_scheduler() {
     // create new scheduler on current core
     let scheduler = Scheduler::new();
-    crate::host::arch::CoreStorage::this_mut().set(scheduler);
+    crate::arch::CoreStorage::this_mut().set(scheduler);
 
     // register it with task manager
     TASK_MANAGER
         .get()
         .unwrap()
         .lock()
-        .register_scheduler(crate::host::arch::CoreStorage::this_mut().get().unwrap());
+        .register_scheduler(crate::arch::CoreStorage::this_mut().get().unwrap());
 }

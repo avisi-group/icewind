@@ -29,7 +29,7 @@ use {
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
-    kernel::host::{
+    kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         devices::manager::SharedDeviceManager,
         fs::Filesystem,
@@ -181,7 +181,7 @@ impl ModelDevice {
         let shared = SharedDeviceManager::get()
             .get_device_by_alias("transport00:05.0")
             .unwrap();
-        let crate::host::devices::Device::Transport(transport) = &mut *shared.lock() else {
+        let kernel::devices::Device::Transport(transport) = &mut *shared.lock() else {
             panic!();
         };
 

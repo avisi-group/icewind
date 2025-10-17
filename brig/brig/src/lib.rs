@@ -10,17 +10,16 @@ use {
     common::{TestConfig, bytes},
     core::{panic::PanicInfo, sync::atomic::Ordering},
     kernel::{
-        host::{
+        arch::{
             self,
-            arch::x86::memory::{
+            x86::memory::{
                 HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
                 VirtualMemoryArea,
             },
-            devices::manager::SharedDeviceManager,
-            fs::{Filesystem, tar::TarFilesystem},
-            rand, scheduler, tasks, timer,
         },
-        logger, qemu_exit,
+        devices::manager::SharedDeviceManager,
+        fs::{Filesystem, tar::TarFilesystem},
+        logger, qemu_exit, rand, scheduler, tasks, timer,
     },
     page_fault_handler::page_fault_exception,
 };
@@ -48,13 +47,13 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 
     VirtualMemoryArea::current().opt.level_4_table_mut()[0].set_unused();
 
-    host::arch::CoreStorage::init_self();
+    arch::CoreStorage::init_self();
 
     // required for generating UUIDs
     rand::init();
 
     // Host machine initialisation
-    host::arch::platform_init(boot_info, page_fault_exception);
+    arch::platform_init(boot_info, page_fault_exception);
     timer::init();
     tasks::init();
 
@@ -103,8 +102,8 @@ fn continue_start() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    host::arch::x86::irq::local_disable();
-    let (used, total) = host::arch::x86::memory::stats();
+    arch::x86::irq::local_disable();
+    let (used, total) = arch::x86::memory::stats();
 
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));

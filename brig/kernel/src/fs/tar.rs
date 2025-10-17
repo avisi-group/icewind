@@ -1,5 +1,5 @@
 use {
-    crate::host::{
+    crate::{
         devices::BlockDevice,
         fs::{Error, Filesystem},
     },

@@ -1,5 +1,5 @@
 use {
-    crate::host::arch::x86::{MachineContext, dbg},
+    crate::arch::x86::{MachineContext, dbg},
     bitset_core::BitSet,
     common::{intern::InternedString, irq_handler},
     spin::Once,

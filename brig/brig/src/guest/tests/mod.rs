@@ -1,15 +1,8 @@
 use {
-    crate::{
-        guest::{
-            Nanoseconds,
-            devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
-            models,
-        },
-        host::{
-            memory::bump::{BumpAllocator, BumpAllocatorRef},
-            timer::GLOBAL_CLOCK,
-        },
-        timer::Measurement,
+    crate::guest::{
+        Nanoseconds,
+        devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
+        models,
     },
     alloc::{alloc::Global, boxed::Box, sync::Arc},
     common::{
@@ -31,6 +24,10 @@ use {
                 UnaryOperationKind, X86Emitter, X86Node,
             },
         },
+    },
+    kernel::{
+        memory::bump::{BumpAllocator, BumpAllocatorRef},
+        timer::{GLOBAL_CLOCK, Measurement},
     },
 };
 

@@ -1,6 +1,6 @@
 use {
     super::Bus,
-    crate::host::{
+    crate::{
         arch::x86::memory::PhysAddrExt,
         devices::{ivshmem::probe_ivshmem, virtio::probe_virtio_block},
     },

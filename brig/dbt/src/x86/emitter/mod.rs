@@ -27,7 +27,7 @@ use {
         panic,
     },
     derive_where::derive_where,
-    kernel::host::arch::x86::memory::VirtualMemoryArea,
+    kernel::arch::x86::memory::VirtualMemoryArea,
 };
 
 mod to_operand;

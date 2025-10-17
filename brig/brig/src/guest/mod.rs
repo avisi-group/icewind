@@ -1,18 +1,15 @@
 use {
-    crate::{
-        guest::{
-            devices::{
-                arm::{
-                    a9gic::GlobalInterruptController,
-                    generic_timer::GenericTimer,
-                    mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
-                },
-                primecell::pl011::Pl011,
-                virtio::devices::block::VirtioBlock,
+    crate::guest::{
+        devices::{
+            arm::{
+                a9gic::GlobalInterruptController,
+                generic_timer::GenericTimer,
+                mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
             },
-            models::ModelDevice,
+            primecell::pl011::Pl011,
+            virtio::devices::block::VirtioBlock,
         },
-        host::fs::Filesystem,
+        models::ModelDevice,
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
     common::{
@@ -25,6 +22,7 @@ use {
     core::{panic, ptr, sync::atomic::AtomicU64},
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
+    kernel::fs::Filesystem,
     spin::Mutex,
 };
 
@@ -281,7 +279,7 @@ pub fn linux_platform() -> Guest {
 
     // timer
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));
-    kernel::host::timer::register_tickable(
+    kernel::timer::register_tickable(
         //     // Nanoseconds(1_000_000_000),
         timer.tick_interval(),
         timer.clone(),

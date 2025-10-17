@@ -1,5 +1,5 @@
 use {
-    crate::host::{
+    crate::{
         arch::x86::memory::PHYSICAL_MEMORY_OFFSET,
         devices::{self, Bus, acpi, lapic},
     },

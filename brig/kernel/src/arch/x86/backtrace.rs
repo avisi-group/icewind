@@ -1,5 +1,5 @@
 use {
-    crate::host::arch::x86::memory::PhysAddrExt,
+    crate::arch::x86::memory::PhysAddrExt,
     core::{arch::asm, slice},
     elf::{
         ElfBytes, endian::AnyEndian, parse::ParsingTable, string_table::StringTable, symbol::Symbol,

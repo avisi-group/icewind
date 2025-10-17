@@ -4,7 +4,7 @@ use {
             devices::Irq,
             queue::defs::{BlkReq, BlkReqType},
         },
-        host::arch::x86::memory::guest_physical_to_host_virt,
+        arch::x86::memory::guest_physical_to_host_virt,
     },
     alloc::vec::Vec,
     core::sync::atomic::AtomicU32,

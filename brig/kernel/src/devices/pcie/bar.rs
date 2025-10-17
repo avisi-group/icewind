@@ -1,5 +1,5 @@
 use {
-    crate::host::arch::x86::memory::{PhysAddrExt, VirtualMemoryArea},
+    crate::arch::x86::memory::{PhysAddrExt, VirtualMemoryArea},
     virtio_drivers::transport::pci::bus::{
         BarInfo, DeviceFunction, MemoryBarType, MmioCam, PciRoot,
     },

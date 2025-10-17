@@ -1,5 +1,5 @@
 use {
-    crate::host::{
+    crate::{
         arch::x86::memory::PhysAddrExt,
         devices::{Bus, pcie::PCIEBus},
     },

@@ -7,7 +7,7 @@ use {
     common::{GuestExecutionContext, irq_handler, memory::AddressSpaceRegionKind},
     core::alloc::Layout,
     iced_x86::{Code, OpKind, Register},
-    kernel::host::arch::x86::{
+    kernel::arch::x86::{
         MachineContext,
         memory::{
             GUEST_PHYSICAL_END, GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt,

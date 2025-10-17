@@ -1,5 +1,5 @@
 use {
-    crate::{host::devices::SharedDevice, rand::new_uuid_v4},
+    crate::{devices::SharedDevice, rand::new_uuid_v4},
     alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec::Vec},
     spin::{Mutex, Once},
     uuid::Uuid,

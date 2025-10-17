@@ -1,5 +1,5 @@
 use {
-    crate::host::devices::pit::{self, PIT_FREQUENCY},
+    crate::devices::pit::{self, PIT_FREQUENCY},
     log::trace,
     x86::time::rdtscp,
 };

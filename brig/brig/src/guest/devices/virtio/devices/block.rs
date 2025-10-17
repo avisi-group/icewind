@@ -1,11 +1,8 @@
 use {
-    crate::{
-        guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
-        host::devices::manager::SharedDeviceManager,
-    },
+    crate::guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
     alloc::sync::Arc,
     common::device::{Device, IrqController, MemoryMappedDevice},
-    kernel::util::any_as_u8_slice,
+    kernel::{devices::manager::SharedDeviceManager, util::any_as_u8_slice},
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
 };

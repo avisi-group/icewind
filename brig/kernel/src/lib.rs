@@ -10,16 +10,17 @@
 
 extern crate alloc;
 
-use {
-    crate::{
-        host::{rand, scheduler, tasks},
-        logger::WRITER,
-    },
-    x86::io::outw,
-};
+use {crate::logger::WRITER, x86::io::outw};
 
-pub mod host;
+pub mod arch;
+pub mod devices;
+pub mod fs;
 pub mod logger;
+pub mod memory;
+pub mod rand;
+pub mod scheduler;
+pub mod tasks;
+pub mod timer;
 pub mod util;
 
 fn _serial_in() {

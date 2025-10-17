@@ -1,6 +1,6 @@
 use {
     crate::{
-        host::arch::x86::irq::assign_irq,
+        arch::x86::irq::assign_irq,
         println,
         scheduler::{self, TIMER_FREQUENCY},
     },
@@ -55,7 +55,7 @@ fn timer_interrupt() {
     scheduler::schedule();
 
     unsafe {
-        crate::host::devices::lapic::LAPIC
+        crate::devices::lapic::LAPIC
             .get()
             .unwrap()
             .lock()
