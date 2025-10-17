@@ -13,14 +13,14 @@ use {
             },
         },
     },
-    common::{Alloc, ktest},
+    common::ktest,
     core::cmp::{Ordering, min},
 };
 
-impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
+impl<'a, 'ctx> X86Emitter<'ctx> {
     /// Same as `to_operand` but if the value is a constant (of any size), move
     /// it to a register
-    pub fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+    pub fn to_operand_reg_promote(&mut self, node: &X86NodeRef) -> Operand {
         if let NodeKind::Constant { .. } | NodeKind::FunctionPointer(_) = node.kind() {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
             let value_reg = Operand::vreg(width, self.next_vreg());
@@ -33,7 +33,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     }
 
     /// Same as `to_operand_inner` but handles immediate quirks
-    pub fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+    pub fn to_operand(&mut self, node: &X86NodeRef) -> Operand {
         let op = self.to_operand_inner(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
@@ -82,7 +82,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    fn to_operand_inner(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+    fn to_operand_inner(&mut self, node: &X86NodeRef) -> Operand {
         if let Some(operand) = self.current_block_operands.get(node) {
             return *operand;
         }
@@ -582,7 +582,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         op
     }
 
-    fn unary_operation_to_operand(&mut self, kind: &UnaryOperationKind<A>) -> Operand<A> {
+    fn unary_operation_to_operand(&mut self, kind: &UnaryOperationKind) -> Operand {
         match &kind {
             UnaryOperationKind::Complement(value) => {
                 let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
@@ -707,7 +707,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind<A>) -> Operand<A> {
+    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind) -> Operand {
         use BinaryOperationKind::*;
 
         let (Add(left, right)
@@ -938,13 +938,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     }
 }
 
-fn encode_compare<A: Alloc>(
-    kind: &BinaryOperationKind<A>,
-    emitter: &mut X86Emitter<A>,
-    right: X86NodeRef<A>, /* TODO: this was flipped in order to make tests pass, unflip right
-                           * and left and fix the body of the function */
-    left: X86NodeRef<A>,
-) -> Operand<A> {
+fn encode_compare(
+    kind: &BinaryOperationKind,
+    emitter: &mut X86Emitter,
+    right: X86NodeRef, /* TODO: this was flipped in order to make tests pass, unflip right
+                        * and left and fix the body of the function */
+    left: X86NodeRef,
+) -> Operand {
     use crate::x86::encoder::OperandKind::*;
 
     if let (NodeKind::Constant { .. }, NodeKind::Constant { .. })

@@ -11,15 +11,12 @@ use {
         },
         models::ModelDevice,
     },
-    alloc::{
-        alloc::Global, boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec,
-    },
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec},
     common::{
         GuestExecutionContext,
         device::{Device, MemoryMappedDevice, RegisterMappedDevice},
         intern::InternedString,
         memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
-        rudder::Model,
         sysreg_helpers::{self, encode_sysreg_id},
     },
     core::{
@@ -30,7 +27,6 @@ use {
     dbt::{
         register_file::RegisterFile,
         trampoline::{self, ExecutionResult},
-        x86::{X86TranslationContext, emitter::X86Emitter},
     },
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
@@ -441,14 +437,5 @@ impl Debug for Translation {
         }
 
         Ok(())
-    }
-}
-
-pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
-    if old != new {
-        log::debug!("EL changed! {old} -> {new}");
-        // chain_cache.fill_keys(1);
-        // translation_cache.fill_keys(1);
-        VirtualMemoryArea::current().invalidate_guest_mappings();
     }
 }

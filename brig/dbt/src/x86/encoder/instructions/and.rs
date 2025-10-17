@@ -9,10 +9,9 @@ use {
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
         AsmRegisterXmm, CodeAssembler, byte_ptr, qword_ptr,
     },
- common::Alloc,
 };
 
-pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
+pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
     match (src, dst) {
         (
             Operand { kind: I(left), .. },

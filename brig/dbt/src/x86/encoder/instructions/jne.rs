@@ -1,17 +1,19 @@
 use {
-    crate::x86::{
-        X86Block,
-        encoder::{Operand, OperandKind::Target as T},
+    crate::{
+        bump_alloc::BumpAllocatorRef,
+        x86::{
+            X86Block,
+            encoder::{Operand, OperandKind::Target as T},
+        },
     },
     common::{arena::Ref, hashmap::HashMapA},
     iced_x86::code_asm::{CodeAssembler, CodeLabel},
- common::Alloc,
 };
 
-pub fn encode<A: Alloc>(
+pub fn encode(
     assembler: &mut CodeAssembler,
-    label_map: &HashMapA<Ref<X86Block<A>>, CodeLabel, A>,
-    tgt: &Operand<A>,
+    label_map: &HashMapA<Ref<X86Block>, CodeLabel, BumpAllocatorRef>,
+    tgt: &Operand,
 ) {
     let T(target) = tgt.kind() else { panic!() };
 

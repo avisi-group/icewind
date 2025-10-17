@@ -1,13 +1,15 @@
 use {
-    crate::x86::emitter::{
-        BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
-        UnaryOperationKind,
+    crate::{
+        bump_alloc::BumpAllocatorRef,
+        x86::emitter::{
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
+            UnaryOperationKind,
+        },
     },
     alloc::vec::Vec,
-    common::Alloc,
 };
 
-pub trait Emitter<A: Alloc> {
+pub trait Emitter {
     type BlockRef;
     type NodeRef;
 
@@ -15,12 +17,12 @@ pub trait Emitter<A: Alloc> {
     fn function_ptr(&mut self, val: u64) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
-    fn create_tuple(&mut self, values: Vec<Self::NodeRef, A>) -> Self::NodeRef;
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef, BumpAllocatorRef>) -> Self::NodeRef;
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
-    fn unary_operation(&mut self, op: UnaryOperationKind<A>) -> Self::NodeRef;
-    fn binary_operation(&mut self, op: BinaryOperationKind<A>) -> Self::NodeRef;
-    fn ternary_operation(&mut self, op: TernaryOperationKind<A>) -> Self::NodeRef;
+    fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
+    fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
+    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef;
     fn cast(&mut self, value: Self::NodeRef, typ: Type, kind: CastOperationKind) -> Self::NodeRef;
     fn bits_cast(
         &mut self,
@@ -84,12 +86,12 @@ pub trait Emitter<A: Alloc> {
 
     fn jump(&mut self, target: Self::BlockRef);
 
-    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, A>);
+    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, BumpAllocatorRef>);
 
     fn call_with_return(
         &mut self,
         function: Self::NodeRef,
-        arguments: Vec<Self::NodeRef, A>,
+        arguments: Vec<Self::NodeRef, BumpAllocatorRef>,
     ) -> Self::NodeRef;
 
     fn prologue(&mut self);

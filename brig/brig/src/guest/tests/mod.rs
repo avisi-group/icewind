@@ -2,9 +2,9 @@ use {
     crate::guest::{
         Nanoseconds, Translation,
         devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
-        models, write_to_el,
+        models::{self, BUMP_ALLOCATOR, write_to_el},
     },
-    alloc::{alloc::Global, boxed::Box, sync::Arc},
+    alloc::{alloc::Global, boxed::Box, sync::Arc, vec::Vec},
     common::{
         bits::{bit_insert, mask},
         hashmap::HashMap,
@@ -14,6 +14,7 @@ use {
     },
     core::{panic, u128},
     dbt::{
+        bump_alloc::{BumpAllocator, BumpAllocatorRef},
         emitter::{Emitter, Type},
         interpret::{self, Value, interpret},
         register_file::RegisterFile,
@@ -26,20 +27,18 @@ use {
             },
         },
     },
-    kernel::{
-        memory::bump::{BumpAllocator, BumpAllocatorRef},
-        timer::{GLOBAL_CLOCK, Measurement},
-    },
+    kernel::timer::{GLOBAL_CLOCK, Measurement},
 };
 
 mod fuzz;
 
-fn setup() -> (Arc<Model>, RegisterFile, X86TranslationContext<Global>) {
+fn setup() -> (Arc<Model>, RegisterFile, X86TranslationContext) {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
 
-    let ctx = X86TranslationContext::new(
+    let ctx = X86TranslationContext::new_with_allocator(
+        BumpAllocatorRef::new(&BUMP_ALLOCATOR),
         &model,
         false,
         register_file.global_register_offset(),
@@ -68,7 +67,6 @@ fn static_dynamic_chaos_smoke() {
         let mut emitter = X86Emitter::new(&mut ctx);
 
         translate(
-            Global,
             &*model,
             "func_corrupted_var",
             &[],
@@ -153,7 +151,6 @@ fn num_of_feature_const_123() {
     let feature = emitter.constant(123, Type::Signed(32));
 
     let out = translate(
-        Global,
         &*model,
         "num_of_Feature",
         &[feature],
@@ -179,16 +176,9 @@ fn have_lse2_ext_is_const() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let out = translate(
-        Global,
-        &*model,
-        "HaveLSE2Ext",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let out = translate(&*model, "HaveLSE2Ext", &[], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.leave();
 
@@ -201,7 +191,6 @@ fn statistical_profiling_disabled() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_enabled = translate(
-        Global,
         &*model,
         "StatisticalProfilingEnabled",
         &[],
@@ -257,16 +246,9 @@ fn using_aarch32_disabled() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let is_enabled = translate(
-        Global,
-        &*model,
-        "UsingAArch32",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let is_enabled = translate(&*model, "UsingAArch32", &[], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), is_enabled);
 
@@ -285,15 +267,7 @@ fn branchto() {
 
     let target = emitter.constant(0xDEADFEED, Type::Unsigned(64));
 
-    translate(
-        Global,
-        &*model,
-        "BranchTo",
-        &[target],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap();
+    translate(&*model, "BranchTo", &[target], &mut emitter, &register_file).unwrap();
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -316,7 +290,6 @@ fn decodea64_addsub() {
 
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -372,7 +345,6 @@ fn decodea64_mov() {
     //   aa0103e0        mov     x0, x1
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -407,7 +379,6 @@ fn decodea64_branch() {
 
     let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -440,7 +411,6 @@ fn branch_if_eq() {
 
     let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -575,7 +545,6 @@ fn cmp_csel() {
         // cmp     x2, x0
         let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
         translate(
-            Global,
             &*model,
             "__DecodeA64",
             &[opcode],
@@ -591,7 +560,6 @@ fn cmp_csel() {
 
         let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
         translate(
-            Global,
             &*model,
             "__DecodeA64",
             &[opcode],
@@ -655,7 +623,8 @@ fn fibonacci_instr() {
 
         let model = models::get("aarch64").unwrap();
 
-        let mut ctx = X86TranslationContext::new(
+        let mut ctx = X86TranslationContext::new_with_allocator(
+            BumpAllocatorRef::new(&BUMP_ALLOCATOR),
             &model,
             false,
             register_file.global_register_offset(),
@@ -666,7 +635,6 @@ fn fibonacci_instr() {
         {
             let opcode = emitter.constant(program[pc as usize / 4], Type::Unsigned(32));
             translate(
-                Global,
                 &*model,
                 "__DecodeA64",
                 &[opcode],
@@ -707,7 +675,6 @@ fn mem() {
 
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -741,7 +708,6 @@ fn mem_store() {
 
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -776,7 +742,6 @@ fn mem_load() {
 
     let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -854,7 +819,8 @@ fn fibonacci_block() {
             break;
         }
 
-        let mut ctx = X86TranslationContext::new(
+        let mut ctx = X86TranslationContext::new_with_allocator(
+            BumpAllocatorRef::new(&BUMP_ALLOCATOR),
             &model,
             false,
             register_file.global_register_offset(),
@@ -867,7 +833,6 @@ fn fibonacci_block() {
             emitter.write_register(model.reg_offset("__BranchTaken"), _false);
 
             translate_instruction(
-                Global,
                 &*model,
                 "__DecodeA64",
                 &mut emitter,
@@ -988,7 +953,6 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let carry_in = emitter.read_register(model.reg_offset("R2"), Type::Unsigned(0x1));
 
     let res = translate(
-        Global,
         &*model,
         "add_with_carry_test",
         &[x, y, carry_in],
@@ -1112,7 +1076,6 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     // cmp    x0, x1
     let opcode = emitter.constant(0xeb01001f, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -1144,7 +1107,6 @@ fn shiftreg() {
     let amount = emitter.constant(0, Type::Signed(64));
     let width = emitter.constant(64, Type::Signed(64));
     let value = translate(
-        Global,
         &*model,
         "ShiftReg",
         &[_1, shift_type, amount, width],
@@ -1176,16 +1138,9 @@ fn floorpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "FloorPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1194,16 +1149,9 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "FloorPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1212,16 +1160,9 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "FloorPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1230,16 +1171,9 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "FloorPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1255,16 +1189,9 @@ fn ceilpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "CeilPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1273,16 +1200,9 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "CeilPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1291,16 +1211,9 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "CeilPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1309,16 +1222,9 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(
-        Global,
-        &*model,
-        "CeilPow2",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1337,7 +1243,6 @@ fn _ispow2() {
 
     {
         let value = translate(
-            Global,
             &*model,
             "FloorPow2",
             &[x.clone()],
@@ -1351,7 +1256,6 @@ fn _ispow2() {
 
     {
         let value = translate(
-            Global,
             &*model,
             "CeilPow2",
             &[x.clone()],
@@ -1364,16 +1268,9 @@ fn _ispow2() {
     }
 
     {
-        let value = translate(
-            Global,
-            &*model,
-            "IsPow2",
-            &[x],
-            &mut emitter,
-            &register_file,
-        )
-        .unwrap()
-        .unwrap();
+        let value = translate(&*model, "IsPow2", &[x], &mut emitter, &register_file)
+            .unwrap()
+            .unwrap();
         emitter.write_register(model.reg_offset("R2"), value);
     }
 
@@ -1425,7 +1322,6 @@ fn rbitx0() {
 
     let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -1500,7 +1396,6 @@ fn ubfx() {
 
     let opcode = emitter.constant(0xd3504c63, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -1528,16 +1423,9 @@ fn highest_set_bit() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0b100, Type::Unsigned(64));
-    let res = translate(
-        Global,
-        &*model,
-        "HighestSetBit",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1547,16 +1435,9 @@ fn highest_set_bit() {
     );
 
     let x = emitter.constant(u64::MAX, Type::Unsigned(64));
-    let res = translate(
-        Global,
-        &*model,
-        "HighestSetBit",
-        &[x],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1573,16 +1454,9 @@ fn ror() {
 
     let x = emitter.constant(0xff00, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1593,16 +1467,9 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1613,16 +1480,9 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(32));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1639,16 +1499,9 @@ fn extsv() {
 
     let m = emitter.constant(32, Type::Signed(64));
     let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
-    let res = translate(
-        Global,
-        &*model,
-        "extsv",
-        &[m, v],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1658,16 +1511,9 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
-    let res = translate(
-        Global,
-        &*model,
-        "extsv",
-        &[m, v],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1677,16 +1523,9 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(
-        Global,
-        &*model,
-        "extsv",
-        &[m, v],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1697,16 +1536,9 @@ fn extsv() {
 
     let m = emitter.constant(1, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(
-        Global,
-        &*model,
-        "extsv",
-        &[m, v],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
 
@@ -1717,30 +1549,16 @@ fn zext_ones() {
 
     let n = emitter.constant(1, Type::Signed(64));
     let m = emitter.constant(1, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "zext_ones",
-        &[n, m],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "zext_ones",
-        &[n, m],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1751,16 +1569,9 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(32, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "zext_ones",
-        &[n, m],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1771,16 +1582,9 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(64, Type::Signed(64));
-    let res = translate(
-        Global,
-        &*model,
-        "zext_ones",
-        &[n, m],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1842,7 +1646,6 @@ fn decodebitmasks() {
     let immediate = emitter.constant(0, Type::Unsigned(1));
     let m = emitter.constant(0x40, Type::Signed(64));
     let res = translate(
-        Global,
         &*model,
         "DecodeBitMasks",
         &[immn, imms, immr, immediate, m],
@@ -1946,7 +1749,6 @@ fn rev_d00dfeed() {
     let _32 = emitter.constant(32, Type::Signed(64));
     let _3 = emitter.constant(3, Type::Signed(64));
     translate(
-        Global,
         &*model,
         "execute_aarch64_instrs_integer_arithmetic_rev",
         &[_32.clone(), _3.clone(), _32, _3],
@@ -1980,7 +1782,6 @@ fn place_slice() {
     let shift = emitter.constant(0, Type::Signed(64));
 
     let res = translate(
-        Global,
         &*model,
         "place_slice_signed",
         &[m, xs, i, l, shift],
@@ -2050,7 +1851,11 @@ fn floor() {
             let n = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
             let d = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(64));
 
-            let real = emitter.create_tuple(alloc::vec![n, d]);
+            let mut vec = Vec::new_in(emitter.ctx().allocator());
+            vec.push(n);
+            vec.push(d);
+
+            let real = emitter.create_tuple(vec);
             let floor = emitter.unary_operation(UnaryOperationKind::Floor(real));
             emitter.write_register(model.reg_offset("R0"), floor);
         }
@@ -2085,7 +1890,11 @@ fn _ceil() {
             let n = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
             let d = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(64));
 
-            let real = emitter.create_tuple(alloc::vec![n, d]);
+            let mut vec = Vec::new_in(emitter.ctx().allocator());
+            vec.push(n);
+            vec.push(d);
+
+            let real = emitter.create_tuple(vec);
             let floor = emitter.unary_operation(UnaryOperationKind::Ceil(real));
             emitter.write_register(model.reg_offset("R0"), floor);
         }
@@ -2114,7 +1923,6 @@ fn msr() {
 
     let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2143,7 +1951,6 @@ fn stp() {
 
     let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2182,7 +1989,6 @@ fn ldrsw() {
     //  b9802fe0        ldrsw   x0, [sp, #44]
     let opcode = emitter.constant(0xb9802fe0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2238,7 +2044,6 @@ fn get_num_event_counters_accessible() {
     register_file.write("SEE", -1i64);
 
     let result = translate(
-        Global,
         &*model,
         "AArch64_GetNumEventCountersAccessible",
         &[],
@@ -2270,7 +2075,6 @@ fn sub_pc() {
 
     let opcode = emitter.constant(0xd10043ff, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2302,7 +2106,6 @@ fn lsrv() {
 
     let opcode = emitter.constant(0x9ac02420, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2335,7 +2138,6 @@ fn mem_load_immediate() {
 
     let opcode = emitter.constant(0x180006e0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2370,7 +2172,6 @@ fn eret() {
 
     let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2407,7 +2208,6 @@ fn clz() {
 
     let opcode = emitter.constant(0xdac01129, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2436,7 +2236,6 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(0x1, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2455,7 +2254,6 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(0b1000, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2474,7 +2272,6 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2493,7 +2290,6 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2515,7 +2311,6 @@ fn highest_set_bit_const() {
         Type::Unsigned(32),
     );
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2540,7 +2335,6 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(0x0, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2559,7 +2353,6 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(0b1000, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2578,7 +2371,6 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2597,7 +2389,6 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
     let n = translate(
-        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2619,7 +2410,6 @@ fn count_leading_zero_bits_const() {
         Type::Unsigned(32),
     );
     let n = translate(
-        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2644,7 +2434,6 @@ fn highest_set_bit_dynamic() {
 
     let r0 = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
     let n = translate(
-        Global,
         &*model,
         "HighestSetBit",
         &[r0],
@@ -2677,7 +2466,6 @@ fn msr_daifclr() {
     //  d50348ff        msr               daifclr, #0x8
     let opcode = emitter.constant(0xd50348ff, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2709,7 +2497,6 @@ fn mrs_cntvct_el0() {
 
     let opcode = emitter.constant(0xd53be040, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2736,7 +2523,6 @@ fn current_security_state_is_const() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let state = translate(
-        Global,
         &*model,
         "CurrentSecurityState",
         &[],
@@ -2766,7 +2552,6 @@ fn sys_movzx_investigation() {
 
     let opcode = emitter.constant(0xd50b7428, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2802,7 +2587,6 @@ fn ttbr1_el1_write() {
     let val = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
 
     translate(
-        Global,
         &*model,
         "TTBR1_EL1_write",
         &[val],
@@ -2836,7 +2620,6 @@ fn aarch64_sysregwrite() {
     let t = emitter.constant(1, Type::Signed(64));
 
     translate(
-        Global,
         &*model,
         "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
         &[t],
@@ -2869,7 +2652,6 @@ fn msr_ttbr() {
 
     let opcode = emitter.constant(0xd5182021, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2904,7 +2686,6 @@ fn branch_link_pc_flag() {
 
     let opcode = emitter.constant(0x9400044d, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2930,7 +2711,6 @@ fn mrs_mpidr_el1() {
 
     let opcode = emitter.constant(0xd53800a5, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2960,7 +2740,6 @@ fn mov_300000() {
 
     let opcode = emitter.constant(0xd2a00604, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -2990,7 +2769,6 @@ fn mrs_ctr_el0() {
 
     let opcode = emitter.constant(0xd53b0023, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3025,7 +2803,6 @@ fn mrs_id_aa64dfr0_el1() {
 
     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3112,7 +2889,6 @@ fn ldaxr() {
 
     let opcode = emitter.constant(0xc85ffc03, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3138,7 +2914,6 @@ fn _slow_benchmark() {
 
     let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3174,7 +2949,6 @@ fn slow_msr_2() {
 
     let opcode = emitter.constant(0xd5181000, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3200,7 +2974,6 @@ fn csinc() {
 
     let opcode = emitter.constant(0x1a9f17e3, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3232,7 +3005,6 @@ fn ldrh() {
 
     let opcode = emitter.constant(0x78635823, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3271,7 +3043,6 @@ fn csneg() {
 
     let opcode = emitter.constant(0x5a8307e3, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3301,7 +3072,6 @@ fn ldp() {
     //  a9405400        ldp     x0, x21, [x0]
     let opcode = emitter.constant(0xa9405400, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3343,7 +3113,6 @@ fn mem_load_32_bit() {
 
     let opcode = emitter.constant(0xb9400000, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3377,7 +3146,6 @@ fn ccmp() {
 
     let opcode = emitter.constant(0xfa4008a0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3416,7 +3184,6 @@ fn msr_elr_el2() {
 
     let opcode = emitter.constant(0xd51c4024, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3452,7 +3219,6 @@ fn eret_3() {
 
     let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3487,7 +3253,6 @@ fn exception_return() {
     let new_pc = emitter.constant(0x80000004, Type::Unsigned(64));
     let spsr = emitter.constant(0x3c9, Type::Unsigned(64));
     translate(
-        Global,
         &*model,
         "AArch64_ExceptionReturn",
         &[new_pc, spsr],
@@ -3522,7 +3287,6 @@ fn illegal_exception_return() {
 
     let spsr = emitter.constant(0x3c9, Type::Unsigned(64));
     let illegal_psr_state = translate(
-        Global,
         &*model,
         "IllegalExceptionReturn",
         &[spsr],
@@ -3553,16 +3317,10 @@ fn el_from_spsr() {
     register_file.write("SCR_EL3_bits", 0x5b1);
 
     let spsr = emitter.constant(0b1111001001, Type::Unsigned(64));
-    let valid_target_tuple = translate(
-        Global,
-        &*model,
-        "ELFromSPSR",
-        &[spsr],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let valid_target_tuple =
+        translate(&*model, "ELFromSPSR", &[spsr], &mut emitter, &register_file)
+            .unwrap()
+            .unwrap();
 
     let valid = emitter.access_tuple(valid_target_tuple.clone(), 0);
     let target = emitter.access_tuple(valid_target_tuple, 1);
@@ -3641,7 +3399,6 @@ fn el_state_using_aarch32k() {
         )),
     });
     let known_aarch32_tuple = translate(
-        Global,
         &*model,
         "ELStateUsingAArch32K",
         &[el, secure],
@@ -3674,7 +3431,6 @@ fn el_state_using_aarch32k_dynamic() {
     let target = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(2));
 
     let tuple = translate(
-        Global,
         &*model,
         "ELUsingAArch32K",
         &[target],
@@ -3711,16 +3467,9 @@ fn have_aarch64() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let have_aarch64 = translate(
-        Global,
-        &*model,
-        "HaveAArch64",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let have_aarch64 = translate(&*model, "HaveAArch64", &[], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     assert_eq!(
         *have_aarch64.kind(),
@@ -3735,7 +3484,6 @@ fn xpaclri() {
 
     // nop
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -3745,7 +3493,6 @@ fn xpaclri() {
     .unwrap();
 
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -3756,7 +3503,6 @@ fn xpaclri() {
 
     // nop
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -3767,7 +3513,6 @@ fn xpaclri() {
 
     // nop
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -3795,7 +3540,6 @@ fn _brk() {
 
     let opcode = emitter.constant(0xd4210000, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3824,7 +3568,6 @@ fn lsr() {
 
     let opcode = emitter.constant(0xd360fd08, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -3859,7 +3602,7 @@ fn lsr() {
 
 //     //   0xd61f0100  br                x8
 //     translate_instruction(
-//         Global,
+//
 //         &*model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -3898,7 +3641,7 @@ fn lsr() {
 
 //     //   0x97ffffdf bl      0xffff_ffff_ffff_ff7c
 //     translate_instruction(
-//         Global,
+//
 //         &*model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -3939,7 +3682,7 @@ fn lsr() {
 
 //     //   d538d080        mrs     x0, tpidr_el1
 //     translate_instruction(
-//         Global,
+//
 //         &*model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -3971,7 +3714,6 @@ fn udf() {
 
     //   00000115        udf     #277
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -3997,7 +3739,6 @@ fn eret_post_exception() {
 
     //   0xd69f03e0        eret
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -4032,7 +3773,6 @@ fn check_eret_trap() {
     let pac = emitter.constant(0, Type::Unsigned(1));
     let use_key_a = emitter.constant(1, Type::Unsigned(1));
     let res = translate(
-        Global,
         &*model,
         "AArch64_CheckForERetTrap",
         &[pac, use_key_a],
@@ -4057,7 +3797,6 @@ fn exceptionreturn_post_exception() {
 
     //
     translate(
-        Global,
         &*model,
         "AArch64_ExceptionReturn",
         &[new_pc, spsr],
@@ -4104,15 +3843,7 @@ fn end_cycle() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    translate(
-        Global,
-        &*model,
-        "__EndCycle",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap();
+    translate(&*model, "__EndCycle", &[], &mut emitter, &register_file).unwrap();
 
     emitter.leave();
 
@@ -4126,8 +3857,7 @@ fn _decodea64_profiling() {
 
     let mut measure = Measurement::start();
 
-    let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
-    let allocator_ref = BumpAllocatorRef::new(&allocator);
+    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
 
     let register_file = RegisterFile::init(&*model);
 
@@ -4143,7 +3873,6 @@ fn _decodea64_profiling() {
     measure.trigger("init");
 
     translate_instruction(
-        allocator_ref,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -4182,8 +3911,7 @@ fn _branch_profiling() {
 
     let mut measure = Measurement::start();
 
-    let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
-    let allocator_ref = BumpAllocatorRef::new(&allocator);
+    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
 
     let register_file = RegisterFile::init(&*model);
 
@@ -4199,7 +3927,6 @@ fn _branch_profiling() {
     measure.trigger("init");
 
     translate_instruction(
-        allocator_ref,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -4231,8 +3958,7 @@ fn _branch_profiling() {
 fn cond_branch() {
     let model = models::get("aarch64").unwrap();
 
-    let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
-    let allocator_ref = BumpAllocatorRef::new(&allocator);
+    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
 
     let register_file = RegisterFile::init(&*model);
 
@@ -4246,7 +3972,6 @@ fn cond_branch() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     translate_instruction(
-        allocator_ref,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -4280,7 +4005,6 @@ fn _mrs_timer() {
     // mrs     x0, cntvct_el0
     let opcode = emitter.constant(0xd53be040, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4324,7 +4048,6 @@ fn create_gpr_access_desc() {
     let start = GLOBAL_CLOCK.now();
 
     let _out = translate(
-        Global,
         &*model,
         "CreateAccDescGPR",
         &[memop, nontemporal, privileged, tagchecked],
@@ -4350,7 +4073,6 @@ fn stp_mem_init() {
     // a901fc1f        stp     xzr, xzr, [x0, #24]
     let opcode = emitter.constant(0xa901fc1f, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4386,7 +4108,6 @@ fn sbfm() {
 
     // 93407c63        sxtw    x3, w3
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -4422,7 +4143,6 @@ fn umulh() {
     // execute_aarch64_instrs_integer_arithmetic_mul_widening_64_128hi
     let opcode = emitter.constant(0x9bc17c02, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4461,7 +4181,6 @@ fn eor() {
     //ca010042        eor     x2, x2, x1
     let opcode = emitter.constant(0xca010042, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4520,7 +4239,6 @@ fn extr() {
         // execute_aarch64_instrs_integer_ins_ext_extract_immediate
         let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
         translate(
-            Global,
             &*model,
             "__DecodeA64",
             &[opcode],
@@ -4566,7 +4284,6 @@ fn branch_maybe_2048() {
 
     let opcode = emitter.constant(0x17ffffe1, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4597,7 +4314,6 @@ fn cbz_maybe_2048() {
     // <__flush_smp_call_function_queue+0x130>
     let opcode = emitter.constant(0xb40005b4, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4627,7 +4343,6 @@ fn ldp_128() {
     // execute_aarch64_instrs_memory_pair_simdfp_post_idx
     let opcode = emitter.constant(0xad410c02, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4670,16 +4385,9 @@ fn simd_128_reg_minimal() {
 
     let n = emitter.constant(3, Type::Signed(64));
     let width = emitter.constant(128, Type::Signed(64));
-    let result = translate(
-        Global,
-        &*model,
-        "V_read",
-        &[n, width],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let result = translate(&*model, "V_read", &[n, width], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     assert!(matches!(
         result.kind(),
@@ -4695,16 +4403,9 @@ fn simd_128_reg_to_mem() {
 
     let n = emitter.constant(3, Type::Signed(64));
     let width = emitter.constant(128, Type::Signed(64));
-    let result = translate(
-        Global,
-        &*model,
-        "V_read",
-        &[n, width],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let result = translate(&*model, "V_read", &[n, width], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     let addr = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
     emitter.write_memory(addr, result, false);
@@ -4732,16 +4433,9 @@ fn _currentvl_read() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let res = translate(
-        Global,
-        &*model,
-        "CurrentVL_read",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "CurrentVL_read", &[], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), res);
 
@@ -4766,7 +4460,6 @@ fn v_set() {
     let n = emitter.constant(3, Type::Signed(64));
     let width = emitter.constant(128, Type::Signed(64));
     translate(
-        Global,
         &*model,
         "V_set",
         &[n, width, value],
@@ -4859,7 +4552,6 @@ fn slice_mask() {
     let l = emitter.constant(0, Type::Signed(64));
 
     let res = translate(
-        Global,
         &*model,
         "slice_mask",
         &[n, i, l],
@@ -4890,7 +4582,6 @@ fn _mrs_ttbr() {
     // d5382021        mrs     x1, ttbr1_el1
     let opcode = emitter.constant(0xd5382021, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4923,7 +4614,6 @@ fn sttr() {
     //f800081f        sttr    xzr, [x0]
     let opcode = emitter.constant(0xf800081f, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4959,7 +4649,6 @@ fn at() {
     // AT_S1E1R_SysOpsWrite_efb944f010174dbe
     let opcode = emitter.constant(0xd5087816, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -4990,7 +4679,6 @@ fn svc() {
     // execute_aarch64_instrs_system_exceptions_runtime_svc
     let opcode = emitter.constant(0xd4000001, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -5016,7 +4704,6 @@ fn stp_stuck_loop() {
 
     let opcode = emitter.constant(0xa902de74, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -5055,7 +4742,6 @@ fn sttr_2() {
     // execute_aarch64_instrs_memory_single_general_immediate_signed_offset_unpriv
     let opcode = emitter.constant(0xf80008c3, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -5088,7 +4774,6 @@ fn cmeq_v116b() {
     // execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd
     let opcode = emitter.constant(0x4e209801, Type::Unsigned(32));
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -5112,7 +4797,6 @@ fn simbench_eret() {
     register_file.write::<u64>("SCR_EL3_bits", 0x430);
     //  eret
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5144,16 +4828,10 @@ fn simbench_el_from_spsr() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let spsr = emitter.constant(0x0, Type::Unsigned(64));
-    let valid_target_tuple = translate(
-        Global,
-        &*model,
-        "ELFromSPSR",
-        &[spsr],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let valid_target_tuple =
+        translate(&*model, "ELFromSPSR", &[spsr], &mut emitter, &register_file)
+            .unwrap()
+            .unwrap();
 
     let valid = emitter.access_tuple(valid_target_tuple.clone(), 0);
     let target = emitter.access_tuple(valid_target_tuple, 1);
@@ -5186,7 +4864,6 @@ fn simbench_illegal_exception_return() {
 
     let spsr = emitter.read_register(model.reg_offset("SPSR_EL1_bits"), Type::Unsigned(64));
     let illegal_psr_state = translate(
-        Global,
         &*model,
         "IllegalExceptionReturn",
         &[spsr],
@@ -5215,7 +4892,6 @@ fn is_secure_below_el3() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_secure_below_el3 = translate(
-        Global,
         &*model,
         "IsSecureBelowEL3",
         &[],
@@ -5250,7 +4926,6 @@ fn _simbench_elusingaarch32k() {
     let is_secure_below_el3 = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(1));
 
     let tuple = translate(
-        Global,
         &*model,
         "ELStateUsingAArch32K",
         &[target, is_secure_below_el3],
@@ -5291,7 +4966,6 @@ fn cbnz() {
 
     // execute_aarch64_instrs_branch_conditional_compare
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5312,15 +4986,7 @@ fn branch_not_taken() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let _res = translate(
-        Global,
-        &*model,
-        "BranchNotTaken",
-        &[],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap();
+    let _res = translate(&*model, "BranchNotTaken", &[], &mut emitter, &register_file).unwrap();
 
     emitter.leave();
 
@@ -5340,7 +5006,6 @@ fn mrs_current_el_1() {
     //      mrs     x0, currentel
     // execute_aarch64_instrs_system_register_system
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5368,7 +5033,6 @@ fn mrs_current_el_3() {
     //      mrs     x0, currentel
     // execute_aarch64_instrs_system_register_system
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5395,7 +5059,6 @@ fn ic_ivau() {
     // decode_sys_aarch64_instrs_system_sysops
     // IC_IVAU_SysOpsWrite_f40d5c6453a840a5
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5418,7 +5081,6 @@ fn ldurb() {
 
     // 385fd001 	ldurb	w1, [x0, #-3]
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5448,7 +5110,6 @@ fn ldr_q0() {
 
     // 3cdd0d60 	ldr	q0, [x11, #-48]!
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5480,7 +5141,6 @@ fn tpidr_el0() {
 
     //  d51bd048        msr     tpidr_el0, x8
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5491,7 +5151,6 @@ fn tpidr_el0() {
 
     //  d53bd048 	mrs	x8, tpidr_el0
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5518,7 +5177,6 @@ fn sub_sxtw() {
 
     //cb23c083 	sub	x3, x4, w3, sxtw
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5546,7 +5204,6 @@ fn adcs_fuzzed_0() {
 
     // 3a090207        adcs    w7, w16, w9
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5576,7 +5233,6 @@ fn ldp_q_el1() {
 
     // ad480400        ldp     q0, q1, [x0, #256]
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5617,7 +5273,6 @@ fn stp_q() {
 
     // ad080400        stp     q0, q1, [x0, #256]
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5667,7 +5322,6 @@ fn add_8h() {
     //  4e7585e8        add     v8.8h, v15.8h, v21.8h
     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_single_sisd
     translate_instruction(
-        Global,
         &model,
         "__DecodeA64",
         &mut emitter,
@@ -5709,7 +5363,6 @@ fn simd_const() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     translate(
-        Global,
         &model,
         "CheckFPAdvSIMDEnabled64",
         &[],
@@ -5730,7 +5383,6 @@ fn tst_x10_0x7() {
 
     //f240095f        tst     x10, #0x7
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5751,7 +5403,6 @@ fn eon0() {
 
     // eon     w1, w14, wzr, lsr #0
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5779,7 +5430,6 @@ fn eon1() {
 
     // eon     w17, w1, wzr, asr #0
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5807,7 +5457,6 @@ fn ngc() {
 
     // 5a0803f9        ngc     w25, w8
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5836,7 +5485,6 @@ fn extr_fuzz0() {
     // 93d20383        extr    x3, x28, x18, #0
     // decode_extr_aarch64_instrs_integer_ins_ext_extract_immediate
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5867,7 +5515,6 @@ fn movi() {
     // (64-bit scalar variant)
     // execute_aarch64_instrs_vector_logical
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5907,7 +5554,6 @@ fn v_set_zeroextend() {
     let n = emitter.constant(3, Type::Signed(64));
     let width = emitter.constant(128, Type::Signed(64));
     translate(
-        Global,
         &*model,
         "V_set",
         &[n, width, value],
@@ -5940,7 +5586,6 @@ fn and_16b_fuzz0() {
     //  4e391ef7        and     v23.16b, v23.16b, v25.16b
     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_logical_and_orr
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -5982,7 +5627,6 @@ fn and_16b_fuzz1() {
 
     //  4e291dc9        and     v9.16b, v14.16b, v9.16b
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6018,7 +5662,6 @@ fn ror_fuzz0() {
 
     //  1ac92d30        ror     w16, w9, w9
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6056,7 +5699,6 @@ fn ror_fuzz1() {
 
     //   1ac72fb2        ror     w18, w29, w7
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6085,7 +5727,6 @@ fn ror_fuzz2() {
 
     //  1ac52f1a        ror     w26, w24, w5
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6137,16 +5778,9 @@ fn ror_0() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
 
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), res);
     emitter.leave();
@@ -6170,16 +5804,9 @@ fn ror_1() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
 
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), res);
     emitter.leave();
@@ -6203,16 +5830,9 @@ fn ror_2() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
 
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), res);
     emitter.leave();
@@ -6236,16 +5856,9 @@ fn ror_3() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
 
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), res);
     emitter.leave();
@@ -6269,16 +5882,9 @@ fn ror_4() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
     let shift = emitter.read_register(model.reg_offset("R1"), Type::Signed(64));
 
-    let res = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, shift],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), res);
     emitter.leave();
@@ -6304,7 +5910,6 @@ fn shiftreg_2() {
     let amount = emitter.constant(17, Type::Signed(64));
     let width = emitter.constant(32, Type::Signed(64));
     let value = translate(
-        Global,
         &*model,
         "ShiftReg",
         &[reg, shift_type, amount, width],
@@ -6342,7 +5947,6 @@ fn ror_no_modulo() {
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
 
     let value = translate(
-        Global,
         &*model,
         "ROR",
         &[x, cast_read],
@@ -6379,16 +5983,9 @@ fn ror_modulo() {
 
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
 
-    let value = translate(
-        Global,
-        &*model,
-        "ROR",
-        &[x, amount],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap()
-    .unwrap();
+    let value = translate(&*model, "ROR", &[x, amount], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
 
     emitter.write_register(model.reg_offset("R2"), value);
 
@@ -6417,7 +6014,7 @@ fn ror_modulo() {
 
 //     //  0e205903        cnt     v3.8b, v8.8b
 //     translate_instruction(
-//         Global,
+//
 //         &*model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -6460,7 +6057,7 @@ fn ror_modulo() {
 //     //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
 //     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
 //     translate_instruction(
-//         Global,
+//
 //         &model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -6504,7 +6101,7 @@ fn ror_modulo() {
 
 //     //1e22007e        scvtf   s30, w3
 //     translate_instruction(
-//         Global,
+//
 //         &*model,
 //         "__DecodeA64",
 //         &mut emitter,
@@ -6538,7 +6135,6 @@ fn sdiv_test_0_panic() {
 
     // 1ad60fee        sdiv    w14, wzr, w22
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6566,7 +6162,6 @@ fn sdiv_fuzz0() {
 
     // 1ad80cf5        sdiv    w21, w7, w24
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6594,7 +6189,6 @@ fn sdiv_fuzz1() {
 
     // 1ad40ea4        sdiv    w4, w21, w20
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6630,7 +6224,6 @@ fn sdiv_fuzz2() {
     // decode_sdiv_aarch64_instrs_integer_arithmetic_div
     // execute_aarch64_instrs_integer_arithmetic_div, is_unsigned = false
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6660,7 +6253,6 @@ fn udiv() {
     // decode_udiv_aarch64_instrs_integer_arithmetic_div
     // execute_aarch64_instrs_integer_arithmetic_div, is_unsigned = true
     translate(
-        Global,
         &*model,
         "__DecodeA64",
         &[opcode],
@@ -6703,7 +6295,6 @@ fn fuzz_0b2313e2_59_fixed() {
     // 0b2313e2        add     w2, wsp, w3, uxtb #4
 
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6731,7 +6322,6 @@ fn fuzz_1ac20abb_2645_fixed() {
 
     // 1ac20abb        udiv    w27, w21, w2
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6760,7 +6350,6 @@ fn fuzz_9b487f10_2213_fixed() {
     //  9b487f10        smulh   x16, x24, x8
     //  block 0x18d
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6790,7 +6379,6 @@ fn crc() {
     // execute_aarch64_instrs_integer_crc
     // Poly32Mod2
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,
@@ -6819,7 +6407,6 @@ fn bitreverse_dyn_32() {
     let data_in = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(32));
 
     let res = translate(
-        Global,
         &*model,
         "BitReverse",
         &[data_in],
@@ -6852,7 +6439,6 @@ fn bitreverse_const_32() {
     let data_in = emitter.constant(0x12345678, Type::Unsigned(32));
 
     let res = translate(
-        Global,
         &*model,
         "BitReverse",
         &[data_in],
@@ -6979,7 +6565,6 @@ fn poly32mod2() {
     let poly = emitter.constant(0x04C11DB7, Type::Unsigned(32));
 
     let res = translate(
-        Global,
         &*model,
         "Poly32Mod2",
         &[data_in, poly],

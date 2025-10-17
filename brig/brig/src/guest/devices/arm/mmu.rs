@@ -1,7 +1,10 @@
 use {
     crate::{
         arch::x86::{memory::guest_physical_to_host_virt, safepoint::interrupt_restore_safepoint},
-        guest::{GuestExecutionContext, get_current_guest, models::ModelDevice, write_to_el},
+        guest::{
+            GuestExecutionContext, get_current_guest,
+            models::{ModelDevice, write_to_el},
+        },
     },
     aarch64_paging::paging::{Attributes, Descriptor},
     common::sysreg_helpers::encode_sysreg_id,

@@ -3,10 +3,9 @@ use {
         Operand, OperandKind::Register as R, Width, registers::Register::Physical as PHYS,
     },
     iced_x86::code_asm::{AsmRegister8, AsmRegister32, CodeAssembler},
- common::Alloc,
 };
 
-pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, dst: &Operand<A>) {
+pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
     match dst {
         Operand {
             kind: R(PHYS(target)),

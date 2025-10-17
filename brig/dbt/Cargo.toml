@@ -23,6 +23,6 @@ thiserror = { version = "2.0.17", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
 strum = { version = "0.27.2", features = ["derive"], default-features = false }
 linkme = "0.3.35"
-derive-where = "1.6.0"
 bitfields = "1.0.0"
 x86_64 = "0.15.2"
+spin = "0.10.0"

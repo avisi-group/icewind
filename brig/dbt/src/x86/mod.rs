@@ -1,5 +1,6 @@
 use {
     crate::{
+        bump_alloc::BumpAllocatorRef,
         emitter::Emitter,
         register_file::GLOBAL_REGISTER_SIZE,
         x86::{
@@ -7,9 +8,8 @@ use {
             encoder::{Instruction, Opcode, Operand, OperandKind, registers::PhysicalRegister},
         },
     },
-    alloc::{alloc::Global, collections::vec_deque::VecDeque, vec::Vec},
+    alloc::{collections::vec_deque::VecDeque, vec::Vec},
     common::{
-        Alloc,
         arena::{Arena, Ref},
         hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},
         intern::InternedString,
@@ -53,15 +53,15 @@ pub enum X86BlockMark {
     Permanent,
 }
 
-pub struct X86Block<A: Alloc> {
-    instructions: Vec<Instruction<A>, A>,
-    next: Vec<Ref<X86Block<A>>, A>,
+pub struct X86Block {
+    instructions: Vec<Instruction, BumpAllocatorRef>,
+    next: Vec<Ref<X86Block>, BumpAllocatorRef>,
     linked: bool,
     mark: X86BlockMark,
 }
 
-impl<A: Alloc> X86Block<A> {
-    pub fn new_in(allocator: A) -> Self {
+impl X86Block {
+    pub fn new_in(allocator: BumpAllocatorRef) -> Self {
         Self {
             instructions: Vec::new_in(allocator.clone()),
             next: Vec::new_in(allocator),
@@ -86,19 +86,19 @@ impl<A: Alloc> X86Block<A> {
         self.mark
     }
 
-    pub fn append(&mut self, instruction: Instruction<A>) {
+    pub fn append(&mut self, instruction: Instruction) {
         self.instructions.push(instruction);
     }
 
-    pub fn instructions(&self) -> &[Instruction<A>] {
+    pub fn instructions(&self) -> &[Instruction] {
         &self.instructions
     }
 
-    pub fn instructions_mut(&mut self) -> &mut Vec<Instruction<A>, A> {
+    pub fn instructions_mut(&mut self) -> &mut Vec<Instruction, BumpAllocatorRef> {
         &mut self.instructions
     }
 
-    pub fn next_blocks(&self) -> &[Ref<X86Block<A>>] {
+    pub fn next_blocks(&self) -> &[Ref<X86Block>] {
         &self.next
     }
 
@@ -106,7 +106,7 @@ impl<A: Alloc> X86Block<A> {
         self.next.clear();
     }
 
-    pub fn push_next(&mut self, target: Ref<X86Block<A>>) {
+    pub fn push_next(&mut self, target: Ref<X86Block>) {
         self.next.push(target);
         if self.next.len() > 2 {
             panic!(
@@ -116,7 +116,7 @@ impl<A: Alloc> X86Block<A> {
     }
 }
 
-impl<A: Alloc> Debug for X86Block<A> {
+impl Debug for X86Block {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for instr in &self.instructions {
             writeln!(f, "\t{instr}")?;
@@ -126,19 +126,19 @@ impl<A: Alloc> Debug for X86Block<A> {
     }
 }
 
-struct CachedFunction<A: Alloc> {
-    entry_block: Ref<X86Block<A>>,
-    result: Option<X86NodeRef<A>>,
+struct CachedFunction {
+    entry_block: Ref<X86Block>,
+    result: Option<X86NodeRef>,
 }
 
-pub struct X86TranslationContext<A: Alloc> {
-    allocator: A,
-    blocks: Arena<X86Block<A>, A>,
-    initial_block: Ref<X86Block<A>>,
-    panic_block: Ref<X86Block<A>>,
+pub struct X86TranslationContext {
+    allocator: BumpAllocatorRef,
+    blocks: Arena<X86Block, BumpAllocatorRef>,
+    initial_block: Ref<X86Block>,
+    panic_block: Ref<X86Block>,
     writes_to_pc: bool,
 
-    function_cache: HashMapA<InternedString, CachedFunction<A>, A>,
+    function_cache: HashMapA<InternedString, CachedFunction, BumpAllocatorRef>,
 
     pc_offset: u64,
     el_offset: u64,
@@ -160,7 +160,7 @@ pub struct X86TranslationContext<A: Alloc> {
     memory_mask: bool,
 }
 
-impl<A: Alloc> Debug for X86TranslationContext<A> {
+impl Debug for X86TranslationContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "X86TranslationContext:")?;
         writeln!(f, "\tinitial: {:?}", self.initial_block())?;
@@ -191,26 +191,26 @@ impl<A: Alloc> Debug for X86TranslationContext<A> {
     }
 }
 
-impl X86TranslationContext<Global> {
-    pub fn new(
-        model: &Model,
-        memory_mask: bool,
-        global_register_offset: usize,
-        el_changed_callback: extern "sysv64" fn(u8, u8),
-    ) -> Self {
-        Self::new_with_allocator(
-            Global,
-            model,
-            memory_mask,
-            global_register_offset,
-            el_changed_callback,
-        )
-    }
-}
+// impl X86TranslationContext {
+//     pub fn new(
+//         model: &Model,
+//         memory_mask: bool,
+//         global_register_offset: usize,
+//         el_changed_callback: extern "sysv64" fn(u8, u8),
+//     ) -> Self {
+//         Self::new_with_allocator(
+//             Global,
+//             model,
+//             memory_mask,
+//             global_register_offset,
+//             el_changed_callback,
+//         )
+//     }
+// }
 
-impl<'a, A: Alloc> X86TranslationContext<A> {
+impl<'a> X86TranslationContext {
     pub fn new_with_allocator(
-        allocator: A,
+        allocator: BumpAllocatorRef,
         model: &Model,
         memory_mask: bool,
         global_register_offset: usize,
@@ -255,23 +255,23 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         celf
     }
 
-    pub fn allocator(&self) -> A {
+    pub fn allocator(&self) -> BumpAllocatorRef {
         self.allocator.clone()
     }
 
-    pub fn arena(&self) -> &Arena<X86Block<A>, A> {
+    pub fn arena(&self) -> &Arena<X86Block, BumpAllocatorRef> {
         &self.blocks
     }
 
-    pub fn arena_mut(&mut self) -> &mut Arena<X86Block<A>, A> {
+    pub fn arena_mut(&mut self) -> &mut Arena<X86Block, BumpAllocatorRef> {
         &mut self.blocks
     }
 
-    fn initial_block(&self) -> Ref<X86Block<A>> {
+    fn initial_block(&self) -> Ref<X86Block> {
         self.initial_block
     }
 
-    pub fn panic_block(&self) -> Ref<X86Block<A>> {
+    pub fn panic_block(&self) -> Ref<X86Block> {
         self.panic_block
     }
 
@@ -306,7 +306,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         // log::error!("{}", dot::render(self.arena(), self.initial_block()));
 
-        let mut instructions = Vec::<Instruction<A>>::new();
+        let mut instructions = Vec::<Instruction>::new();
         let mut block_to_instruction_index = hashmap_in(self.allocator());
         for block in &all_blocks {
             block_to_instruction_index.insert(block.clone(), instructions.len());
@@ -472,7 +472,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         code
     }
 
-    pub fn create_block(&mut self) -> Ref<X86Block<A>> {
+    pub fn create_block(&mut self) -> Ref<X86Block> {
         let b = X86Block::new_in(self.allocator());
         self.arena_mut().insert(b)
     }
@@ -505,10 +505,10 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
     }
 }
 
-fn link_visit<A: Alloc>(
-    block: Ref<X86Block<A>>,
-    arena: &mut Arena<X86Block<A>>,
-    sorted_blocks: &mut VecDeque<Ref<X86Block<A>>>,
+fn link_visit(
+    block: Ref<X86Block>,
+    arena: &mut Arena<X86Block>,
+    sorted_blocks: &mut VecDeque<Ref<X86Block>>,
 ) -> bool {
     match block.get(arena).get_mark() {
         X86BlockMark::Permanent => true,
@@ -537,9 +537,9 @@ fn link_visit<A: Alloc>(
     }
 }
 
-fn empty_block_jump_threading<A: Alloc>(
-    arena: &mut Arena<X86Block<A>, A>,
-    current_block: Ref<X86Block<A>>,
+fn empty_block_jump_threading(
+    arena: &mut Arena<X86Block, BumpAllocatorRef>,
+    current_block: Ref<X86Block>,
 ) {
     // if the current block only has one target
     if let [child] = current_block.get(arena).next_blocks() {

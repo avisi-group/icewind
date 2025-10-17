@@ -10,7 +10,6 @@ use {
         },
     },
     alloc::vec::Vec,
-    common::Alloc as MemAlloc,
     strum::EnumCount,
 };
 
@@ -24,8 +23,8 @@ struct RegisterTrack {
     last_control_flow_count: i32,
 }
 
-pub fn allocate<A: MemAlloc>(
-    instructions: &mut Vec<Instruction<A>>,
+pub fn allocate(
+    instructions: &mut Vec<Instruction>,
     num_virtual_registers: usize,
     global_register_offset: usize,
 ) {
@@ -43,9 +42,9 @@ pub fn allocate<A: MemAlloc>(
     );
 }
 
-fn calculate_vreg_live_ranges<A: MemAlloc>(
+fn calculate_vreg_live_ranges(
     register_tracking: &mut RegisterTracker,
-    instructions: &mut Vec<Instruction<A>>,
+    instructions: &mut Vec<Instruction>,
 ) {
     let mut current_control_flow_count: i32 = 0;
 
@@ -97,9 +96,9 @@ fn calculate_vreg_live_ranges<A: MemAlloc>(
     }
 }
 
-fn do_allocate<A: MemAlloc>(
+fn do_allocate(
     register_tracking: &mut RegisterTracker,
-    instructions: &mut Vec<Instruction<A>>,
+    instructions: &mut Vec<Instruction>,
 ) -> Vec<(usize, PhysicalRegisterSet)> {
     let mut avail_phys_regs_gpr = PhysicalRegisterSet::new();
     let mut avail_phys_regs_xmm = PhysicalRegisterSet::new();
@@ -384,10 +383,10 @@ fn do_allocate<A: MemAlloc>(
     live_at_calls
 }
 
-fn commit<A: MemAlloc>(
+fn commit(
     register_tracking: &RegisterTracker,
     mut live_at_calls: Vec<(usize, PhysicalRegisterSet)>,
-    instructions: &mut Vec<Instruction<A>>,
+    instructions: &mut Vec<Instruction>,
     global_register_offset: usize,
 ) {
     for i in 0..instructions.len() {

@@ -5,14 +5,13 @@ use {
         Width, memory_operand_to_iced,
         registers::Register::Physical as PHYS,
     },
-    common::Alloc,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
         qword_ptr,
     },
 };
 
-pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
+pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
     match (src, dst) {
         // ADD R -> R
         (

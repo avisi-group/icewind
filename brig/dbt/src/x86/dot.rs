@@ -1,11 +1,10 @@
 use {
-    crate::x86::X86Block,
+    crate::{bump_alloc::BumpAllocatorRef, x86::X86Block},
     alloc::{
         format,
         string::{String, ToString},
     },
     common::{
-        Alloc,
         arena::{Arena, Ref},
         hashmap::HashSet,
     },
@@ -13,7 +12,7 @@ use {
     itertools::Itertools,
 };
 
-pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) -> String {
+pub fn render(arena: &Arena<X86Block, BumpAllocatorRef>, entry: Ref<X86Block>) -> String {
     let mut out = String::new();
 
     let mut blocks = HashSet::default();
@@ -72,6 +71,6 @@ pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) 
     out
 }
 
-fn ref_label<A: Alloc>(r: Ref<X86Block<A>>) -> String {
+fn ref_label(r: Ref<X86Block>) -> String {
     format!("n{:x}", r.index())
 }

@@ -1,5 +1,6 @@
 use {
     crate::{
+        bump_alloc::BumpAllocatorRef,
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
         x86::{
@@ -10,7 +11,6 @@ use {
     },
     alloc::{collections::BTreeMap, vec::Vec},
     common::{
-        Alloc,
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in},
         intern::InternedString,
@@ -25,7 +25,6 @@ use {
         hash::{Hash, Hasher},
         panic,
     },
-    derive_where::derive_where,
     itertools::Itertools,
 };
 
@@ -43,38 +42,38 @@ pub enum Error {
 
 /// Kind of jump to a target block
 #[derive(Debug)]
-enum JumpKind<A: Alloc> {
+enum JumpKind {
     // static jump (jump or branch with constant condition)
     Static {
         rudder: Ref<Block>,
-        x86: Ref<X86Block<A>>,
-        variables: BTreeMap<InternedString, LocalVariable<A>, A>,
+        x86: Ref<X86Block>,
+        variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
-        x86: Ref<X86Block<A>>,
-        variables: BTreeMap<InternedString, LocalVariable<A>, A>,
+        x86: Ref<X86Block>,
+        variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
     },
 }
 
 #[derive(Debug, Clone)]
-enum StatementResult<A: Alloc> {
-    Data(Option<X86NodeRef<A>>),
-    ControlFlow(ControlFlow<A>),
+enum StatementResult {
+    Data(Option<X86NodeRef>),
+    ControlFlow(ControlFlow),
 }
 
 #[derive(Debug, Clone)]
-enum ControlFlow<A: Alloc> {
+enum ControlFlow {
     Jump(
         Ref<Block>,
-        Ref<X86Block<A>>,
-        BTreeMap<InternedString, LocalVariable<A>, A>,
+        Ref<X86Block>,
+        BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
     ),
     Branch(
         Ref<Block>,
         Ref<Block>,
-        BTreeMap<InternedString, LocalVariable<A>, A>,
+        BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
     ),
     Panic,
     Return,
@@ -85,14 +84,13 @@ const NUM_TRANSLATE_ATTEMPTS: usize = 3;
 /// Top-level translation of a given guest instruction opcode
 ///
 /// Includes logic for retrying decoding if a SEE exception is thrown.
-pub fn translate_instruction<A: Alloc>(
-    allocator: A,
+pub fn translate_instruction(
     model: &Model,
     function: &str,
-    emitter: &mut X86Emitter<A>,
+    emitter: &mut X86Emitter,
     register_file: &RegisterFile,
     opcode: u32,
-) -> Result<Option<X86NodeRef<A>>, Error> {
+) -> Result<Option<X86NodeRef>, Error> {
     register_file.write("SEE", -1i64);
 
     let initial_block = emitter.get_current_block();
@@ -124,14 +122,7 @@ pub fn translate_instruction<A: Alloc>(
 
         let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
 
-        let res = translate(
-            allocator,
-            model,
-            function,
-            &[opcode],
-            emitter,
-            register_file,
-        );
+        let res = translate(model, function, &[opcode], emitter, register_file);
 
         match res {
             Ok(_) => break (res, start_block),
@@ -157,35 +148,25 @@ pub fn translate_instruction<A: Alloc>(
     result
 }
 
-pub fn translate<A: Alloc>(
-    allocator: A,
+pub fn translate(
     model: &Model,
     function: &str,
-    arguments: &[X86NodeRef<A>],
-    emitter: &mut X86Emitter<A>,
+    arguments: &[X86NodeRef],
+    emitter: &mut X86Emitter,
     register_file: &RegisterFile,
-) -> Result<Option<X86NodeRef<A>>, Error> {
-    translate_with_variable_ids(
-        allocator,
-        model,
-        function,
-        arguments,
-        emitter,
-        register_file,
-    )
+) -> Result<Option<X86NodeRef>, Error> {
+    translate_with_variable_ids(model, function, arguments, emitter, register_file)
 }
 
-fn translate_with_variable_ids<A: Alloc>(
-    allocator: A,
+fn translate_with_variable_ids(
     model: &Model,
     function: &str,
-    arguments: &[X86NodeRef<A>],
-    emitter: &mut X86Emitter<A>,
+    arguments: &[X86NodeRef],
+    emitter: &mut X86Emitter,
     register_file: &RegisterFile,
-) -> Result<Option<X86NodeRef<A>>, Error> {
+) -> Result<Option<X86NodeRef>, Error> {
     if function == "__DecodeA64_Reserved" {
         return translate_with_variable_ids(
-            allocator,
             model,
             "AArch64_UndefinedFault",
             &[],
@@ -229,7 +210,7 @@ fn translate_with_variable_ids<A: Alloc>(
 
                 let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
 
-                let mut arguments = Vec::new_in(allocator);
+                let mut arguments = Vec::new_in(emitter.ctx().allocator());
                 arguments.push(arg0);
 
                 let return_value = emitter.call_with_return(function, arguments);
@@ -249,7 +230,7 @@ fn translate_with_variable_ids<A: Alloc>(
 
                 let arg2 = emitter.constant(8, Type::Unsigned(64));
 
-                let mut arguments = Vec::new_in(allocator);
+                let mut arguments = Vec::new_in(emitter.ctx().allocator());
                 arguments.push(arg0); // Register Id
                 arguments.push(arg1); // Value
                 arguments.push(arg2); // Length
@@ -266,54 +247,45 @@ fn translate_with_variable_ids<A: Alloc>(
         }
     }
 
-    FunctionTranslator::new(
-        allocator,
-        model,
-        function,
-        arguments,
-        emitter,
-        register_file,
-    )
-    .translate()
+    FunctionTranslator::new(model, function, arguments, emitter, register_file).translate()
 }
 
-#[derive(Clone)]
-#[derive_where(Debug)]
-enum LocalVariable<A: Alloc> {
-    Virtual { value: Option<X86NodeRef<A>> },
+#[derive(Clone, Debug)]
+enum LocalVariable {
+    Virtual { value: Option<X86NodeRef> },
     Stack { typ: emitter::Type, id: usize },
 }
 
-impl<A: Alloc> Default for LocalVariable<A> {
+impl Default for LocalVariable {
     fn default() -> Self {
         LocalVariable::Virtual { value: None }
     }
 }
 
 // we only care if the variable is virtual or on the stack?
-impl<A: Alloc> Hash for LocalVariable<A> {
+impl Hash for LocalVariable {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
 
-impl<A: Alloc> PartialEq for LocalVariable<A> {
-    fn eq(&self, other: &LocalVariable<A>) -> bool {
+impl PartialEq for LocalVariable {
+    fn eq(&self, other: &LocalVariable) -> bool {
         core::mem::discriminant(self).eq(&core::mem::discriminant(other))
     }
 }
 
-impl<A: Alloc> Eq for LocalVariable<A> {}
+impl Eq for LocalVariable {}
 
-#[derive_where(Debug)]
-struct ReturnValue<A: Alloc> {
-    variables: Vec<LocalVariable<A>, A>,
-    previous_write: Option<(Ref<X86Block<A>>, usize)>,
+#[derive(Debug)]
+struct ReturnValue {
+    variables: Vec<LocalVariable, BumpAllocatorRef>,
+    previous_write: Option<(Ref<X86Block>, usize)>,
 }
 
-impl<A: Alloc> ReturnValue<A> {
+impl ReturnValue {
     pub fn new<'e, 'c>(
-        emitter: &'e mut X86Emitter<'c, A>,
+        emitter: &'e mut X86Emitter<'c>,
         return_type: Option<rudder::types::Type>,
     ) -> Self {
         let num_variables = match return_type {
@@ -335,44 +307,47 @@ impl<A: Alloc> ReturnValue<A> {
     }
 }
 
-struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
-    allocator: A,
-
+struct FunctionTranslator<'model, 'registers, 'emitter, 'context> {
     /// The model we are translating guest code for
     model: &'model Model,
+
+    allocator: BumpAllocatorRef,
 
     /// Function being translated
     function: &'model Function,
 
     dynamic_blocks: HashMapA<
-        (Ref<Block>, BTreeMap<InternedString, LocalVariable<A>, A>),
-        (Ref<X86Block<A>>, bool),
-        A,
+        (
+            Ref<Block>,
+            BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+        ),
+        (Ref<X86Block>, bool),
+        BumpAllocatorRef,
     >,
-    static_blocks: HashMapA<Ref<Block>, Vec<Ref<X86Block<A>>>, A>,
+    static_blocks: HashMapA<Ref<Block>, Vec<Ref<X86Block>>, BumpAllocatorRef>,
 
-    entry_variables: BTreeMap<InternedString, LocalVariable<A>, A>,
+    entry_variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
 
-    return_value: ReturnValue<A>,
+    return_value: ReturnValue,
 
     // don't re-promote stack variables to a different location
-    promoted_locations: HashMapA<InternedString, usize, A>,
+    promoted_locations: HashMapA<InternedString, usize, BumpAllocatorRef>,
 
     /// Cached registers
-    cached_registers: HashMapA<usize, X86NodeRef<A>, A>,
+    cached_registers: HashMapA<usize, X86NodeRef, BumpAllocatorRef>,
 
     /// Dynamic bitvector stack lengths
-    bits_stack_widths: HashMapA<usize, u32, A>,
+    bits_stack_widths: HashMapA<usize, u32, BumpAllocatorRef>,
 
     /// X86 instruction emitter
-    emitter: &'emitter mut X86Emitter<'context, A>,
+    emitter: &'emitter mut X86Emitter<'context>,
 
     /// Pointer to the register file used for cached register reads
     register_file: &'registers RegisterFile,
 }
 
-impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
-    fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
+impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
+    fn read_return_value(&mut self) -> Option<X86NodeRef> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
                 let mut values = Vec::new_in(self.allocator);
@@ -391,7 +366,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
     }
 
-    fn write_return_value(&mut self, value: X86NodeRef<A>) {
+    fn write_return_value(&mut self, value: X86NodeRef) {
         let values = match value.kind() {
             NodeKind::Tuple(elements) => (*elements).clone(),
             _ => {
@@ -494,12 +469,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     }
 
     fn new(
-        allocator: A,
         model: &'m Model,
         function: &str,
-        arguments: &[X86NodeRef<A>],
-        emitter: &'e mut X86Emitter<'c, A>,
-
+        arguments: &[X86NodeRef],
+        emitter: &'e mut X86Emitter<'c>,
         register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:#?}", arguments);
@@ -524,7 +497,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
 
         let mut celf = Self {
-            allocator,
+            allocator: emitter.ctx().allocator(),
             model,
             function,
             dynamic_blocks: hashmap_in(emitter.ctx().allocator()),
@@ -558,7 +531,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         celf
     }
 
-    fn translate(&mut self) -> Result<Option<X86NodeRef<A>>, Error> {
+    fn translate(&mut self) -> Result<Option<X86NodeRef>, Error> {
         // create an empty block all control flow will end at
         let exit_block = self
             .emitter
@@ -687,8 +660,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         &mut self,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-        mut variables: BTreeMap<InternedString, LocalVariable<A>, A>,
-    ) -> Result<ControlFlow<A>, Error> {
+        mut variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+    ) -> Result<ControlFlow, Error> {
         let block = block_ref.get(self.function.arena());
 
         let mut statement_value_store = StatementValueStore::new(self.allocator.clone());
@@ -757,14 +730,14 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     // todo: fix these parameters this is silly
     fn translate_statement(
         &mut self,
-        value_store: &StatementValueStore<A>,
+        value_store: &StatementValueStore,
         is_dynamic: bool,
         statement: &Statement,
         block: Ref<Block>,
 
         arena: &Arena<Statement>,
-        variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
-    ) -> Result<StatementResult<A>, Error> {
+        variables: &mut BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+    ) -> Result<StatementResult, Error> {
         //  log::trace!("translate stmt: {statement:?}");
 
         Ok(match statement {
@@ -1177,7 +1150,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 // }
 
                 let res = StatementResult::Data(translate_with_variable_ids(
-                    self.allocator.clone(),
                     self.model,
                     target.as_ref(),
                     &args,
@@ -1425,7 +1397,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         })
     }
 
-    fn read_variable(&mut self, variable: LocalVariable<A>) -> X86NodeRef<A> {
+    fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
         match variable {
             LocalVariable::Virtual { value } => {
                 value.unwrap_or_else(|| panic!("local virtual variable never written to"))
@@ -1453,7 +1425,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
     }
 
-    fn write_variable(&mut self, variable: &mut LocalVariable<A>, new_value: X86NodeRef<A>) {
+    fn write_variable(&mut self, variable: &mut LocalVariable, new_value: X86NodeRef) {
         match variable {
             LocalVariable::Virtual { value } => *value = Some(new_value),
             LocalVariable::Stack { typ, id } => {
@@ -1510,22 +1482,22 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
 /// statements
 ///
 /// Reverse linear search 2x faster than hashmap
-struct StatementValueStore<A: Alloc> {
-    vec: Vec<(Ref<Statement>, X86NodeRef<A>), A>,
+struct StatementValueStore {
+    vec: Vec<(Ref<Statement>, X86NodeRef), BumpAllocatorRef>,
 }
 
-impl<A: Alloc> StatementValueStore<A> {
-    pub fn new(allocator: A) -> Self {
+impl StatementValueStore {
+    pub fn new(allocator: BumpAllocatorRef) -> Self {
         Self {
             vec: alloc::vec::Vec::new_in(allocator),
         }
     }
 
-    pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef<A>) {
+    pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef) {
         self.vec.push((s, v));
     }
 
-    pub fn get(&self, s: Ref<Statement>) -> X86NodeRef<A> {
+    pub fn get(&self, s: Ref<Statement>) -> X86NodeRef {
         self.vec
             .iter()
             .rev()

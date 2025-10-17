@@ -18,12 +18,6 @@ pub mod memory;
 pub mod sysreg_helpers;
 pub mod tests;
 
-/// Allocator convenience trait
-pub trait Alloc: Allocator + Clone + Copy + Debug {}
-
-// implement Alloc on everything that implements it's constituent traits
-impl<T: Allocator + Clone + Copy + Debug> Alloc for T {}
-
 #[repr(C)]
 pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,

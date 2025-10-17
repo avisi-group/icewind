@@ -9,10 +9,9 @@ use {
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
- common::Alloc,
 };
 
-pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, value: &Operand<A>) {
+pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) {
     match (amount, value) {
         (
             Operand {

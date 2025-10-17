@@ -1,6 +1,6 @@
 use {
     crate::dbt::emitter::Emitter,
-    common::Alloc,
+
     core::{marker::PhantomData, sync::atomic::AtomicUsize},
 };
 
@@ -9,7 +9,7 @@ pub struct Dag<A> {
     next_id: AtomicUsize,
 }
 
-impl<A: Alloc> Dag<A> {
+impl Dag<A> {
     pub fn new() -> Self {
         Self {
             alloc: PhantomData::default(),
@@ -144,7 +144,7 @@ pub enum DagNodeKind {
     },
 }
 
-impl<A: Alloc> Emitter<A> for Dag<A> {
+impl Emitter<A> for Dag<A> {
     type BlockRef = ();
 
     type NodeRef = DagNode;

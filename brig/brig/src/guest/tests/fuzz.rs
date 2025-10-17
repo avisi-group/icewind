@@ -1,8 +1,12 @@
 use {
-    crate::guest::{Translation, models, write_to_el},
+    crate::guest::{
+        Translation,
+        models::{self, BUMP_ALLOCATOR, write_to_el},
+    },
     alloc::{alloc::Global, format, vec::Vec},
     common::{fuzz_test::InstructionFuzzTest, ktest},
     dbt::{
+        bump_alloc::BumpAllocatorRef,
         emitter::Emitter,
         register_file::RegisterFile,
         translate::translate_instruction,
@@ -34,7 +38,8 @@ fn run_test(instruction: u32, _index: usize, initial_state: &[u64; 31], post_sta
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(
+    let mut ctx = X86TranslationContext::new_with_allocator(
+        BumpAllocatorRef::new(&BUMP_ALLOCATOR),
         &model,
         false,
         register_file.global_register_offset(),
@@ -48,7 +53,6 @@ fn run_test(instruction: u32, _index: usize, initial_state: &[u64; 31], post_sta
     register_file.write::<u64>("_PC", 0x40004f9c);
 
     translate_instruction(
-        Global,
         &*model,
         "__DecodeA64",
         &mut emitter,

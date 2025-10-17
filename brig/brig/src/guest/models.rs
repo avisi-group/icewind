@@ -2,14 +2,13 @@ use {
     crate::guest::{
         Translation,
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
-        get_current_guest, write_to_el,
+        get_current_guest,
     },
     alloc::{
         alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
         sync::Arc, vec::Vec,
     },
     common::{
-        Alloc,
         device::Device,
         hashmap::HashMap,
         intern::InternedString,
@@ -21,6 +20,7 @@ use {
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::{
+        bump_alloc::{BumpAllocator, BumpAllocatorRef},
         emitter::{Emitter, Type},
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
@@ -33,9 +33,8 @@ use {
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         devices::manager::SharedDeviceManager,
         fs::Filesystem,
-        memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
-    spin::Mutex,
+    spin::{Lazy, Mutex},
     x86_64::structures::paging::{PageSize, Size4KiB},
 };
 
@@ -52,6 +51,8 @@ const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
 static HIT_USERSPACE: AtomicBool = AtomicBool::new(false);
 
+pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
+    Lazy::new(|| BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE));
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
@@ -196,8 +197,6 @@ impl ModelDevice {
         // virtual to physical PCs
         let mut translation_cache = DirectMappedCache::<1024, u64>::new(1);
 
-        let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
-
         let _status = record_safepoint();
 
         log::debug!(
@@ -226,9 +225,9 @@ impl ModelDevice {
                 block_cache
                     .entry(block_start_physical_pc)
                     .or_insert_with(|| {
-                        allocator.clear();
+                        BUMP_ALLOCATOR.clear();
                         self.translate_block(
-                            BumpAllocatorRef::new(&allocator),
+                            BumpAllocatorRef::new(&BUMP_ALLOCATOR),
                             chain_cache.table as u64,
                             block_start_virtual_pc,
                             single_step_mode,
@@ -309,9 +308,9 @@ impl ModelDevice {
         }
     }
 
-    fn translate_block<A: Alloc>(
+    fn translate_block(
         &self,
-        allocator: A,
+        allocator: BumpAllocatorRef,
         chain_cache: u64,
         block_start_pc: u64,
         single_step_mode: bool,
@@ -350,7 +349,6 @@ impl ModelDevice {
             LAST_TRANSLATED_OPCODE.store(opcode, Ordering::Relaxed);
 
             let _return_value = translate_instruction(
-                allocator,
                 &*self.model,
                 "__DecodeA64",
                 &mut emitter,
@@ -565,5 +563,14 @@ pub extern "sysv64" fn prelude_debug(pc: u64, opcode: u64) {
                 .register_file
                 .read::<u8>("PSTATE_EL")
         )
+    }
+}
+
+pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
+    if old != new {
+        log::debug!("EL changed! {old} -> {new}");
+        // chain_cache.fill_keys(1);
+        // translation_cache.fill_keys(1);
+        VirtualMemoryArea::current().invalidate_guest_mappings();
     }
 }

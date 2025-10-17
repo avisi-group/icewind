@@ -5,16 +5,10 @@ use {
         Width,
         registers::Register::Physical as PHYS,
     },
-    common::Alloc,
     iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
 };
 
-pub fn encode<A: Alloc>(
-    assembler: &mut CodeAssembler,
-    src: &Operand<A>,
-    dst: &Operand<A>,
-    carry: &Operand<A>,
-) {
+pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry: &Operand) {
     match (src, dst, carry) {
         (
             Operand {

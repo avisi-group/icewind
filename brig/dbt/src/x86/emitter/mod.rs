@@ -1,5 +1,6 @@
 use {
     crate::{
+        bump_alloc::BumpAllocatorRef,
         emitter::{Emitter, Type},
         trampoline::ExecutionResult,
         x86::{
@@ -13,7 +14,7 @@ use {
     },
     alloc::{rc::Rc, vec::Vec},
     common::{
-        Alloc, GuestExecutionContext,
+        GuestExecutionContext,
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
@@ -26,7 +27,6 @@ use {
         mem::offset_of,
         panic,
     },
-    derive_where::derive_where,
 };
 
 mod to_operand;
@@ -42,19 +42,19 @@ pub enum X86Error {
     RegisterAllocation,
 }
 
-pub struct X86Emitter<'ctx, A: Alloc> {
-    current_block: Ref<X86Block<A>>,
-    current_block_operands: HashMap<X86NodeRef<A>, Operand<A>>,
-    panic_block: Ref<X86Block<A>>,
+pub struct X86Emitter<'ctx> {
+    current_block: Ref<X86Block>,
+    current_block_operands: HashMap<X86NodeRef, Operand>,
+    panic_block: Ref<X86Block>,
     next_vreg: usize,
     pub execution_result: ExecutionResult,
-    ctx: &'ctx mut X86TranslationContext<A>,
+    ctx: &'ctx mut X86TranslationContext,
     // node to global variable ID
-    sets_flags: HashMap<X86NodeRef<A>, usize>,
+    sets_flags: HashMap<X86NodeRef, usize>,
 }
 
-impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
-    pub fn new(ctx: &'ctx mut X86TranslationContext<A>) -> Self {
+impl<'a, 'ctx> X86Emitter<'ctx> {
+    pub fn new(ctx: &'ctx mut X86TranslationContext) -> Self {
         Self {
             current_block: ctx.initial_block(),
             current_block_operands: HashMap::default(),
@@ -66,15 +66,15 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    pub fn ctx(&self) -> &X86TranslationContext<A> {
+    pub fn ctx(&self) -> &X86TranslationContext {
         &self.ctx
     }
 
-    pub fn ctx_mut(&mut self) -> &mut X86TranslationContext<A> {
+    pub fn ctx_mut(&mut self) -> &mut X86TranslationContext {
         &mut self.ctx
     }
 
-    pub fn node(&self, node: X86Node<A>) -> X86NodeRef<A> {
+    pub fn node(&self, node: X86Node) -> X86NodeRef {
         X86NodeRef(Rc::new_in(node, self.ctx().allocator.clone()))
     }
 
@@ -84,13 +84,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         vreg
     }
 
-    pub fn push_instruction(&mut self, instr: Instruction<A>) {
+    pub fn push_instruction(&mut self, instr: Instruction) {
         self.current_block
             .get_mut(self.ctx.arena_mut())
             .append(instr);
     }
 
-    pub fn push_target(&mut self, target: Ref<X86Block<A>>) {
+    pub fn push_target(&mut self, target: Ref<X86Block>) {
         log::debug!("adding target {target:?} to {:?}", self.current_block);
         self.current_block
             .get_mut(self.ctx.arena_mut())
@@ -99,8 +99,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
     fn emit_call(
         &mut self,
-        function: X86NodeRef<A>,
-        arguments: Vec<X86NodeRef<A>, A>,
+        function: X86NodeRef,
+        arguments: Vec<X86NodeRef, BumpAllocatorRef>,
         has_return_value: bool,
     ) {
         let function = self.to_operand_reg_promote(&function);
@@ -136,7 +136,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
     }
 
-    fn mask(&mut self, start: X86NodeRef<A>, length: X86NodeRef<A>, width: u32) -> X86NodeRef<A> {
+    fn mask(&mut self, start: X86NodeRef, length: X86NodeRef, width: u32) -> X86NodeRef {
         let _1 = self.constant(1, Type::Unsigned(width));
 
         // mask = (1 << mask_length) - 1
@@ -151,11 +151,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
     fn bit_insert_64(
         &mut self,
-        target: X86NodeRef<A>,
-        source: X86NodeRef<A>,
-        start: X86NodeRef<A>,
-        length: X86NodeRef<A>,
-    ) -> X86NodeRef<A> {
+        target: X86NodeRef,
+        source: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
+    ) -> X86NodeRef {
         let mask = self.mask(start.clone(), length, target.typ().width());
 
         // invert because we want to make an emply slot for the source value to be
@@ -177,11 +177,11 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
     fn bit_insert_128(
         &mut self,
-        target: X86NodeRef<A>,
-        source: X86NodeRef<A>,
-        start: X86NodeRef<A>,
-        length: X86NodeRef<A>,
-    ) -> X86NodeRef<A> {
+        target: X86NodeRef,
+        source: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
+    ) -> X86NodeRef {
         if source.typ().width() > 64 {
             todo!()
         }
@@ -321,9 +321,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     }
 }
 
-impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
-    type NodeRef = X86NodeRef<A>;
-    type BlockRef = Ref<X86Block<A>>;
+impl<'ctx> Emitter for X86Emitter<'ctx> {
+    type NodeRef = X86NodeRef;
+    type BlockRef = Ref<X86Block>;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
@@ -386,7 +386,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         })
     }
 
-    fn unary_operation(&mut self, op: UnaryOperationKind<A>) -> Self::NodeRef {
+    fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef {
         use UnaryOperationKind::*;
 
         match &op {
@@ -525,7 +525,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         }
     }
 
-    fn binary_operation(&mut self, op: BinaryOperationKind<A>) -> Self::NodeRef {
+    fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef {
         use BinaryOperationKind::*;
 
         // todo: re-enable me
@@ -882,7 +882,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         }
     }
 
-    fn ternary_operation(&mut self, op: TernaryOperationKind<A>) -> Self::NodeRef {
+    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef {
         use TernaryOperationKind::*;
         match &op {
             AddWithCarry(src, dst, carry) => {
@@ -1948,7 +1948,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::int(n));
     }
 
-    fn create_tuple(&mut self, values: Vec<Self::NodeRef, A>) -> Self::NodeRef {
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef, BumpAllocatorRef>) -> Self::NodeRef {
         self.node(X86Node {
             typ: Type::Tuple,
             kind: NodeKind::Tuple(values),
@@ -2091,14 +2091,14 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         }
     }
 
-    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, A>) {
+    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, BumpAllocatorRef>) {
         self.emit_call(function, arguments, false);
     }
 
     fn call_with_return(
         &mut self,
         function: Self::NodeRef,
-        arguments: Vec<Self::NodeRef, A>,
+        arguments: Vec<Self::NodeRef, BumpAllocatorRef>,
     ) -> Self::NodeRef {
         self.emit_call(function, arguments, true);
 
@@ -2136,31 +2136,31 @@ fn signextend_64() {
     assert_eq!(64, sign_extend(64, 8, 64));
 }
 
-#[derive_where(Debug)]
-pub struct X86NodeRef<A: Alloc>(pub Rc<X86Node<A>, A>);
+#[derive(Debug)]
+pub struct X86NodeRef(pub Rc<X86Node, BumpAllocatorRef>);
 
-impl<A: Alloc> Clone for X86NodeRef<A> {
+impl Clone for X86NodeRef {
     fn clone(&self) -> Self {
         Self(Rc::clone(&self.0))
     }
 }
 
-impl<A: Alloc> Hash for X86NodeRef<A> {
+impl Hash for X86NodeRef {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Rc::as_ptr(&self.0).hash(state);
     }
 }
 
-impl<A: Alloc> Eq for X86NodeRef<A> {}
+impl Eq for X86NodeRef {}
 
-impl<A: Alloc> PartialEq for X86NodeRef<A> {
-    fn eq(&self, other: &X86NodeRef<A>) -> bool {
+impl PartialEq for X86NodeRef {
+    fn eq(&self, other: &X86NodeRef) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl<A: Alloc> X86NodeRef<A> {
-    pub fn kind(&self) -> &NodeKind<A> {
+impl X86NodeRef {
+    pub fn kind(&self) -> &NodeKind {
         &self.0.kind
     }
 
@@ -2169,15 +2169,14 @@ impl<A: Alloc> X86NodeRef<A> {
     }
 }
 
-#[derive_where(Debug)]
-pub struct X86Node<A: Alloc> {
+#[derive(Debug)]
+pub struct X86Node {
     pub typ: Type,
-    pub kind: NodeKind<A>,
+    pub kind: NodeKind,
 }
 
-#[derive(Clone)]
-#[derive_where(Debug, PartialEq, Eq)]
-pub enum NodeKind<A: Alloc> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NodeKind {
     Constant {
         value: u64,
         width: u32,
@@ -2187,18 +2186,18 @@ pub enum NodeKind<A: Alloc> {
         offset: u64,
     },
     ReadMemory {
-        address: X86NodeRef<A>,
+        address: X86NodeRef,
     },
-    UnaryOperation(UnaryOperationKind<A>),
-    BinaryOperation(BinaryOperationKind<A>),
-    TernaryOperation(TernaryOperationKind<A>),
+    UnaryOperation(UnaryOperationKind),
+    BinaryOperation(BinaryOperationKind),
+    TernaryOperation(TernaryOperationKind),
     Cast {
-        value: X86NodeRef<A>,
+        value: X86NodeRef,
         kind: CastOperationKind,
     },
     Shift {
-        value: X86NodeRef<A>,
-        amount: X86NodeRef<A>,
+        value: X86NodeRef,
+        amount: X86NodeRef,
         kind: ShiftOperationKind,
     },
     ReadStackVariable {
@@ -2207,70 +2206,67 @@ pub enum NodeKind<A: Alloc> {
         width: u32,
     },
     BitExtract {
-        value: X86NodeRef<A>,
-        start: X86NodeRef<A>,
-        length: X86NodeRef<A>,
+        value: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
     },
     BitInsert {
-        target: X86NodeRef<A>,
-        source: X86NodeRef<A>,
-        start: X86NodeRef<A>,
-        length: X86NodeRef<A>,
+        target: X86NodeRef,
+        source: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
     },
     BitReplicate {
-        pattern: X86NodeRef<A>,
-        count: X86NodeRef<A>,
+        pattern: X86NodeRef,
+        count: X86NodeRef,
     },
     GetFlags {
-        operation: X86NodeRef<A>,
+        operation: X86NodeRef,
     },
-    Tuple(Vec<X86NodeRef<A>, A>),
+    Tuple(Vec<X86NodeRef, BumpAllocatorRef>),
     Select {
-        condition: X86NodeRef<A>,
-        true_value: X86NodeRef<A>,
-        false_value: X86NodeRef<A>,
+        condition: X86NodeRef,
+        true_value: X86NodeRef,
+        false_value: X86NodeRef,
     },
     CallReturnValue,
 }
 
-#[derive(Clone)]
-#[derive_where(Debug, PartialEq, Eq)]
-pub enum BinaryOperationKind<A: Alloc> {
-    Add(X86NodeRef<A>, X86NodeRef<A>),
-    Sub(X86NodeRef<A>, X86NodeRef<A>),
-    Multiply(X86NodeRef<A>, X86NodeRef<A>),
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BinaryOperationKind {
+    Add(X86NodeRef, X86NodeRef),
+    Sub(X86NodeRef, X86NodeRef),
+    Multiply(X86NodeRef, X86NodeRef),
 
-    Divide(X86NodeRef<A>, X86NodeRef<A>),
-    Modulo(X86NodeRef<A>, X86NodeRef<A>),
-    And(X86NodeRef<A>, X86NodeRef<A>),
-    Or(X86NodeRef<A>, X86NodeRef<A>),
-    Xor(X86NodeRef<A>, X86NodeRef<A>),
-    PowI(X86NodeRef<A>, X86NodeRef<A>),
-    CompareEqual(X86NodeRef<A>, X86NodeRef<A>),
-    CompareNotEqual(X86NodeRef<A>, X86NodeRef<A>),
-    CompareLessThan(X86NodeRef<A>, X86NodeRef<A>),
-    CompareLessThanOrEqual(X86NodeRef<A>, X86NodeRef<A>),
-    CompareGreaterThan(X86NodeRef<A>, X86NodeRef<A>),
-    CompareGreaterThanOrEqual(X86NodeRef<A>, X86NodeRef<A>),
+    Divide(X86NodeRef, X86NodeRef),
+    Modulo(X86NodeRef, X86NodeRef),
+    And(X86NodeRef, X86NodeRef),
+    Or(X86NodeRef, X86NodeRef),
+    Xor(X86NodeRef, X86NodeRef),
+    PowI(X86NodeRef, X86NodeRef),
+    CompareEqual(X86NodeRef, X86NodeRef),
+    CompareNotEqual(X86NodeRef, X86NodeRef),
+    CompareLessThan(X86NodeRef, X86NodeRef),
+    CompareLessThanOrEqual(X86NodeRef, X86NodeRef),
+    CompareGreaterThan(X86NodeRef, X86NodeRef),
+    CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
 }
 
-#[derive(Clone)]
-#[derive_where(Debug, PartialEq, Eq)]
-pub enum UnaryOperationKind<A: Alloc> {
-    Not(X86NodeRef<A>),
-    Negate(X86NodeRef<A>),
-    Complement(X86NodeRef<A>),
-    Power2(X86NodeRef<A>),
-    Absolute(X86NodeRef<A>),
-    Ceil(X86NodeRef<A>),
-    Floor(X86NodeRef<A>),
-    SquareRoot(X86NodeRef<A>),
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UnaryOperationKind {
+    Not(X86NodeRef),
+    Negate(X86NodeRef),
+    Complement(X86NodeRef),
+    Power2(X86NodeRef),
+    Absolute(X86NodeRef),
+    Ceil(X86NodeRef),
+    Floor(X86NodeRef),
+    SquareRoot(X86NodeRef),
 }
 
-#[derive(Clone)]
-#[derive_where(Debug, PartialEq, Eq)]
-pub enum TernaryOperationKind<A: Alloc> {
-    AddWithCarry(X86NodeRef<A>, X86NodeRef<A>, X86NodeRef<A>),
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TernaryOperationKind {
+    AddWithCarry(X86NodeRef, X86NodeRef, X86NodeRef),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2337,10 +2333,7 @@ pub enum ShiftOperationKind {
 //     }
 // }
 
-fn emit_compare<A: Alloc>(
-    op: BinaryOperationKind<A>,
-    emitter: &mut X86Emitter<A>,
-) -> X86NodeRef<A> {
+fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef {
     use BinaryOperationKind::*;
 
     let (CompareLessThan(left, right)
@@ -2483,7 +2476,7 @@ fn emit_compare<A: Alloc>(
     }
 }
 
-fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> {
+fn contains_get_flags(value: &X86NodeRef) -> Option<X86NodeRef> {
     match value.kind() {
         NodeKind::GetFlags { operation } => Some(operation.clone()),
 
@@ -2545,7 +2538,7 @@ fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> 
     }
 }
 
-fn contains_addwithcarry<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> {
+fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
     match value.kind() {
         NodeKind::TernaryOperation(TernaryOperationKind::AddWithCarry(_, _, _)) => {
             Some(value.clone())
