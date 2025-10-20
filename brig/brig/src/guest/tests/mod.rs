@@ -2448,8 +2448,6 @@ fn highest_set_bit_dynamic() {
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    //   log::info!("{translation:?}");
-
     register_file.write::<u64>("R0", 0x1);
 
     translation.execute(&register_file);

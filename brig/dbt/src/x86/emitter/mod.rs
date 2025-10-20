@@ -1486,6 +1486,24 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                 self.binary_operation(BinaryOperationKind::And(cast, mask))
             }
+            (
+                _,
+                _,
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+            ) => {
+                // known length can at least pass that type information along
+                self.node(X86Node {
+                    typ: Type::Unsigned(u32::try_from(*length_value).unwrap()),
+                    kind: NodeKind::BitExtract {
+                        value,
+                        start,
+                        length,
+                    },
+                })
+            }
             // todo: handle this here, only pass down when we need bextr?
             _ => self.node(X86Node {
                 typ,

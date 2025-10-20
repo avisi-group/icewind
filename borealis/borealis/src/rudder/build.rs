@@ -971,103 +971,22 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //    } else {
                 //         return op & ~(bit << n);
                 //    }
-                let op = cast(
-                    self.block,
-                    self.block_arena_mut(),
-                    args[0].clone(),
-                    Type::u64(),
-                );
+                let op = args[0].clone();
                 let n = args[1].clone();
-                let bit = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Cast {
-                        kind: CastOperationKind::ZeroExtend,
-                        typ: (Type::u64()),
-                        value: args[2].clone(),
-                    },
-                );
+                let bit = args[2].clone();
 
                 // 1
-                let one = build(
+                let _1 = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant(Constant::new_unsigned(1, 64)),
                 );
 
-                // (bit & 1)
-                let and = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: bit.clone(),
-                        rhs: one.clone(),
-                    },
-                );
-
-                //  (bit & 1) == 1
-                let condition = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::CompareEqual,
-                        lhs: and,
-                        rhs: one,
-                    },
-                );
-
-                // bit << n
-                let shift = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: bit.clone(),
-                        amount: n,
-                    },
-                );
-
-                // op | (bit << n)
-                let true_value = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: op.clone(),
-                        rhs: shift.clone(),
-                    },
-                );
-
-                // ~(bit << n)
-                let inverse = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::UnaryOperation {
-                        kind: UnaryOperationKind::Complement,
-                        value: shift,
-                    },
-                );
-
-                // op & ~(bit << n)
-                let false_value = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: op,
-                        rhs: inverse,
-                    },
-                );
 
                 Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Select {
-                        condition,
-                        true_value,
-                        false_value,
-                    },
+                    Statement::BitInsert { target: op, source: bit, start: n, width: _1 }
                 ))
             }
 

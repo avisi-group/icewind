@@ -332,7 +332,6 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::movzx(src, dst).unwrap())
                         }
                         (ZeroExtend, Greater) => {
-                            // todo: fix this
                             panic!(
                                 "cannot zero extend when src ({src}) is larger than dst ({dst})\ntarget type: {:?}\nvalue: {value:#?}",
                                 node.typ()
