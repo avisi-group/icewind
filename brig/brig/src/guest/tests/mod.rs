@@ -6639,8 +6639,6 @@ fn cnt_fuzz0() {
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    log::error!("{translation:?}");
-
     let z_offset = model.reg_offset("_Z");
 
     let q3_offset = z_offset + (3 * 256);
@@ -6739,7 +6737,6 @@ fn bitcount_dyn_ff() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
-    log::error!("{translation:?}");
 
     register_file.write("R0", 0xff);
 

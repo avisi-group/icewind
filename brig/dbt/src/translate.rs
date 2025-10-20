@@ -250,7 +250,7 @@ fn translate_with_variable_ids(
     FunctionTranslator::new(model, function, arguments, emitter, register_file).translate()
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 enum LocalVariable {
     Virtual { value: Option<X86NodeRef> },
     Stack { typ: emitter::Type, id: usize },
@@ -261,21 +261,6 @@ impl Default for LocalVariable {
         LocalVariable::Virtual { value: None }
     }
 }
-
-// we only care if the variable is virtual or on the stack?
-impl Hash for LocalVariable {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::mem::discriminant(self).hash(state);
-    }
-}
-
-impl PartialEq for LocalVariable {
-    fn eq(&self, other: &LocalVariable) -> bool {
-        core::mem::discriminant(self).eq(&core::mem::discriminant(other))
-    }
-}
-
-impl Eq for LocalVariable {}
 
 #[derive(Debug)]
 struct ReturnValue {
@@ -590,7 +575,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                         .instructions()
                         .is_empty()
                     {
-                        log::trace!("already visited");
+                        log::trace!("already visited x86 block: {x86_block:?}");
                         continue;
                     }
 
@@ -1239,6 +1224,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                             .entry((*false_target, variables.clone()))
                             .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
+
                         self.emitter.branch(condition, true_x86, false_x86);
                         Ok(StatementResult::ControlFlow(ControlFlow::Branch(
                             *true_target,

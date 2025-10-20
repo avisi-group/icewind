@@ -304,7 +304,7 @@ impl<'a> X86TranslationContext {
             all_blocks
         };
 
-        // log::error!("{}", dot::render(self.arena(), self.initial_block()));
+        log::debug!("{}", dot::render(self.arena(), self.initial_block()));
 
         let mut instructions = Vec::<Instruction>::new();
         let mut block_to_instruction_index = hashmap_in(self.allocator());
@@ -330,9 +330,9 @@ impl<'a> X86TranslationContext {
                 }
             });
 
-        // println!("\n\n\nPRE ALLOC");
+        // log::error!("\n\n\nPRE ALLOC");
         // for (idx, instr) in instructions.iter().enumerate() {
-        //     println!("{idx}: {instr}");
+        //     log::error!("{idx}: {instr}");
         // }
 
         register_allocator::allocate(
@@ -341,9 +341,9 @@ impl<'a> X86TranslationContext {
             self.global_register_offset,
         );
 
-        // println!("\n\n\nPOST ALLOC");
+        // log::error!("\n\n\nPOST ALLOC");
         // for (idx, instr) in instructions.iter().enumerate() {
-        //     println!("{idx}: {instr}");
+        //     log::error!("{idx}: {instr}");
         // }
 
         // Collapse labels
@@ -402,8 +402,6 @@ impl<'a> X86TranslationContext {
 
             instr.encode(&mut assembler, &block_labels);
         }
-
-        // log::debug!("{}", dot::render(self.arena(), self.initial_block()));
 
         // for (i, block) in all_blocks.iter().enumerate() {
         //     let block_label = label_map.get_mut(block).unwrap();
