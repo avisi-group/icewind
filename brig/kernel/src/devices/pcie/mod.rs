@@ -40,7 +40,7 @@ pub fn enumerate(
     let pci_driver_map = [
         (PciId::new(0x1af4, 0x1001), probe_virtio_block as ProbeFn),
         (PciId::new(0x8086, 0x2922), probe_ich9r),
-        (PciId::new(0x1af4, 0x1110), probe_ivshmem),
+        //(PciId::new(0x1af4, 0x1110), probe_ivshmem),
     ]
     .into_iter()
     .collect::<HashMap<_, _>>();
