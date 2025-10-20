@@ -56,6 +56,13 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 || bit_extract_of_bit_insert(arena, stmt, value, start, width)
         }
 
+        Statement::BitInsert {
+            target,
+            source,
+            start,
+            width,
+        } => bit_insert_entire_value(arena, stmt, target, source, start, width),
+
         Statement::CreateBits { value, width } => create_bits(arena, stmt, value, width),
 
         _ => {
@@ -73,17 +80,25 @@ fn bit_extract_entire_value(
     start: Ref<Statement>,
     width: Ref<Statement>,
 ) -> bool {
-    let Statement::Constant(Constant::SignedInteger { value: 0, .. }) = start.get(arena) else {
+    let Statement::Constant(
+        Constant::SignedInteger { value: 0, .. } | Constant::UnsignedInteger { value: 0, .. },
+    ) = start.get(arena)
+    else {
         return false;
     };
 
-    let Statement::Constant(Constant::SignedInteger { value: width, .. }) = width.get(arena) else {
+    let Statement::Constant(width) = width.get(arena) else {
         return false;
+    };
+    let width = match width {
+        Constant::UnsignedInteger { value, .. } => i64::try_from(*value).unwrap(),
+        Constant::SignedInteger { value, .. } => *value,
+        _ => panic!(),
     };
 
     let value = value.get(arena).clone();
 
-    if *width != i64::try_from(value.typ(arena).unwrap().width_bits()).unwrap() {
+    if width != i64::try_from(value.typ(arena).unwrap().width_bits()).unwrap() {
         return false;
     }
 
@@ -206,6 +221,47 @@ fn create_bits(
                 value: source_ref,
             },
         });
+
+    true
+}
+
+// bit insert of the entire target by the source should be replaced with the
+// source
+fn bit_insert_entire_value(
+    arena: &mut Arena<Statement>,
+    stmt: Ref<Statement>,
+    target: Ref<Statement>,
+    source: Ref<Statement>,
+    start: Ref<Statement>,
+    width: Ref<Statement>,
+) -> bool {
+    let Statement::Constant(
+        Constant::SignedInteger { value: 0, .. } | Constant::UnsignedInteger { value: 0, .. },
+    ) = start.get(arena)
+    else {
+        return false;
+    };
+
+    let Statement::Constant(width) = width.get(arena) else {
+        return false;
+    };
+    let width = match width {
+        Constant::UnsignedInteger { value, .. } => i64::try_from(*value).unwrap(),
+        Constant::SignedInteger { value, .. } => *value,
+        _ => panic!(),
+    };
+
+    let source = source.get(arena).clone();
+    let target = target.get(arena).clone();
+
+    // `width` must be the same as the target and source widths
+    if !(width == i64::try_from(source.typ(arena).unwrap().width_bits()).unwrap()
+        && width == i64::try_from(target.typ(arena).unwrap().width_bits()).unwrap())
+    {
+        return false;
+    }
+
+    stmt.get_mut(arena).replace(source);
 
     true
 }
