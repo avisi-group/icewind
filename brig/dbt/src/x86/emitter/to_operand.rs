@@ -333,12 +333,10 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                         }
                         (ZeroExtend, Greater) => {
                             // todo: fix this
-                            // panic!(
-                            //     "cannot zero extend when src ({src}) is larger than dst
-                            // ({dst})\ntarget type: {:?}\n{value:#?}",
-                            //     node.typ()
-                            // )
-                            self.push_instruction(Instruction::mov(src, dst).unwrap())
+                            panic!(
+                                "cannot zero extend when src ({src}) is larger than dst ({dst})\ntarget type: {:?}\nvalue: {value:#?}",
+                                node.typ()
+                            )
                         }
 
                         (SignExtend, Equal) => {

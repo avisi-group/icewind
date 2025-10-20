@@ -14,12 +14,12 @@ use {
     },
 };
 
-const SCALAR_DATA: &[u8] = include_bytes!("fuzz_scalar.postcard");
-const VECTOR_DATA: &[u8] = include_bytes!("fuzz_vector.postcard");
-
 #[ktest]
 fn fuzz_scalar() {
-    for test in postcard::from_bytes::<Vec<InstructionFuzzTest>>(SCALAR_DATA).unwrap() {
+    for test in
+        postcard::from_bytes::<Vec<InstructionFuzzTest>>(include_bytes!("fuzz_scalar.postcard"))
+            .unwrap()
+    {
         log::trace!(
             "running scalar fuzz test \"{:08x}\" {}",
             test.instruction,
@@ -39,9 +39,35 @@ fn fuzz_scalar() {
 
 #[ktest]
 fn fuzz_vector() {
-    for test in postcard::from_bytes::<Vec<InstructionFuzzTest>>(VECTOR_DATA).unwrap() {
+    for test in
+        postcard::from_bytes::<Vec<InstructionFuzzTest>>(include_bytes!("fuzz_vector.postcard"))
+            .unwrap()
+    {
         log::trace!(
             "running vector fuzz test \"{:08x}\" {}",
+            test.instruction,
+            test.test_number
+        );
+
+        run_test(
+            test.instruction,
+            test.test_number,
+            &test.pre_gprs,
+            &test.pre_fprs,
+            &test.post_gprs,
+            &test.post_fprs,
+        );
+    }
+}
+
+#[ktest]
+fn fuzz_float() {
+    for test in
+        postcard::from_bytes::<Vec<InstructionFuzzTest>>(include_bytes!("fuzz_float.postcard"))
+            .unwrap()
+    {
+        log::trace!(
+            "running float fuzz test \"{:08x}\" {}",
             test.instruction,
             test.test_number
         );
@@ -79,8 +105,8 @@ fn run_test(
 
     register_file.write::<u8>("PSTATE_EL", 1);
     register_file.write::<u64>("CPACR_EL1_bits", 0b11u64 << 20 | 0b11 << 24);
-    register_file.write::<u64>("SP_EL1", 0x400058f0);
-    register_file.write::<u64>("_PC", 0x40004f9c);
+    register_file.write::<u64>("SP_EL1", 0x400063b0);
+    register_file.write::<u64>("_PC", 0x40005a5c);
 
     translate_instruction(
         &*model,
@@ -117,7 +143,7 @@ fn run_test(
         .for_each(|(i, value)| {
             let read = register_file.read::<u64>(format!("R{i}"));
             if read != *value {
-                panic!("R{i} mismatch! expected {value}, got {}", read)
+                panic!("R{i} mismatch! expected {value:#x}, got {:#x}", read)
                 //log::error!("fuzz_{instruction:08x}_{index}")
             }
         });
@@ -125,7 +151,7 @@ fn run_test(
     post_fprs.iter().enumerate().for_each(|(i, value)| {
         let read = register_file.read_raw::<u128>(z_offset + (i * 256));
         if read != *value {
-            panic!("Q{i} mismatch! expected {value}, got {}", read)
+            panic!("Q{i} mismatch! expected {value:#x}, got {:#x}", read)
             //log::error!("fuzz_{instruction:08x}_{index}")
         }
     });
