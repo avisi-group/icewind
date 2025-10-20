@@ -2,6 +2,8 @@
 pub struct InstructionFuzzTest {
     pub test_number: usize,
     pub instruction: u32,
-    pub initial_state: [u64; 31],
-    pub post_state: [u64; 31],
+    pub pre_gprs: [u64; 32],
+    pub post_gprs: [u64; 32],
+    pub pre_fprs: [u128; 32],
+    pub post_fprs: [u128; 32],
 }

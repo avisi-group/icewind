@@ -6586,3 +6586,166 @@ fn poly32mod2() {
 
     assert_eq!(register_file.read::<u64>("R1"), 0x1e6a2c48);
 }
+
+#[common::ktest]
+fn umov_fuzz0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  0e013c80        umov    w0, v4.b[0]
+    // execute_aarch64_instrs_vector_transfer_integer_move_unsigned
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e013c80,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q4_offset = z_offset + (4 * 256);
+
+    register_file.write_raw::<u128>(
+        q4_offset.try_into().unwrap(),
+        0x9eb304522041182818bcf95624574a2b,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R0"), 0x2b);
+}
+
+#[ktest]
+fn cnt_fuzz0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 0e205879        cnt     v25.8b, v3.8b
+    // execute_aarch64_instrs_vector_arithmetic_unary_cnt
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e205879,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    log::error!("{translation:?}");
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q3_offset = z_offset + (3 * 256);
+    let q25_offset = z_offset + (25 * 256);
+
+    register_file.write_raw::<u128>(
+        q3_offset.try_into().unwrap(),
+        0xcdac94bff8150e4b85879e1bd76f6503,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q25_offset.try_into().unwrap()),
+        0x304050406060402
+    );
+}
+
+#[ktest]
+fn bitcount_const_0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let value = emitter.constant(0b0010_1010_1011, Type::Unsigned(32));
+
+    let count = translate(&*model, "BitCount", &[value], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        count.kind(),
+        &NodeKind::Constant {
+            value: 6,
+            width: 64
+        }
+    );
+}
+
+#[ktest]
+fn bitcount_const_max() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let value = emitter.constant(u64::from(u32::MAX), Type::Unsigned(32));
+
+    let count = translate(&*model, "BitCount", &[value], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        count.kind(),
+        &NodeKind::Constant {
+            value: 32,
+            width: 64
+        }
+    );
+}
+
+#[ktest]
+fn bitcount_dyn_0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let value = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(8));
+
+    let count = translate(&*model, "BitCount", &[value], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
+
+    emitter.write_register(model.reg_offset("R1"), count);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("R0", 0b0);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 0);
+}
+
+#[ktest]
+fn bitcount_dyn_ff() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let value = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(8));
+
+    let count = translate(&*model, "BitCount", &[value], &mut emitter, &register_file)
+        .unwrap()
+        .unwrap();
+
+    emitter.write_register(model.reg_offset("R1"), count);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+    log::error!("{translation:?}");
+
+    register_file.write("R0", 0xff);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R1"), 8);
+}
