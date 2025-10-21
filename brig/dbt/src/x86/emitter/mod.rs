@@ -1224,49 +1224,6 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 bit_extract(*value, *start, *length),
                 Type::Unsigned(u32::try_from(*length).unwrap()),
             ),
-            // register read direct
-            (
-                NodeKind::GuestRegister { offset },
-                NodeKind::Constant {
-                    value: bit_extract_offset,
-                    ..
-                },
-                NodeKind::Constant {
-                    value: length_value @ (8 | 16 | 32 | 64 | 128),
-                    ..
-                },
-            ) => {
-                let length = u32::try_from(*length_value).unwrap();
-
-                let new_typ = match typ {
-                    Type::Unsigned(_) => Type::Unsigned(length),
-                    _ => todo!("{typ:?}"),
-                };
-
-                assert!((bit_extract_offset % 8) == 0);
-
-                self.read_register(*offset + (bit_extract_offset / 8), new_typ)
-            }
-            // // register read with bitextract
-            // (
-            //     NodeKind::GuestRegister { offset },
-            //     NodeKind::Constant {
-            //         value: start_value, ..
-            //     },
-            //     NodeKind::Constant {
-            //         value: length_value,
-            //         ..
-            //     },
-            // ) => {
-            //     let start_quotient = start_value / 8;
-            //     let start_remainder = start_value % 8;
-            //     let length = u16::try_from(*length_value).unwrap();
-            //     let new_typ = match typ {
-            //         Type::Unsigned(_) => Type::Unsigned(length),
-            //         _ => todo!("{typ:?}"),
-            //     };
-            //     todo!();
-            // }
 
             // concat optimization
             (
@@ -1459,32 +1416,47 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     _ => value.clone(),
                 };
 
-                // // if we're extracting from an XMM, but we're only working on the lower 64
-                // bits, // just truncate it first this was done to avoid issues
-                // with non % 8 amounts // on xmm registers being disallowed
-                // let value = if value.typ().width() > 64 && *start_value + *length_value <= 64
-                // {     self.cast(value, Type::Unsigned(64),
-                // CastOperationKind::Truncate) } else {
-                //     value
-                // };
+                if let NodeKind::GuestRegister { offset } = value.kind()
+                    && matches!(*length_value, 8 | 16 | 32 | 64 | 128)
+                {
+                    let length = u32::try_from(*length_value).unwrap();
 
-                // value >> start && mask(length)
-                // should emit fixed shift?
-                let shifted =
-                    self.shift(value, start.clone(), ShiftOperationKind::LogicalShiftRight);
+                    let new_typ = match typ {
+                        Type::Unsigned(_) => Type::Unsigned(length),
+                        _ => todo!("{typ:?}"),
+                    };
 
-                let cast = self.cast(
-                    shifted,
-                    Type::Unsigned(u32::try_from(*length_value).unwrap()),
-                    CastOperationKind::Truncate,
-                );
+                    assert!((start_value % 8) == 0);
 
-                let mask = self.constant(
-                    mask(u32::try_from(*length_value).unwrap()),
-                    cast.typ().clone(),
-                );
+                    self.read_register(*offset + (start_value / 8), new_typ)
+                } else {
+                    // // if we're extracting from an XMM, but we're only working on the lower 64
+                    // bits, // just truncate it first this was done to avoid issues
+                    // with non % 8 amounts // on xmm registers being disallowed
+                    // let value = if value.typ().width() > 64 && *start_value + *length_value <= 64
+                    // {     self.cast(value, Type::Unsigned(64),
+                    // CastOperationKind::Truncate) } else {
+                    //     value
+                    // };
 
-                self.binary_operation(BinaryOperationKind::And(cast, mask))
+                    // value >> start && mask(length)
+                    // should emit fixed shift?
+                    let shifted =
+                        self.shift(value, start.clone(), ShiftOperationKind::LogicalShiftRight);
+
+                    let cast = self.cast(
+                        shifted,
+                        Type::Unsigned(u32::try_from(*length_value).unwrap()),
+                        CastOperationKind::Truncate,
+                    );
+
+                    let mask = self.constant(
+                        mask(u32::try_from(*length_value).unwrap()),
+                        cast.typ().clone(),
+                    );
+
+                    self.binary_operation(BinaryOperationKind::And(cast, mask))
+                }
             }
             (
                 _,
@@ -2294,7 +2266,6 @@ impl PartialEq for X86NodeRef {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
-
 impl X86NodeRef {
     pub fn kind(&self) -> &NodeKind {
         &self.0.kind

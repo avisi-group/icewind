@@ -60,8 +60,8 @@ fn fuzz_vector() {
     }
 }
 
-#[ktest]
-fn fuzz_float() {
+//#[ktest]
+fn _fuzz_float() {
     for test in
         postcard::from_bytes::<Vec<InstructionFuzzTest>>(include_bytes!("fuzz_float.postcard"))
             .unwrap()

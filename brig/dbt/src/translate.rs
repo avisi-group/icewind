@@ -21,10 +21,7 @@ use {
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         width_helpers::unsigned_smallest_width_of_value,
     },
-    core::{
-        hash::{Hash, Hasher},
-        panic,
-    },
+    core::{hash::Hash, panic},
     itertools::Itertools,
 };
 
