@@ -676,28 +676,28 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     //     )
                     // }
 
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     value.kind(),
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        value.kind(),
+                    );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    // log::trace!(
-                    //     "{} {} = ()",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    // );
+                    log::trace!(
+                        "{} {} = ()",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                    );
                 }
                 StatementResult::ControlFlow(block_result) => {
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     block_result
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        block_result
+                    );
                     return Ok(block_result);
                 }
             }
@@ -798,8 +798,6 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                             || (symbol.name().as_ref() == "address"
                                 && self.function.name().as_ref()
                                     == "execute_aarch64_instrs_memory_pair_general_post_idx")
-                                    // terrible hack workaround for cmeq generating millions of blocks, there's some explosion (something like 2^(8 loops * 4 dynamic block choices))
-                                || (( symbol.name().as_ref() == "test_passed" || symbol.name().as_ref() == "element") && self.function.name().as_ref() == "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd")
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
