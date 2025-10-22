@@ -1013,11 +1013,13 @@ fn encode_compare(
         panic!("should've been fixed earlier")
     }
 
-    let is_signed = match (left.typ(), right.typ()) {
-        (Type::Unsigned(_) | Type::Bits | Type::Int, Type::Unsigned(_) | Type::Bits) => false,
-        (Type::Signed(_) | Type::Int, Type::Signed(_) | Type::Int) => true,
-        _ => panic!("different types in comparison:\n{left:?}\nand\n{right:?}"),
-    };
+    // let is_signed = match (left.typ(), right.typ()) {
+    //     (Type::Unsigned(_) | Type::Bits | Type::Int, Type::Unsigned(_) |
+    // Type::Bits) => false,     (Type::Signed(_) | Type::Int, Type::Signed(_) |
+    // Type::Int) => true,     _ => panic!("different types in
+    // comparison:\n{left:?}\nand\n{right:?}"), };
+    let is_signed = matches!(left.typ(), Type::Signed(_) | Type::Int)
+        || matches!(right.typ(), Type::Signed(_) | Type::Int);
 
     let left_op = emitter.to_operand(&left);
     let right_op = emitter.to_operand(&right);
