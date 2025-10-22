@@ -1,11 +1,15 @@
+#![no_std]
+
+extern crate alloc;
+
 use {
-    crate::guest::devices::primecell::PRIMECELL_ID,
     alloc::sync::Arc,
     common::device::{Device, IrqController, MemoryMappedDevice},
     core::sync::atomic::{AtomicU8, AtomicU32, AtomicUsize, Ordering},
 };
 
 const PERIPHERAL_ID: u32 = 0x00041190;
+const PRIMECELL_ID: u32 = 0xb105f00d;
 
 pub struct Pl190 {
     irq_status: AtomicU32,

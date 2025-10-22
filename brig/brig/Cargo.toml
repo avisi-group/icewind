@@ -11,6 +11,9 @@ kernel = { path = "../kernel" }
 dbt = { path = "../dbt" }
 common = { path = "../common" }
 
+pl011 = { path = "../devices/primecell/pl011" }
+virtio = { path = "../devices/virtio" }
+
 bootloader_api = "0.11.12"
 log = { version = "0.4.28", default-features = false }
 postcard = { version = "1.1.3", features = ["alloc"], default-features = false }
@@ -21,7 +24,7 @@ iced-x86 = { version = "1.21.0", default-features = false, features = [
     "block_encoder",
     "gas",
     "no_std",
-    "code_asm"
+    "code_asm",
 ] }
 elfloader = { git = "https://github.com/avisi-group/rust-elfloader", rev = "c7e6230" }
 spin = "0.10.0"
@@ -29,7 +32,5 @@ embedded-time = "0.12.1"
 disarm64 = "0.1.25"
 x86 = "0.52.0"
 linkme = "0.3.35"
-virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
-virtio-drivers = { version = "0.12.0", features = ["alloc"] }
 bitfields = "1.0.0"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }

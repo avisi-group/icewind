@@ -1,0 +1,15 @@
+[package]
+name = "virtio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+kernel.workspace = true
+
+log = { version = "0.4.28", default-features = false }
+spin = "0.10.0"
+x86 = "0.52.0"
+virtio-drivers = { version = "0.12.0", features = ["alloc"] }
+virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
+bitfields = "1.0.0"

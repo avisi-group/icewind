@@ -1,13 +1,11 @@
 use {
     crate::{
-        guest::devices::virtio::{
-            devices::Irq,
-            queue::defs::{BlkReq, BlkReqType},
-        },
-        arch::x86::memory::guest_physical_to_host_virt,
+        devices::Irq,
+        queue::defs::{BlkReq, BlkReqType},
     },
     alloc::vec::Vec,
     core::sync::atomic::AtomicU32,
+    kernel::arch::x86::memory::guest_physical_to_host_virt,
     x86::fence,
 };
 

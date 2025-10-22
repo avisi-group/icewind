@@ -1,5 +1,5 @@
 use {
-    crate::guest::devices::virtio::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
+    crate::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
     alloc::sync::Arc,
     common::device::{Device, IrqController, MemoryMappedDevice},
     kernel::{devices::manager::SharedDeviceManager, util::any_as_u8_slice},

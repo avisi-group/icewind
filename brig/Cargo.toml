@@ -1,6 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["dbt", "kernel", "proc_macro_lib", "common", "brig"]
+members = [
+    "dbt",
+    "kernel",
+    "proc_macro_lib",
+    "common",
+    "brig",
+    "devices/primecell/pl011",
+    "devices/primecell/pl190",
+    "devices/virtio",
+]
 
 [profile.release]
 debug = true
@@ -9,3 +18,7 @@ overflow-checks = false
 lto = "thin"
 incremental = true
 codegen-units = 1
+
+[workspace.dependencies]
+common = { path = "./common" }
+kernel = { path = "./kernel" }

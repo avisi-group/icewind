@@ -1,13 +1,9 @@
 use {
     crate::guest::{
-        devices::{
-            arm::{
-                a9gic::GlobalInterruptController,
-                generic_timer::GenericTimer,
-                mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
-            },
-            primecell::pl011::Pl011,
-            virtio::devices::block::VirtioBlock,
+        devices::arm::{
+            a9gic::GlobalInterruptController,
+            generic_timer::GenericTimer,
+            mmu::{AT_S1E1R, DC_ZVA, at_s1e1r_handler, dc_zva_handler},
         },
         models::ModelDevice,
     },
@@ -32,7 +28,9 @@ use {
     embedded_time::duration::Nanoseconds,
     iced_x86::{Formatter, Instruction},
     kernel::{arch::x86::memory::VirtualMemoryArea, fs::Filesystem},
+    pl011::Pl011,
     spin::Mutex,
+    virtio::devices::block::VirtioBlock,
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 

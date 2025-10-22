@@ -1,5 +1,5 @@
 use {
-    crate::guest::devices::virtio::queue::VirtQueue,
+    crate::queue::VirtQueue,
     alloc::{sync::Arc, vec::Vec},
     bitfields::bitfield,
     common::device::IrqController,

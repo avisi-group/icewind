@@ -1,0 +1,8 @@
+[package]
+name = "pl011"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+kernel.workspace = true

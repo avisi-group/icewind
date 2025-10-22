@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 use {
     alloc::sync::Arc,
     common::device::{Device, IrqController, MemoryMappedDevice},
