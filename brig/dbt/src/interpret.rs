@@ -664,7 +664,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
             };
 
             log::trace!(
-                "{}: block {block_ref:?}: {statement_ref:?} = {value:?}",
+                "{}: block {block_ref:?}: {statement_ref} = {value:?}",
                 self.function_name
             );
 
@@ -692,7 +692,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 values
                     .into_iter()
                     .enumerate()
-                    .map(|(i, value)| (i * width, value))
+                    .map(|(i, value)| (offset + (i * width), value))
                     .for_each(|(offset, value)| {
                         self.write_register(value, offset);
                     });
