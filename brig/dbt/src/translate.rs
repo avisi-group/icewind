@@ -21,7 +21,10 @@ use {
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         width_helpers::unsigned_smallest_width_of_value,
     },
-    core::{hash::Hash, panic},
+    core::{
+        hash::{Hash, Hasher},
+        panic,
+    },
     itertools::Itertools,
 };
 
@@ -44,13 +47,13 @@ enum JumpKind {
     Static {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: LocalVariableStore,
+        variables: VariableStore,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: LocalVariableStore,
+        variables: VariableStore,
     },
 }
 
@@ -62,8 +65,8 @@ enum StatementResult {
 
 #[derive(Debug, Clone)]
 enum ControlFlow {
-    Jump(Ref<Block>, Ref<X86Block>, LocalVariableStore),
-    Branch(Ref<Block>, Ref<Block>, LocalVariableStore),
+    Jump(Ref<Block>, Ref<X86Block>, VariableStore),
+    Branch(Ref<Block>, Ref<Block>, VariableStore),
     Panic,
     Return,
 }
@@ -240,20 +243,20 @@ fn translate_with_variable_ids(
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-enum LocalVariable {
+enum Variable {
     Virtual { value: Option<X86NodeRef> },
     Stack { typ: emitter::Type, id: usize },
 }
 
-impl Default for LocalVariable {
+impl Default for Variable {
     fn default() -> Self {
-        LocalVariable::Virtual { value: None }
+        Variable::Virtual { value: None }
     }
 }
 
 #[derive(Debug)]
 struct ReturnValue {
-    variables: Vec<LocalVariable, BumpAllocatorRef>,
+    variables: Vec<Variable, BumpAllocatorRef>,
     previous_write: Option<(Ref<X86Block>, usize)>,
 }
 
@@ -271,7 +274,7 @@ impl ReturnValue {
         let mut variables = Vec::with_capacity_in(num_variables, emitter.ctx().allocator());
 
         for _ in 0..num_variables {
-            variables.push(LocalVariable::default());
+            variables.push(Variable::default());
         }
 
         Self {
@@ -290,11 +293,10 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context> {
     /// Function being translated
     function: &'model Function,
 
-    dynamic_blocks:
-        HashMapA<(Ref<Block>, LocalVariableStore), (Ref<X86Block>, bool), BumpAllocatorRef>,
+    dynamic_blocks: HashMapA<(Ref<Block>, VariableStore), (Ref<X86Block>, bool), BumpAllocatorRef>,
     static_blocks: HashMapA<Ref<Block>, Vec<Ref<X86Block>>, BumpAllocatorRef>,
 
-    entry_variables: LocalVariableStore,
+    entry_variables: VariableStore,
 
     return_value: ReturnValue,
 
@@ -350,7 +352,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
             .return_value
             .variables
             .iter()
-            .map(|v| matches!(v, LocalVariable::Virtual { .. }))
+            .map(|v| matches!(v, Variable::Virtual { .. }))
             .all_equal_value()
             .expect("variables not all virtual or all stack");
 
@@ -380,7 +382,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     .into_iter()
                     .zip(types.into_iter())
                     .map(|(local_variable, typ)| {
-                        let LocalVariable::Virtual { value } = local_variable else {
+                        let Variable::Virtual { value } = local_variable else {
                             panic!()
                         };
 
@@ -392,7 +394,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                         // fix up the previous write
                         self.emitter.write_stack_variable(id, prev_value);
 
-                        LocalVariable::Stack {
+                        Variable::Stack {
                             typ: emit_rudder_type(&typ),
                             id,
                         }
@@ -470,7 +472,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
             function,
             dynamic_blocks: hashmap_in(emitter.ctx().allocator()),
             static_blocks: hashmap_in(emitter.ctx().allocator()),
-            entry_variables: LocalVariableStore::new_in(emitter.ctx().allocator()),
+            entry_variables: VariableStore::new_in(emitter.ctx().allocator()),
             promoted_locations: hashmap_in(emitter.ctx().allocator()),
             bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
             cached_registers: hashmap_in(emitter.ctx().allocator()),
@@ -489,7 +491,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
             .map(|(parameter, argument)| {
                 (
                     parameter.name(),
-                    LocalVariable::Virtual {
+                    Variable::Virtual {
                         value: Some(argument.clone()),
                     },
                 )
@@ -628,7 +630,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         &mut self,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-        mut variables: LocalVariableStore,
+        mut variables: VariableStore,
     ) -> Result<ControlFlow, Error> {
         let block = block_ref.get(self.function.arena());
 
@@ -704,7 +706,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         block: Ref<Block>,
 
         arena: &Arena<Statement>,
-        variables: &mut LocalVariableStore,
+        variables: &mut VariableStore,
     ) -> Result<StatementResult, Error> {
         //  log::trace!("translate stmt: {statement:?}");
 
@@ -785,7 +787,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
                     match variable {
-                        LocalVariable::Virtual { .. } => {
+                        Variable::Virtual { .. } => {
                             log::trace!(
                                 "promoting {:?} from virtual to stack in block {:#x} in {:?}",
                                 symbol.name(),
@@ -811,7 +813,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                                 id
                             };
 
-                            *variable = LocalVariable::Stack {
+                            *variable = Variable::Stack {
                                 typ: emit_rudder_type(&symbol.typ()),
                                 id,
                             };
@@ -820,7 +822,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                             let current_block = self.emitter.get_current_block();
                             self.emitter.set_current_block(current_block);
                         }
-                        LocalVariable::Stack { id, .. } => {
+                        Variable::Stack { id, .. } => {
                             log::debug!(
                                 "local var {:?} already on stack @ {:#x} in block {:#x} in {:?}",
                                 symbol.name(),
@@ -1368,12 +1370,12 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         })
     }
 
-    fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
+    fn read_variable(&mut self, variable: Variable) -> X86NodeRef {
         match variable {
-            LocalVariable::Virtual { value } => {
+            Variable::Virtual { value } => {
                 value.unwrap_or_else(|| panic!("local virtual variable never written to"))
             }
-            LocalVariable::Stack { id, typ } => {
+            Variable::Stack { id, typ } => {
                 let read = self.emitter.read_stack_variable(id, typ);
 
                 if matches!(typ, Type::Bits) {
@@ -1396,10 +1398,10 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         }
     }
 
-    fn write_variable(&mut self, variable: &mut LocalVariable, new_value: X86NodeRef) {
+    fn write_variable(&mut self, variable: &mut Variable, new_value: X86NodeRef) {
         match variable {
-            LocalVariable::Virtual { value } => *value = Some(new_value),
-            LocalVariable::Stack { typ, id } => {
+            Variable::Virtual { value } => *value = Some(new_value),
+            Variable::Stack { typ, id } => {
                 if matches!(typ, Type::Bits) {
                     // no panic even if we tried to write two different sizes to the stack :(
                     // this relies on the depth first block translation order
@@ -1479,38 +1481,52 @@ impl StatementValueStore {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct LocalVariableStore {
-    map: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+#[derive(Debug, Clone)]
+struct VariableStore {
+    map: BTreeMap<InternedString, Variable, BumpAllocatorRef>,
 }
 
-impl LocalVariableStore {
+impl VariableStore {
     pub fn new_in(allocator: BumpAllocatorRef) -> Self {
         Self {
             map: BTreeMap::new_in(allocator),
         }
     }
 
-    pub fn insert(&mut self, name: InternedString, var: LocalVariable) {
+    pub fn insert(&mut self, name: InternedString, var: Variable) {
         assert!(self.map.insert(name, var).is_none())
     }
 
-    pub fn get(&self, name: InternedString) -> Option<&LocalVariable> {
+    pub fn get(&self, name: InternedString) -> Option<&Variable> {
         self.map.get(&name)
     }
 
-    pub fn get_or_insert_default(&mut self, name: InternedString) -> &mut LocalVariable {
+    pub fn get_or_insert_default(&mut self, name: InternedString) -> &mut Variable {
         self.map.entry(name).or_insert_with(|| {
             log::trace!("writing var {name:?} for the first time");
-            LocalVariable::default()
+            Variable::default()
         })
     }
 }
 
-impl Extend<(InternedString, LocalVariable)> for LocalVariableStore {
-    fn extend<T: IntoIterator<Item = (InternedString, LocalVariable)>>(&mut self, iter: T) {
+impl Extend<(InternedString, Variable)> for VariableStore {
+    fn extend<T: IntoIterator<Item = (InternedString, Variable)>>(&mut self, iter: T) {
         for (name, var) in iter {
             self.insert(name, var);
         }
     }
 }
+
+impl Hash for VariableStore {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        alloc::format!("{:?}", self.map).hash(state);
+    }
+}
+
+impl PartialEq for VariableStore {
+    fn eq(&self, other: &VariableStore) -> bool {
+        alloc::format!("{:?}", self.map) == alloc::format!("{:?}", other.map)
+    }
+}
+
+impl Eq for VariableStore {}
