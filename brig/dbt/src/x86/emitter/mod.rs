@@ -2244,7 +2244,7 @@ fn signextend_64() {
     assert_eq!(64, sign_extend(64, 8, 64));
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub struct X86NodeRef(pub Rc<X86Node, BumpAllocatorRef>);
 
 impl Clone for X86NodeRef {
@@ -2253,19 +2253,6 @@ impl Clone for X86NodeRef {
     }
 }
 
-impl Hash for X86NodeRef {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
-    }
-}
-
-impl Eq for X86NodeRef {}
-
-impl PartialEq for X86NodeRef {
-    fn eq(&self, other: &X86NodeRef) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
-    }
-}
 impl X86NodeRef {
     pub fn kind(&self) -> &NodeKind {
         &self.0.kind
@@ -2276,13 +2263,13 @@ impl X86NodeRef {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct X86Node {
     pub typ: Type,
     pub kind: NodeKind,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum NodeKind {
     Constant {
         value: u64,
@@ -2339,7 +2326,7 @@ pub enum NodeKind {
     CallReturnValue,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum BinaryOperationKind {
     Add(X86NodeRef, X86NodeRef),
     Sub(X86NodeRef, X86NodeRef),
@@ -2359,7 +2346,7 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum UnaryOperationKind {
     Not(X86NodeRef),
     Negate(X86NodeRef),
@@ -2371,12 +2358,12 @@ pub enum UnaryOperationKind {
     SquareRoot(X86NodeRef),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum TernaryOperationKind {
     AddWithCarry(X86NodeRef, X86NodeRef, X86NodeRef),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -2386,7 +2373,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,

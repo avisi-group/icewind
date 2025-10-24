@@ -1481,7 +1481,7 @@ impl StatementValueStore {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VariableStore {
     map: BTreeMap<InternedString, Variable, BumpAllocatorRef>,
 }
@@ -1516,17 +1516,3 @@ impl Extend<(InternedString, Variable)> for VariableStore {
         }
     }
 }
-
-impl Hash for VariableStore {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        alloc::format!("{:?}", self.map).hash(state);
-    }
-}
-
-impl PartialEq for VariableStore {
-    fn eq(&self, other: &VariableStore) -> bool {
-        alloc::format!("{:?}", self.map) == alloc::format!("{:?}", other.map)
-    }
-}
-
-impl Eq for VariableStore {}
