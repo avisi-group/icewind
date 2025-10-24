@@ -24,6 +24,7 @@ pub fn run(_ctx: &OptimizationContext, model: &mut Model) -> bool {
         .functions()
         .par_iter()
         .filter(|(name, _)| !INTRINSICS.contains(&name.as_ref()))
+        .filter(|(name, _)| !name.as_ref().starts_with("init_register"))
         .filter(|(_, f)| f.block_iter().count() == 1)
         .map(|(name, f)| {
             //let block = f.entry_block().get(f.arena());

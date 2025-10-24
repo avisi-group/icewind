@@ -73,7 +73,6 @@ pub fn get(name: &str) -> Option<Arc<Model>> {
 
 pub fn load_all<FS: Filesystem>(fs: &mut FS) {
     log::info!("loading models");
-    // todo: don't hardcode this, load all .postcards?
 
     // todo: don't hardcode this, load all .postcards?
     ["aarch64.postcard"]

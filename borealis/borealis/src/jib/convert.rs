@@ -11,6 +11,7 @@ use {
         bitvector::{BV, b64::B64},
         ir::{Def, Exp, Instr, Loc, Ty},
     },
+    itertools::Itertools,
     num_bigint::BigInt,
     sailrs::shared::Shared,
     std::{borrow::Borrow, collections::BTreeMap},
@@ -113,7 +114,7 @@ pub struct BoomEmitter {
     /// separate
     function_types: HashMap<InternedString, (Parameters, Return)>,
     /// Register initialization statements (also letbinds)
-    register_init_statements: Vec<Shared<boom::Statement>>,
+    register_init_statements: HashMap<InternedString, Vec<Shared<boom::Statement>>>,
 }
 
 impl BoomEmitter {
@@ -134,9 +135,40 @@ impl BoomEmitter {
     pub fn finish(mut self) -> boom::Ast {
         // create register initialization function
         {
-            let entry_block = ControlFlowBlock::new();
+            let register_init_fns = self
+                .register_init_statements
+                .into_iter()
+                .map(|(name, statements)| {
+                    let name = format!("init_register_{name}").into();
+                    let entry_block = ControlFlowBlock::new();
+                    entry_block.set_statements(statements.clone());
+                    entry_block.set_terminator(boom::control_flow::Terminator::Return(None));
 
-            entry_block.set_statements(self.register_init_statements);
+                    let def = FunctionDefinition {
+                        signature: FunctionSignature {
+                            name,
+                            parameters: Shared::new(vec![]),
+                            return_type: None,
+                        },
+                        entry_block,
+                    };
+
+                    (name, def)
+                })
+                .collect::<Vec<_>>();
+
+            let calls = register_init_fns
+                .iter()
+                .map(|(name, _)| Statement::FunctionCall {
+                    expression: None,
+                    name: *name,
+                    arguments: vec![],
+                })
+                .map(Shared::new)
+                .collect();
+
+            let entry_block = ControlFlowBlock::new();
+            entry_block.set_statements(calls);
             entry_block.set_terminator(boom::control_flow::Terminator::Return(None));
 
             self.ast.functions.insert(
@@ -150,6 +182,8 @@ impl BoomEmitter {
                     entry_block,
                 },
             );
+
+            self.ast.functions.extend(register_init_fns);
         }
 
         // external functions
@@ -186,11 +220,15 @@ impl BoomEmitter {
         match definition {
             Def::Register(ident, typ, body) => {
                 self.ast.registers.insert(*ident, self.convert_type(typ));
-                let mut statements = body
+                let statements = body
                     .iter()
                     .flat_map(|i| self.convert_instruction(i))
                     .collect::<Vec<_>>();
-                self.register_init_statements.append(&mut statements);
+                assert!(
+                    self.register_init_statements
+                        .insert(*ident, statements)
+                        .is_none()
+                );
             }
             Def::Enum(name, variants) => {
                 self.ast.enums.insert(*name, variants.clone());
@@ -209,11 +247,18 @@ impl BoomEmitter {
                 bindings.iter().for_each(|(ident, typ)| {
                     self.ast.registers.insert(*ident, self.convert_type(typ));
                 });
-                let mut statements = body
+                let statements = body
                     .iter()
                     .flat_map(|i| self.convert_instruction(i))
                     .collect::<Vec<_>>();
-                self.register_init_statements.append(&mut statements);
+
+                let ident = bindings.iter().map(|(ident, _)| *ident).join("_").into();
+
+                assert!(
+                    self.register_init_statements
+                        .insert(ident, statements)
+                        .is_none()
+                );
             }
             Def::Extern(id, _, _, parameters, out) | Def::Val(id, parameters, out) => {
                 self.function_types.insert(

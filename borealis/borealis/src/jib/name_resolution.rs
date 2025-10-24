@@ -83,7 +83,8 @@ impl<'ir> ResolverState<'ir> {
             .replace("z5", "%")
             .replace("zI", "<")
             .replace("zK", ">")
-            .replace("zD", "-");
+            .replace("zD", "-")
+            .replace("zzext", "zext");
 
         InternedString::from(str)
     }
