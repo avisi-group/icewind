@@ -6731,13 +6731,12 @@ fn cmeq_v116b() {
 
     // 4e209801        cmeq    v1.16b, v0.16b, #0
     // execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd
-    let opcode = emitter.constant(0x4e209801, Type::Unsigned(32));
-    translate(
+    translate_instruction(
         &*model,
         "__DecodeA64",
-        &[opcode],
         &mut emitter,
         &register_file,
+        0x4e209801,
     )
     .unwrap();
 
@@ -6933,8 +6932,6 @@ fn addp_8h_inner_elements_3() {
         q30_offset.try_into().unwrap(),
         0xdb7db577b6b6f48470825a89c7944092u128,
     );
-
-    log::error!("{translation:?}");
 
     translation.execute(&register_file);
 

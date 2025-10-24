@@ -44,13 +44,13 @@ enum JumpKind {
     Static {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+        variables: LocalVariableStore,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+        variables: LocalVariableStore,
     },
 }
 
@@ -62,16 +62,8 @@ enum StatementResult {
 
 #[derive(Debug, Clone)]
 enum ControlFlow {
-    Jump(
-        Ref<Block>,
-        Ref<X86Block>,
-        BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
-    ),
-    Branch(
-        Ref<Block>,
-        Ref<Block>,
-        BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
-    ),
+    Jump(Ref<Block>, Ref<X86Block>, LocalVariableStore),
+    Branch(Ref<Block>, Ref<Block>, LocalVariableStore),
     Panic,
     Return,
 }
@@ -298,17 +290,11 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context> {
     /// Function being translated
     function: &'model Function,
 
-    dynamic_blocks: HashMapA<
-        (
-            Ref<Block>,
-            BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
-        ),
-        (Ref<X86Block>, bool),
-        BumpAllocatorRef,
-    >,
+    dynamic_blocks:
+        HashMapA<(Ref<Block>, LocalVariableStore), (Ref<X86Block>, bool), BumpAllocatorRef>,
     static_blocks: HashMapA<Ref<Block>, Vec<Ref<X86Block>>, BumpAllocatorRef>,
 
-    entry_variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+    entry_variables: LocalVariableStore,
 
     return_value: ReturnValue,
 
@@ -484,7 +470,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
             function,
             dynamic_blocks: hashmap_in(emitter.ctx().allocator()),
             static_blocks: hashmap_in(emitter.ctx().allocator()),
-            entry_variables: BTreeMap::new_in(emitter.ctx().allocator()),
+            entry_variables: LocalVariableStore::new_in(emitter.ctx().allocator()),
             promoted_locations: hashmap_in(emitter.ctx().allocator()),
             bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
             cached_registers: hashmap_in(emitter.ctx().allocator()),
@@ -642,7 +628,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         &mut self,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-        mut variables: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+        mut variables: LocalVariableStore,
     ) -> Result<ControlFlow, Error> {
         let block = block_ref.get(self.function.arena());
 
@@ -718,7 +704,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
         block: Ref<Block>,
 
         arena: &Arena<Statement>,
-        variables: &mut BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+        variables: &mut LocalVariableStore,
     ) -> Result<StatementResult, Error> {
         //  log::trace!("translate stmt: {statement:?}");
 
@@ -761,7 +747,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 }))
             }
             Statement::ReadVariable { symbol } => {
-                let Some(var) = variables.get(&symbol.name()).cloned() else {
+                let Some(var) = variables.get(symbol.name()).cloned() else {
                     panic!(
                         "attempted to read {} in block {:#x} in {:?} before it was written to",
                         symbol.name(),
@@ -788,10 +774,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     self.function.name()
                 );
 
-                let variable = variables.entry(symbol.name()).or_insert_with(|| {
-                    log::trace!("writing var {} for the first time", symbol.name());
-                    LocalVariable::default()
-                });
+                let variable = variables.get_or_insert_default(symbol.name());
 
                 if is_dynamic
                         // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
@@ -1214,7 +1197,12 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                         let true_x86 = (*self
                             .dynamic_blocks
                             .entry((*true_target, variables.clone()))
-                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
+                            .or_insert_with(|| {
+                                // log::error!(
+                                //     "creating new dyn block for rudder block {true_target:?} with
+                                // variables:\n{variables:#?}" );
+                                (self.emitter.ctx_mut().create_block(), false)
+                            }))
                         .0;
                         let false_x86 = (*self
                             .dynamic_blocks
@@ -1488,5 +1476,41 @@ impl StatementValueStore {
             .map(|(_, node)| node)
             .unwrap()
             .clone()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+struct LocalVariableStore {
+    map: BTreeMap<InternedString, LocalVariable, BumpAllocatorRef>,
+}
+
+impl LocalVariableStore {
+    pub fn new_in(allocator: BumpAllocatorRef) -> Self {
+        Self {
+            map: BTreeMap::new_in(allocator),
+        }
+    }
+
+    pub fn insert(&mut self, name: InternedString, var: LocalVariable) {
+        assert!(self.map.insert(name, var).is_none())
+    }
+
+    pub fn get(&self, name: InternedString) -> Option<&LocalVariable> {
+        self.map.get(&name)
+    }
+
+    pub fn get_or_insert_default(&mut self, name: InternedString) -> &mut LocalVariable {
+        self.map.entry(name).or_insert_with(|| {
+            log::trace!("writing var {name:?} for the first time");
+            LocalVariable::default()
+        })
+    }
+}
+
+impl Extend<(InternedString, LocalVariable)> for LocalVariableStore {
+    fn extend<T: IntoIterator<Item = (InternedString, LocalVariable)>>(&mut self, iter: T) {
+        for (name, var) in iter {
+            self.insert(name, var);
+        }
     }
 }
