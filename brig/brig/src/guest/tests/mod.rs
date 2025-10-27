@@ -4,9 +4,9 @@ use {
         devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
         models::{self, BUMP_ALLOCATOR, write_to_el},
     },
-    alloc::{alloc::Global, boxed::Box, sync::Arc, vec::Vec},
+    alloc::{boxed::Box, sync::Arc, vec::Vec},
     common::{
-        bits::{bit_insert, mask},
+        bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
         ktest,
         rudder::Model,
@@ -14,7 +14,7 @@ use {
     },
     core::{panic, u128},
     dbt::{
-        bump_alloc::{BumpAllocator, BumpAllocatorRef},
+        bump_alloc::BumpAllocatorRef,
         emitter::{Emitter, Type},
         interpret::{self, Value, interpret},
         register_file::RegisterFile,
@@ -6045,8 +6045,6 @@ fn ror_modulo() {
 //     let num_regs = emitter.next_vreg();
 //     let translation = Translation::new(ctx.compile(num_regs));
 
-//     log::error!("{translation:?}");
-
 //     let z_offset = model.reg_offset("_Z");
 
 //     let q4_offset = z_offset + (4 * 256);
@@ -6939,4 +6937,148 @@ fn addp_8h_inner_elements_3() {
         register_file.read_raw::<u128>(q24_offset.try_into().unwrap()),
         0xab3a_cb0b_0826
     );
+}
+
+#[ktest]
+fn umov_b3_execute() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let d = emitter.constant(28, Type::Signed(64));
+    let datasize = emitter.constant(32, Type::Signed(64));
+    let esize = emitter.constant(8, Type::Signed(64));
+    let idxdsize = emitter.constant(64, Type::Signed(64));
+    let index = emitter.constant(3, Type::Signed(64));
+    let n = emitter.constant(25, Type::Signed(64));
+
+    // 0e073f3c        umov    w28, v25.b[3]
+    // execute_aarch64_instrs_vector_transfer_integer_move_unsigned
+    translate(
+        &*model,
+        "execute_aarch64_instrs_vector_transfer_integer_move_unsigned",
+        &[d, datasize, esize, idxdsize, index, n],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q25_offset = z_offset + (25 * 256);
+
+    register_file.write_raw::<u128>(
+        q25_offset.try_into().unwrap(),
+        0xd6b4dbe5e946b47fa2f61697_02_d4_61_a2u128,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R28"), 0x2);
+}
+
+#[ktest]
+fn umov_b3_decode() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // direct call works, bug is in decode index calculation
+
+    // 0e073f3c        umov    w28, v25.b[3]
+    // decode_umov_advsimd_aarch64_instrs_vector_transfer_integer_move_unsigned
+    // execute_aarch64_instrs_vector_transfer_integer_move_unsigned
+
+    let rd = emitter.constant(28, Type::Unsigned(5));
+    let rn = emitter.constant(25, Type::Unsigned(5));
+    let imm5 = emitter.constant(7, Type::Unsigned(5));
+    let q = emitter.constant(0, Type::Unsigned(1));
+
+    translate(
+        &*model,
+        "decode_umov_advsimd_aarch64_instrs_vector_transfer_integer_move_unsigned",
+        &[rd, rn, imm5, q],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q25_offset = z_offset + (25 * 256);
+
+    register_file.write_raw::<u128>(
+        q25_offset.try_into().unwrap(),
+        0xd6b4dbe5e946b47fa2f61697_02_d4_61_a2u128,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R28"), 0x2);
+}
+
+#[ktest]
+fn bit_extract_index() {
+    assert_eq!(3, bit_extract(0x7, 1, 4));
+}
+
+#[ktest]
+fn bit_extract_index_emitter() {
+    let (_, _, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let imm5 = emitter.constant(7, Type::Unsigned(5));
+    let start = emitter.constant(1, Type::Signed(64));
+    let length = emitter.constant(4, Type::Signed(64));
+
+    assert_eq!(
+        emitter.bit_extract(imm5, start, length).kind(),
+        &NodeKind::Constant { value: 3, width: 4 }
+    );
+}
+
+#[ktest]
+fn umov_b3() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // direct call works, bug is in decode index calculation
+
+    // 0e073f3c        umov    w28, v25.b[3]
+    // decode_umov_advsimd_aarch64_instrs_vector_transfer_integer_move_unsigned
+    // execute_aarch64_instrs_vector_transfer_integer_move_unsigned
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e073f3c,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q25_offset = z_offset + (25 * 256);
+
+    register_file.write_raw::<u128>(
+        q25_offset.try_into().unwrap(),
+        0xd6b4dbe5e946b47fa2f61697_02_d4_61_a2u128,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R28"), 0x2);
 }

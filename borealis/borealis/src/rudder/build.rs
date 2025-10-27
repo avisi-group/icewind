@@ -1366,7 +1366,54 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
 
 
+
             /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
+            "unsigned_subrange" => {
+                let xs = args[0].clone();
+                let i = args[1].clone();
+                let j = args[2].clone();
+
+                // let diff = build(
+                //     self.block,
+                //     self.block_arena_mut(),
+                //     Statement::BinaryOperation {
+                //         kind: BinaryOperationKind::Sub,
+                //         lhs: i,
+                //         rhs: j.clone(),
+                //     },
+                // );
+
+                // let const_1 = build(
+                //     self.block,
+                //     self.block_arena_mut(),
+                //     Statement::Constant(Constant::new_signed(1, 64)),
+                // );
+
+                // let width =  build(
+                //     self.block,
+                //     self.block_arena_mut(),
+                //     Statement::BinaryOperation {
+                //         kind: BinaryOperationKind::Add,
+                //         lhs: diff,
+                //         rhs: const_1,
+                //     },
+                // );
+
+                let extracted = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitExtract { value: xs, start: j, width: i }
+                );
+
+                let cast = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast { kind: CastOperationKind::ZeroExtend, typ: Type::s64(), value: extracted }
+                );
+
+                Some(cast)
+            }
+
             "AddWithCarry" => {
                 let x = args[0].clone();
                 let y = args[1].clone();
