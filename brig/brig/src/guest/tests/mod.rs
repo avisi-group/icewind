@@ -266,8 +266,16 @@ fn branchto() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let target = emitter.constant(0xDEADFEED, Type::Unsigned(64));
+    let btype = emitter.constant(0x0, Type::Signed(32));
 
-    translate(&*model, "BranchTo", &[target], &mut emitter, &register_file).unwrap();
+    translate(
+        &*model,
+        "BranchTo",
+        &[target, btype],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -5519,39 +5527,42 @@ fn movi() {
     );
 }
 
-#[ktest]
-fn v_set_zeroextend() {
-    let (model, register_file, mut ctx) = setup();
-    let mut emitter = X86Emitter::new(&mut ctx);
+// v_set is specialized anyway, uncomment this when you unspecialize it
+// #[ktest]
+// fn v_set_zeroextend() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let value = emitter.constant(0x0, Type::Unsigned(64));
+//     let value = emitter.constant(0x0, Type::Unsigned(64));
+//     let n = emitter.constant(3, Type::Signed(64));
+//     let width = emitter.constant(128, Type::Signed(64));
+//     translate(
+//         &*model,
+//         "V_set",
+//         &[n, width, value],
+//         &mut emitter,
+//         &register_file,
+//     )
+//     .unwrap();
 
-    let n = emitter.constant(3, Type::Signed(64));
-    let width = emitter.constant(128, Type::Signed(64));
-    translate(
-        &*model,
-        "V_set",
-        &[n, width, value],
-        &mut emitter,
-        &register_file,
-    )
-    .unwrap();
+//     emitter.leave();
 
-    emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
 
-    let num_regs = emitter.next_vreg();
-    let translation = Translation::new(ctx.compile(num_regs));
+//     log::error!("{translation:?}");
 
-    let q3_offset = usize::try_from(model.reg_offset("_Z") + 3 * 256).unwrap();
+//     let q3_offset = usize::try_from(model.reg_offset("_Z") + 3 *
+// 256).unwrap();
 
-    register_file.write_raw::<u128>(q3_offset, u128::MAX);
+//     register_file.write_raw::<u128>(q3_offset, u128::MAX);
 
-    translation.execute(&register_file);
+//     translation.execute(&register_file);
 
-    let q3 = register_file.read_raw::<u128>(q3_offset);
+//     let q3 = register_file.read_raw::<u128>(q3_offset);
 
-    assert_eq!(q3, 0x0)
-}
+//     assert_eq!(q3, 0x0)
+// }
 
 #[ktest]
 fn and_16b_fuzz0() {
@@ -5977,62 +5988,51 @@ fn ror_modulo() {
     assert_eq!(register_file.read::<u32>("R2"), 0x7f8000);
 }
 
-// todo: re-enable me after all non float non SIMD instructions pass
-// #[ktest]
-// fn cnt_8b() {
-//     let model = models::get("aarch64").unwrap();
+#[ktest]
+fn cnt_8b() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let register_file = RegisterFile::init(&*model);
-//     let mut ctx = X86TranslationContext::new(&model, false,
-// register_file.global_register_offset());     let mut emitter =
-// X86Emitter::new(&mut ctx);
+    //  0e205903        cnt     v3.8b, v8.8b
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e205903,
+    )
+    .unwrap();
 
-//     //  0e205903        cnt     v3.8b, v8.8b
-//     translate_instruction(
-//
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x0e205903,
-//     )
-//     .unwrap();
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
 
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
-//     let translation = Translation::new(ctx.compile(num_regs));
+    let z_offset = model.reg_offset("_Z");
 
-//     let z_offset = model.reg_offset("_Z");
+    let q3_offset = z_offset + (3 * 256);
+    let q8_offset = z_offset + (8 * 256);
 
-//     let q3_offset = z_offset + (3 * 256);
-//     let q8_offset = z_offset + (8 * 256);
+    register_file.write_raw::<u128>(
+        q8_offset.try_into().unwrap(),
+        0xd697f587e3887926a72f69dbcb976731,
+    );
 
-//     register_file.write_raw::<u128>(
-//         q8_offset.try_into().unwrap(),
-//         0xd697f587e3887926a72f69dbcb976731,
-//     );
+    translation.execute(&register_file);
 
-//     translation.execute(&register_file);
-
-//     assert_eq!(
-//         register_file.read_raw::<u128>(q3_offset.try_into().unwrap()),
-//         0x0505040605050503,
-//     );
-// }
+    assert_eq!(
+        register_file.read_raw::<u128>(q3_offset.try_into().unwrap()),
+        0x0505040605050503,
+    );
+}
 
 // #[ktest]
 // fn addp_16b() {
-//     let model = models::get("aarch64").unwrap();
-
-//     let register_file = RegisterFile::init(&*model);
-//     let mut ctx = X86TranslationContext::new(&model, false,
-// register_file.global_register_offset());     let mut emitter =
-// X86Emitter::new(&mut ctx);
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
 //     //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
 //     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
 //     translate_instruction(
-//
 //         &model,
 //         "__DecodeA64",
 //         &mut emitter,

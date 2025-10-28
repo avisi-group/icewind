@@ -29,10 +29,11 @@ use {
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
+    embedded_time::duration::Nanoseconds,
     kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
-        devices::manager::SharedDeviceManager,
         fs::Filesystem,
+        timer::{GLOBAL_CLOCK, GlobalClock},
     },
     spin::{Lazy, Mutex},
     x86_64::structures::paging::{PageSize, Size4KiB},
@@ -49,10 +50,9 @@ const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
-static HIT_USERSPACE: AtomicBool = AtomicBool::new(false);
-
 pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
     Lazy::new(|| BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE));
+
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
@@ -267,10 +267,17 @@ impl ModelDevice {
             //     // "{block_start_virtual_pc:#018x}").unwrap();
             // }
 
+            // if GLOBAL_CLOCK.now() > Nanoseconds::new(6u64 * 1_000_000_000) {
+            //     log::error!(
+            //         "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
+            //         translated_block.opcodes,
+            //     );
+            // } else {
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
                 translated_block.opcodes,
             );
+            // }
 
             // LAST_EXECUTED_OPCODE.store(
             //     *translated_block.opcodes.first().unwrap(),

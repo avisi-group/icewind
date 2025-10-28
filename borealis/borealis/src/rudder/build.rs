@@ -1475,18 +1475,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::BinaryOperation { kind: BinaryOperationKind::Multiply, lhs: n, rhs: _256 });
 
-                    let offset = build(
+                let offset = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::BinaryOperation { kind: BinaryOperationKind::Add, lhs:z , rhs: offset });
 
-                    Some(build(
+                Some(build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::WriteRegister { offset, value: zero_extended},
                 ))
-
-
             }
 
             // /* To maintain correctness, borealis must only specialize on actual Sail compiler
