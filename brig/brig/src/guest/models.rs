@@ -21,7 +21,7 @@ use {
     core::{
         alloc::Layout,
         fmt::{self, Debug},
-        sync::atomic::{AtomicBool, AtomicU32, Ordering},
+        sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
     dbt::{
         bump_alloc::{BumpAllocator, BumpAllocatorRef},
@@ -58,6 +58,7 @@ pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
+pub static LAST_BLOCK_START_VIRT_PC: AtomicU64 = AtomicU64::new(0);
 pub static LAST_EXECUTED_OPCODE: AtomicU32 = AtomicU32::new(0);
 
 pub fn register_model(name: InternedString, model: Model) {
@@ -205,6 +206,8 @@ impl ModelDevice {
         loop {
             let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
 
+            LAST_BLOCK_START_VIRT_PC.store(block_start_virtual_pc, Ordering::Relaxed);
+
             let block_start_physical_pc =
                 if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
                     pc
@@ -284,11 +287,11 @@ impl ModelDevice {
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
-            if exec_result.need_code_cache_flush() {
-                chain_cache.fill_keys(1);
-                block_cache.clear();
-                translation_cache.fill_keys(1);
-            }
+            // if exec_result.need_code_cache_flush() {
+            //     chain_cache.fill_keys(1);
+            //     block_cache.clear();
+            //     translation_cache.fill_keys(1);
+            // }
 
             if exec_result.interrupt_pending() {
                 let masked = self.well_known_registers.i().read(); //self.register_file.read::<bool>("PSTATE_I");
@@ -349,7 +352,6 @@ impl ModelDevice {
             log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
             log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
 
-            //#[cfg(feature = "debug_translation")]
             opcodes.push(opcode);
 
             LAST_TRANSLATED_OPCODE.store(opcode, Ordering::Relaxed);

@@ -7127,3 +7127,38 @@ fn umov_b3() {
 
     assert_eq!(register_file.read::<u64>("R28"), 0x2);
 }
+
+#[ktest]
+fn register_allocation_panic_block() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // ffffffc008213308:  aa0403e3   mov     x3, x4
+    // ffffffc00821330c:  aa0603e5   mov     x5, x6
+    // ffffffc008213310:  eb05007f   cmp     x3, x5
+    // ffffffc008213314:  dac00c63   rev     x3, x3
+    // ffffffc008213318:  dac00ca5   rev     x5, x5
+    // ffffffc00821331c:  eb05007f   cmp     x3, x5
+    // ffffffc008213320:  1a9f07e0   cset    w0, ne  // ne = any
+    // ffffffc008213324:  5a802400   cneg    w0, w0, cc // cc = lo, ul, last
+    // ffffffc008213328:  d65f03c0   ret
+    for opcode in [
+        0xaa0403e3, 0xaa0603e5, 0xeb05007f, 0xdac00c63, 0xdac00ca5, 0xeb05007f, 0x1a9f07e0,
+        0x5a802400, 0xd65f03c0,
+    ] {
+        translate_instruction(
+            &*model,
+            "__DecodeA64",
+            &mut emitter,
+            &register_file,
+            opcode,
+            0x0,
+        )
+        .unwrap();
+    }
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let _translation = Translation::new(ctx.compile(num_regs));
+}

@@ -123,6 +123,10 @@ fn panic(info: &PanicInfo) -> ! {
             "Last translated opcode = {:#010x}",
             models::LAST_TRANSLATED_OPCODE.load(Ordering::Relaxed)
         );
+        log::error!(
+            "Last block start PC = {:#010x}",
+            models::LAST_BLOCK_START_VIRT_PC.load(Ordering::Relaxed)
+        );
     };
 
     // backtrace();

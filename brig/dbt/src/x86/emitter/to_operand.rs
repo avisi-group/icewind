@@ -6,6 +6,7 @@ use {
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
+                X86NodeRefPtrHash,
             },
             encoder::{
                 Instruction, Operand, OperandKind,
@@ -89,7 +90,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             return *operand;
         }
 
-        if let Some(id) = self.sets_flags.get(node) {
+        if let Some(id) = self.sets_flags.get(&X86NodeRefPtrHash(node.clone())) {
             let read = self.read_stack_variable(*id, node.typ());
             return self.to_operand(&read);
         }
@@ -183,7 +184,10 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     self.push_instruction(Instruction::mov(b, dst).unwrap());
                     self.push_instruction(Instruction::adc(a, dst, carry));
 
-                    if self.sets_flags.contains_key(node) {
+                    if self
+                        .sets_flags
+                        .contains_key(&X86NodeRefPtrHash(node.clone()))
+                    {
                         // N
                         self.push_instruction(Instruction::sets(Operand::mem_base_displ(
                             Width::_8,

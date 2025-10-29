@@ -20,7 +20,6 @@ static LOGGER: &Logger = &Logger {
                                            * about empty file named "" at end of
                                            * archive */
         ("common::bits", LevelFilter::Off), // silencing overflows when generating masks
-        ("dbt::x86::register_allocator", LevelFilter::Info),
         ("brig::guest::models", LevelFilter::Info),
         ("dbt::x86", LevelFilter::Info),
         ("dbt::translate", LevelFilter::Info),

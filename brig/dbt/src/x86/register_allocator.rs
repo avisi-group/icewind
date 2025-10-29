@@ -413,7 +413,7 @@ fn commit(
                     register_tracking
                         .get(&Register::Virtual(*vreg))
                         .physical_register
-                        .unwrap(),
+                        .unwrap_or_else(|| panic!("No physical register tracked by vreg {vreg} when committing instruction {i}")),
                 );
             }
         });

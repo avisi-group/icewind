@@ -50,7 +50,7 @@ pub struct X86Emitter<'ctx> {
     pub execution_result: ExecutionResult,
     ctx: &'ctx mut X86TranslationContext,
     // node to global variable ID
-    sets_flags: HashMap<X86NodeRef, usize>,
+    sets_flags: HashMap<X86NodeRefPtrHash, usize>,
 }
 
 impl<'a, 'ctx> X86Emitter<'ctx> {
@@ -1651,12 +1651,16 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 // generates ADC on first time, will be cached on subsequent runs
                 let operand = self.to_operand(&get_flags_target);
 
-                if !self.sets_flags.contains_key(&get_flags_target) {
+                if !self
+                    .sets_flags
+                    .contains_key(&X86NodeRefPtrHash(get_flags_target.clone()))
+                {
                     let id = self.ctx_mut().allocate_variable_id();
                     self.push_instruction(
                         Instruction::mov(operand, Operand::greg(operand.width(), id)).unwrap(),
                     );
-                    self.sets_flags.insert(get_flags_target, id);
+                    self.sets_flags
+                        .insert(X86NodeRefPtrHash(get_flags_target.clone()), id);
                 }
 
                 let dest = Operand::mem_base_displ(
@@ -2839,3 +2843,20 @@ fn is_no_op_and(left_type: Type, right_type: Type, right_constant: u64) -> bool 
                         || (left_type.width() > 64 && right_constant == u64::MAX)
     }
 }
+
+#[derive(Debug)]
+pub struct X86NodeRefPtrHash(pub X86NodeRef);
+
+impl Hash for X86NodeRefPtrHash {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Rc::as_ptr(&self.0.0).hash(state);
+    }
+}
+
+impl PartialEq for X86NodeRefPtrHash {
+    fn eq(&self, other: &X86NodeRefPtrHash) -> bool {
+        Rc::ptr_eq(&self.0.0, &other.0.0)
+    }
+}
+
+impl Eq for X86NodeRefPtrHash {}

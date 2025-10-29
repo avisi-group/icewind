@@ -342,10 +342,10 @@ impl<'a> X86TranslationContext {
                 }
             });
 
-        // log::error!("\n\n\nPRE ALLOC");
-        // for (idx, instr) in instructions.iter().enumerate() {
-        //     log::error!("{idx}: {instr}");
-        // }
+        log::trace!("\n\n\nPRE ALLOC");
+        for (idx, instr) in instructions.iter().enumerate() {
+            log::trace!("{idx}: {instr}");
+        }
 
         register_allocator::allocate(
             &mut instructions,
@@ -353,10 +353,10 @@ impl<'a> X86TranslationContext {
             self.global_register_offset,
         );
 
-        // log::error!("\n\n\nPOST ALLOC");
-        // for (idx, instr) in instructions.iter().enumerate() {
-        //     log::error!("{idx}: {instr}");
-        // }
+        log::trace!("\n\n\nPOST ALLOC");
+        for (idx, instr) in instructions.iter().enumerate() {
+            log::trace!("{idx}: {instr}");
+        }
 
         // Collapse labels
         // Go through each instruction
