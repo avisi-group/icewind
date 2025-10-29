@@ -2867,52 +2867,34 @@ fn mrs_id_aa64dfr0_el1() {
 // /// but now the trace is valid even with the test failing
 // ///
 // /// leaving off for now but can always come back later
-// ///
 // #[ktest]
 // fn mrs_id_aa64pfr0_el1() {
-//     let model = models::get("aarch64").unwrap();
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let  register_file = RegisterFile::init(&*model);
-//
-//     let mut ctx = X86TranslationContext::new(&model, false,
-// register_file.global_register_offset());     let mut emitter =
-// X86Emitter::new(&mut ctx);
+//     register_file.write::<u64>("ID_AA64PFR0_EL1_bits", 0x1311211130111112);
 
-//     unsafe {
-//         let id_aa64pfr0_el1 =
-//             *(register_file_ptr.add(model.reg_offset("ID_AA64PFR0_EL1_bits")
-// as usize) as *mut u64);         assert_eq!(id_aa64pfr0_el1,
-// 0x1311211130111112);
-
-//         let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as
-// *mut i64;         register_file.write("SEE", -1i64);
-//     }
-
-//     // mrs               x1, id_aa64pfr0_el1
-//
-//     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
-//     translate(Global,
+//     // mrs     x1, id_aa64dfr0_el1
+//     translate_instruction(
 //         &*model,
 //         "__DecodeA64",
-//         &[opcode],
 //         &mut emitter,
 //         &register_file,
-//     );
+//         0xd5380501,
+//         0x0,
+//     )
+//     .unwrap();
 
 //     emitter.leave();
 
 //     let num_regs = emitter.next_vreg();
 //     let translation = Translation::new(ctx.compile(num_regs));
+//     translation.execute(&register_file);
 
-//     unsafe {
-//         let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as
-// *mut u64;
+//     // bug: reading 0x112101f5e1e1e91b instead of 0x1311211130111112
+//     assert_eq!(register_file.read::<u64>("R1"), 0x1311211130111112);
+// }
 
-//         translation.execute(&register_file);
-
-//         assert_eq!(*x1, 0x1311211130111112);
-//     }
-//}
 #[ktest]
 fn ldaxr() {
     let (model, register_file, mut ctx) = setup();
@@ -6058,44 +6040,6 @@ fn cnt_8b() {
 }
 
 // #[ktest]
-// fn addp_16b() {
-//     let (model, register_file, mut ctx) = setup();
-//     let mut emitter = X86Emitter::new(&mut ctx);
-
-//     //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
-//     // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
-//     translate_instruction(
-//         &model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x4e24bc9b,
-//      0x0)
-//     .unwrap();
-
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
-//     let translation = Translation::new(ctx.compile(num_regs));
-
-//     let z_offset = model.reg_offset("_Z");
-
-//     let q4_offset = z_offset + (4 * 256);
-//     let q27_offset = z_offset + (27 * 256);
-
-//     register_file.write_raw::<u128>(
-//         q4_offset.try_into().unwrap(),
-//         0x69e57f8761d4e752d7e93c9c503648a8,
-//     );
-
-//     translation.execute(&register_file);
-
-//     assert_eq!(
-//         register_file.read_raw::<u128>(q27_offset.try_into().unwrap()),
-//         0x119591d9ddd4d090119591d9ddd4d090,
-//     );
-// }
-
-// #[ktest]
 // fn scvtf() {
 //     let model = models::get("aarch64").unwrap();
 
@@ -7161,4 +7105,52 @@ fn register_allocation_panic_block() {
 
     let num_regs = emitter.next_vreg();
     let _translation = Translation::new(ctx.compile(num_regs));
+}
+
+#[ktest]
+fn addp_16b() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  4e24bc9b        addp    v27.16b, v4.16b, v4.16b
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_add_wrapping_pair
+    translate_instruction(
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4e24bc9b,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q4_offset = z_offset + (4 * 256);
+    let q27_offset = z_offset + (27 * 256);
+
+    register_file.write_raw::<u128>(
+        q4_offset.try_into().unwrap(),
+        0x69e5_7f87_61d4_e752_d7e9_3c9c_5036_48a8,
+    );
+
+    // 0x69e5_7f87_61d4_e752_d7e9_3c9c_5036_48a8
+    //
+    // 69_e5_7f_87_61_d4_e7_52_d7_e9_3c_9c_50_36_48_a8
+    // 69_e5_7f_87_61_d4_e7_52_d7_e9_3c_9c_50_36_48_a8_69_e5_7f_87_61_d4_e7_52_d7_e9_3c_9c_50_36_48_a8
+
+    // 0x69 + 0xe5
+    // 0x7f + 0x87
+    // ...
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q27_offset.try_into().unwrap()),
+        0x4e063539c0d886f0_4e063539c0d886f0,
+    );
 }

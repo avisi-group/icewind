@@ -287,6 +287,7 @@ impl ModelDevice {
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
+            // enabling breaks linux boot timestamps
             // if exec_result.need_code_cache_flush() {
             //     chain_cache.fill_keys(1);
             //     block_cache.clear();
