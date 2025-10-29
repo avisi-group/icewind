@@ -99,17 +99,20 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
     fn emit_call(
         &mut self,
-        function: X86NodeRef,
-        arguments: Vec<X86NodeRef, BumpAllocatorRef>,
+        function: Operand,
+        arguments: Vec<Operand, BumpAllocatorRef>,
         has_return_value: bool,
     ) {
-        let function = self.to_operand_reg_promote(&function);
+        let function_reg = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(Instruction::mov(function, function_reg).unwrap());
+
+        //self.to_operand_reg_promote(&function);
 
         let arg_count = arguments.len();
 
         arguments
             .into_iter()
-            .map(|arg| self.to_operand(&arg))
+            // .map(|arg| self.to_operand(&arg))
             .collect::<Vec<_>>()
             .into_iter()
             .zip(ARG_REGS.iter())
@@ -126,7 +129,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
         }
 
         self.push_instruction(Instruction::call(
-            function,
+            function_reg,
             arg_count,
             if has_return_value { 1 } else { 0 },
         ));
@@ -1656,7 +1659,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         }
 
         if offset == self.ctx().el_offset {
-            let function = self.function_ptr(self.ctx().el_changed_callback as u64);
+            let function = self.function_ptr(self.ctx().callbacks.el_changed_callback as u64);
 
             let old = self.read_register(self.ctx().el_offset, Type::Unsigned(64));
             let new = self.cast(
@@ -1686,6 +1689,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             )
             .unwrap(),
         );
+
+        {
+            let mut arguments = Vec::new_in(self.ctx().allocator());
+            arguments.push(Operand::imm(Width::_64, offset));
+
+            let value = if value.width() < Width::_64 {
+                let op = Operand::vreg(Width::_64, self.next_vreg());
+                self.push_instruction(Instruction::movzx(value, op).unwrap());
+                op
+            } else {
+                value
+            };
+
+            arguments.push(value);
+
+            self.emit_call(
+                Operand::imm(Width::_64, self.ctx().callbacks.trace_register_write as u64),
+                arguments,
+                false,
+            );
+        }
 
         // TODO: Arch-specific hack
         if offset == self.ctx().sctlr_el1_offset
@@ -1767,6 +1791,28 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         self.push_instruction(
             Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
         );
+
+        {
+            let mut arguments = Vec::new_in(self.ctx().allocator());
+            arguments.push(address);
+
+            let value = if value.width() < Width::_64 {
+                let op = Operand::vreg(Width::_64, self.next_vreg());
+                self.push_instruction(Instruction::movzx(value, op).unwrap());
+                op
+            } else {
+                value
+            };
+
+            arguments.push(value);
+            arguments.push(Operand::imm(Width::_64, u64::from(width.as_u16())));
+
+            self.emit_call(
+                Operand::imm(Width::_64, self.ctx().callbacks.trace_memory_write as u64),
+                arguments,
+                false,
+            );
+        }
 
         if is_unprivileged {
             self.push_instruction(
@@ -2200,7 +2246,15 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, BumpAllocatorRef>) {
-        self.emit_call(function, arguments, false);
+        let function = self.to_operand(&function);
+
+        let mut arg_ops = Vec::new_in(self.ctx().allocator());
+        arguments
+            .iter()
+            .map(|arg| self.to_operand(arg))
+            .collect_into(&mut arg_ops);
+
+        self.emit_call(function, arg_ops, false);
     }
 
     fn call_with_return(
@@ -2208,13 +2262,70 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         function: Self::NodeRef,
         arguments: Vec<Self::NodeRef, BumpAllocatorRef>,
     ) -> Self::NodeRef {
-        self.emit_call(function, arguments, true);
+        let function = self.to_operand(&function);
+
+        let mut arg_ops = Vec::new_in(self.ctx().allocator());
+        arguments
+            .iter()
+            .map(|arg| self.to_operand(arg))
+            .collect_into(&mut arg_ops);
+
+        self.emit_call(function, arg_ops, true);
 
         self.node(X86Node {
             typ: Type::Unsigned(64),
             kind: NodeKind::CallReturnValue,
         })
     }
+
+    fn trace_instruction_start(&mut self, opcode: u32, pc: u64) {
+        let function = Operand::imm(
+            Width::_64,
+            self.ctx().callbacks.trace_instruction_start as u64,
+        );
+
+        let mut arguments = Vec::new_in(self.ctx().allocator());
+        arguments.push(Operand::imm(Width::_64, u64::from(opcode)));
+        arguments.push(Operand::imm(Width::_64, pc));
+
+        self.emit_call(function, arguments, false);
+    }
+
+    fn trace_instruction_end(&mut self) {
+        let function = Operand::imm(
+            Width::_64,
+            self.ctx().callbacks.trace_instruction_end as u64,
+        );
+        let arguments = Vec::new_in(self.ctx().allocator());
+
+        self.emit_call(function, arguments, false);
+    }
+
+    // fn trace_reg_read(&mut self, offset: u64, value: Self::NodeRef) {
+    //     let offset = self.constant(offset as u64, Type::Unsigned(64));
+    //     let value = self.cast(value, Type::Unsigned(64),
+    // CastOperationKind::ZeroExtend);
+
+    //     let function = self.constant(trace_reg_read as u64, Type::Unsigned(64));
+    //     let mut arguments = Vec::new_in(self.ctx().allocator());
+    //     arguments.push(offset);
+    //     arguments.push(value);
+
+    //     self.emit_call(function, arguments, false);
+    // }
+
+    // fn trace_reg_write(&mut self, offset: u64, value: Self::NodeRef) {
+    //     let offset = self.constant(offset as u64, Type::Unsigned(64));
+    //     let value = self.cast(value, Type::Unsigned(64),
+    // CastOperationKind::ZeroExtend);
+
+    //     let function = self.constant(trace_reg_write as u64, Type::Unsigned(64));
+    //     let mut arguments = Vec::new_in(self.ctx().allocator());
+    //     arguments.push(offset);
+    //     arguments.push(value);
+
+    //     self.emit_call(function, arguments, false);
+    // }
 }
 
 fn sign_extend(value: u64, original_width: u32, target_width: u32) -> u64 {

@@ -13,6 +13,7 @@ use {
             },
         },
     },
+    alloc::vec::Vec,
     common::ktest,
     core::cmp::{Ordering, min},
 };
@@ -120,6 +121,27 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     )
                     .unwrap(),
                 );
+
+                {
+                    let mut arguments = Vec::new_in(self.ctx().allocator());
+                    arguments.push(Operand::imm(Width::_64, *offset));
+
+                    let dst = if dst.width() < Width::_64 {
+                        let op = Operand::vreg(Width::_64, self.next_vreg());
+                        self.push_instruction(Instruction::movzx(dst, op).unwrap());
+                        op
+                    } else {
+                        dst
+                    };
+
+                    arguments.push(dst);
+
+                    self.emit_call(
+                        Operand::imm(Width::_64, self.ctx().callbacks.trace_register_read as u64),
+                        arguments,
+                        false,
+                    );
+                }
 
                 dst
             }
@@ -602,6 +624,28 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest)
                         .unwrap(),
                 );
+
+                {
+                    let mut arguments = Vec::new_in(self.ctx().allocator());
+                    arguments.push(address);
+
+                    let dest = if dest.width() < Width::_64 {
+                        let op = Operand::vreg(Width::_64, self.next_vreg());
+                        self.push_instruction(Instruction::movzx(dest, op).unwrap());
+                        op
+                    } else {
+                        dest
+                    };
+
+                    arguments.push(dest);
+                    arguments.push(Operand::imm(Width::_64, u64::from(width.as_u16())));
+
+                    self.emit_call(
+                        Operand::imm(Width::_64, self.ctx().callbacks.trace_memory_read as u64),
+                        arguments,
+                        false,
+                    );
+                }
 
                 dest
             }

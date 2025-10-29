@@ -2,6 +2,10 @@ use {
     crate::guest::{
         Translation,
         models::{self, BUMP_ALLOCATOR, write_to_el},
+        tracing::{
+            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
+            trace_register_read, trace_register_write,
+        },
     },
     alloc::{format, vec::Vec},
     common::{fuzz_test::InstructionFuzzTest, ktest},
@@ -10,7 +14,7 @@ use {
         emitter::Emitter,
         register_file::RegisterFile,
         translate::translate_instruction,
-        x86::{X86TranslationContext, emitter::X86Emitter},
+        x86::{Callbacks, X86TranslationContext, emitter::X86Emitter},
     },
 };
 
@@ -99,7 +103,15 @@ fn run_test(
         &model,
         false,
         register_file.global_register_offset(),
-        write_to_el,
+        Callbacks {
+            el_changed_callback: write_to_el,
+            trace_instruction_start,
+            trace_instruction_end,
+            trace_register_read,
+            trace_register_write,
+            trace_memory_read,
+            trace_memory_write,
+        },
     );
     let mut emitter = X86Emitter::new(&mut ctx);
 

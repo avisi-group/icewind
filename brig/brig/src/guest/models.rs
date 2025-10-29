@@ -3,6 +3,10 @@ use {
         Translation,
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
         get_current_guest,
+        tracing::{
+            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
+            trace_register_read, trace_register_write,
+        },
     },
     alloc::{
         alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
@@ -25,7 +29,7 @@ use {
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
         x86::{
-            X86TranslationContext,
+            Callbacks, X86TranslationContext,
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
@@ -33,7 +37,7 @@ use {
     kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         fs::Filesystem,
-        timer::{GLOBAL_CLOCK, GlobalClock},
+        timer::GLOBAL_CLOCK,
     },
     spin::{Lazy, Mutex},
     x86_64::structures::paging::{PageSize, Size4KiB},
@@ -178,12 +182,6 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
-        // let shared = SharedDeviceManager::get()
-        //     .get_device_by_alias("transport00:05.0")
-        //     .unwrap();
-        // let kernel::devices::Device::Transport(transport) = &mut *shared.lock() else
-        // {     panic!();
-        // };
 
         let mut instructions_executed = 0usize;
 
@@ -267,17 +265,14 @@ impl ModelDevice {
             //     // "{block_start_virtual_pc:#018x}").unwrap();
             // }
 
-            // if GLOBAL_CLOCK.now() > Nanoseconds::new(6u64 * 1_000_000_000) {
-            //     log::error!(
-            //         "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
-            //         translated_block.opcodes,
-            //     );
-            // } else {
+            // if GLOBAL_CLOCK.now() > Nanoseconds::new(7u64 * 1_000_000_000) {
+            //     tracing::ENABLED.store(true, Ordering::Relaxed);
+            // }
+
             log::debug!(
                 "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
                 translated_block.opcodes,
             );
-            // }
 
             // LAST_EXECUTED_OPCODE.store(
             //     *translated_block.opcodes.first().unwrap(),
@@ -326,7 +321,15 @@ impl ModelDevice {
             &self.model,
             true,
             self.register_file.global_register_offset(),
-            write_to_el,
+            Callbacks {
+                el_changed_callback: write_to_el,
+                trace_instruction_start,
+                trace_instruction_end,
+                trace_register_read,
+                trace_register_write,
+                trace_memory_read,
+                trace_memory_write,
+            },
         );
         let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -353,6 +356,8 @@ impl ModelDevice {
             opcodes.push(opcode);
 
             LAST_TRANSLATED_OPCODE.store(opcode, Ordering::Relaxed);
+
+            emitter.trace_instruction_start(opcode, current_pc);
 
             let _return_value = translate_instruction(
                 &*self.model,

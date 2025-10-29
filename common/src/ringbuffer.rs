@@ -107,6 +107,10 @@ impl<'a> RingBuffer<'a, Producer> {
 
         let capacity = self.capacity();
 
+        if data.len() > capacity {
+            panic!("overflow");
+        }
+
         let head_wrapped = head % capacity;
         let tail_wrapped = tail % capacity;
 

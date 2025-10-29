@@ -38,6 +38,7 @@ pub mod devices;
 pub mod memory;
 pub mod models;
 mod tests;
+pub mod tracing;
 
 pub static GUEST: Mutex<Option<Arc<Guest>>> = Mutex::new(None);
 

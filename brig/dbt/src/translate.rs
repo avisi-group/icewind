@@ -34,7 +34,7 @@ const BLOCK_QUEUE_LIMIT: usize = 1000;
 const FN_DENYLIST: &[&str] = &["AArch64_TranslateAddress"];
 
 /// DBT translation error
-#[derive(Debug, displaydoc::Display, thiserror::Error)]
+#[derive(Debug, Clone, Copy, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// SEE exception during instruction decode
     Decode,
@@ -129,6 +129,8 @@ pub fn translate_instruction(
             }
         }
     };
+
+    emitter.trace_instruction_end();
 
     let end_block = emitter.get_current_block();
 
@@ -239,7 +241,10 @@ fn translate_with_variable_ids(
         }
     }
 
-    FunctionTranslator::new(model, function, arguments, emitter, register_file).translate()
+    let ret =
+        FunctionTranslator::new(model, function, arguments, emitter, register_file).translate();
+
+    ret
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

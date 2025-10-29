@@ -150,7 +150,7 @@ pub struct X86TranslationContext {
     c_offset: u64,
     v_offset: u64,
 
-    el_changed_callback: extern "sysv64" fn(u8, u8),
+    callbacks: Callbacks,
 
     global_register_offset: usize,
 
@@ -208,13 +208,23 @@ impl Debug for X86TranslationContext {
 //     }
 // }
 
+pub struct Callbacks {
+    pub el_changed_callback: extern "sysv64" fn(u8, u8),
+    pub trace_instruction_start: extern "sysv64" fn(u32, u64),
+    pub trace_instruction_end: extern "sysv64" fn(),
+    pub trace_register_read: extern "sysv64" fn(u64, u64),
+    pub trace_register_write: extern "sysv64" fn(u64, u64),
+    pub trace_memory_read: extern "sysv64" fn(u64, u64, u8),
+    pub trace_memory_write: extern "sysv64" fn(u64, u64, u8),
+}
+
 impl<'a> X86TranslationContext {
     pub fn new_with_allocator(
         allocator: BumpAllocatorRef,
         model: &Model,
         memory_mask: bool,
         global_register_offset: usize,
-        el_changed_callback: extern "sysv64" fn(u8, u8),
+        callbacks: Callbacks,
     ) -> Self {
         let mut arena = Arena::new_in(allocator.clone());
 
@@ -242,7 +252,7 @@ impl<'a> X86TranslationContext {
             memory_mask,
             current_variable_id: 0,
 
-            el_changed_callback,
+            callbacks,
         };
 
         // add panic to the panic block

@@ -316,7 +316,8 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
                     } else {
                         // Physical address not in valid guest region -- real fault.
                         panic!(
-                            "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
+                            "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault, RIP: {:x}",
+                            machine_context.rip
                         )
                     }
                 }

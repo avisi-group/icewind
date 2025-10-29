@@ -19,6 +19,7 @@ use {
             Arc,
             atomic::{AtomicBool, Ordering},
         },
+        thread,
     },
     tar::Header,
     walkdir::WalkDir,
@@ -403,36 +404,36 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     cmd.args(["-qmp", "unix:/tmp/qmp.sock,server,nowait"]);
 
-    // let mem_path = "/dev/shm/brig-shared-mem";
+    let mem_path = "/dev/shm/brig-shared-mem";
 
-    // cmd.args(["-device", "ivshmem-plain,memdev=ivshmem"]);
-    // cmd.args([
-    //     "-object",
-    //     &format!("memory-backend-file,id=ivshmem,share=on,mem-path={mem_path},
-    // size=64M"), ]);
+    cmd.args(["-device", "ivshmem-plain,memdev=ivshmem"]);
+    cmd.args([
+        "-object",
+        &format!("memory-backend-file,id=ivshmem,share=on,mem-path={mem_path},size=64M"),
+    ]);
 
-    // let ready = Arc::new(AtomicBool::new(false));
-    // let terminate = Arc::new(AtomicBool::new(false));
+    let ready = Arc::new(AtomicBool::new(false));
+    let terminate = Arc::new(AtomicBool::new(false));
 
-    // let ready_clone = ready.clone();
-    // let terminate_clone = terminate.clone();
+    let ready_clone = ready.clone();
+    let terminate_clone = terminate.clone();
 
-    // let handle = thread::spawn(move || {
-    //     hyperport_reader(
-    //         mem_path,
-    //         "/tmp/hyperport.trace",
-    //         ready_clone,
-    //         terminate_clone,
-    //     )
-    // });
+    let handle = thread::spawn(move || {
+        hyperport_reader(
+            mem_path,
+            "/tmp/hyperport.trace",
+            ready_clone,
+            terminate_clone,
+        )
+    });
 
-    // while ready.load(Ordering::Relaxed) {}
+    while ready.load(Ordering::Relaxed) {}
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
 
-    // terminate.store(true, Ordering::Relaxed);
-    // handle.join().unwrap();
+    terminate.store(true, Ordering::Relaxed);
+    handle.join().unwrap();
 }
 
 fn get_kernel_from_artifacts(artifacts: &[Artifact]) -> PathBuf {
@@ -490,7 +491,7 @@ fn gdb_cli(artifacts: &[Artifact]) {
     std::process::exit(0);
 }
 
-fn _hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
+fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
     shared_mem_path: P1,
     destination_path: P2,
     ready: Arc<AtomicBool>,

@@ -3,6 +3,10 @@ use {
         Nanoseconds, Translation,
         devices::arm::{a9gic::GlobalInterruptController, generic_timer::GenericTimer},
         models::{self, BUMP_ALLOCATOR, write_to_el},
+        tracing::{
+            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
+            trace_register_read, trace_register_write,
+        },
     },
     alloc::{boxed::Box, sync::Arc, vec::Vec},
     common::{
@@ -17,10 +21,10 @@ use {
         bump_alloc::BumpAllocatorRef,
         emitter::{Emitter, Type},
         interpret::{self, Value, interpret},
-        register_file::RegisterFile,
+        register_file::{self, RegisterFile},
         translate::{translate, translate_instruction},
         x86::{
-            X86TranslationContext,
+            Callbacks, X86TranslationContext,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
                 UnaryOperationKind, X86Emitter, X86Node,
@@ -42,7 +46,15 @@ fn setup() -> (Arc<Model>, RegisterFile, X86TranslationContext) {
         &model,
         false,
         register_file.global_register_offset(),
-        write_to_el,
+        Callbacks {
+            el_changed_callback: write_to_el,
+            trace_instruction_start,
+            trace_instruction_end,
+            trace_register_read,
+            trace_register_write,
+            trace_memory_read,
+            trace_memory_write,
+        },
     );
 
     (model, register_file, ctx)
@@ -636,7 +648,15 @@ fn fibonacci_instr() {
             &model,
             false,
             register_file.global_register_offset(),
-            write_to_el,
+            Callbacks {
+                el_changed_callback: write_to_el,
+                trace_instruction_start,
+                trace_instruction_end,
+                trace_register_read,
+                trace_register_write,
+                trace_memory_read,
+                trace_memory_write,
+            },
         );
         let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -832,7 +852,15 @@ fn fibonacci_block() {
             &model,
             false,
             register_file.global_register_offset(),
-            write_to_el,
+            Callbacks {
+                el_changed_callback: write_to_el,
+                trace_instruction_start,
+                trace_instruction_end,
+                trace_register_read,
+                trace_register_write,
+                trace_memory_read,
+                trace_memory_write,
+            },
         );
         let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -3859,21 +3887,10 @@ fn end_cycle() {
 
 //#[ktest]
 fn _decodea64_profiling() {
-    let model = models::get("aarch64").unwrap();
+    let (model, register_file, mut ctx) = setup();
 
     let mut measure = Measurement::start();
 
-    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
-
-    let register_file = RegisterFile::init(&*model);
-
-    let mut ctx = X86TranslationContext::new_with_allocator(
-        allocator_ref,
-        &model,
-        false,
-        register_file.global_register_offset(),
-        write_to_el,
-    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     measure.trigger("init");
@@ -3913,21 +3930,10 @@ fn _decodea64_profiling() {
 
 //#[ktest]
 fn _branch_profiling() {
-    let model = models::get("aarch64").unwrap();
+    let (model, register_file, mut ctx) = setup();
 
     let mut measure = Measurement::start();
 
-    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
-
-    let register_file = RegisterFile::init(&*model);
-
-    let mut ctx = X86TranslationContext::new_with_allocator(
-        allocator_ref,
-        &model,
-        false,
-        register_file.global_register_offset(),
-        write_to_el,
-    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     measure.trigger("init");
@@ -3962,19 +3968,8 @@ fn _branch_profiling() {
 
 #[ktest]
 fn cond_branch() {
-    let model = models::get("aarch64").unwrap();
+    let (model, register_file, mut ctx) = setup();
 
-    let allocator_ref = BumpAllocatorRef::new(&BUMP_ALLOCATOR);
-
-    let register_file = RegisterFile::init(&*model);
-
-    let mut ctx = X86TranslationContext::new_with_allocator(
-        allocator_ref,
-        &model,
-        false,
-        register_file.global_register_offset(),
-        write_to_el,
-    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     translate_instruction(
