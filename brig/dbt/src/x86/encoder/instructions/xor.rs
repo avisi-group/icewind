@@ -5,8 +5,9 @@ use {
         Width,
         registers::Register::Physical as PHYS,
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
-
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
+    },
 };
 
 pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
@@ -23,6 +24,23 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .xor::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_128,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_128,
+            },
+        ) => {
+            assembler
+                .pxor::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
