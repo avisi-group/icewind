@@ -874,6 +874,7 @@ fn fibonacci_block() {
                 &mut emitter,
                 &register_file,
                 program[current_pc as usize / 4],
+                current_pc,
             )
             .unwrap();
 
@@ -3523,6 +3524,7 @@ fn xpaclri() {
         &mut emitter,
         &register_file,
         0xd503201f,
+        0x0,
     )
     .unwrap();
 
@@ -3532,6 +3534,7 @@ fn xpaclri() {
         &mut emitter,
         &register_file,
         0xd50320ff,
+        0x0,
     )
     .unwrap();
 
@@ -3542,6 +3545,7 @@ fn xpaclri() {
         &mut emitter,
         &register_file,
         0xd503201f,
+        0x0,
     )
     .unwrap();
 
@@ -3552,6 +3556,7 @@ fn xpaclri() {
         &mut emitter,
         &register_file,
         0xd503201f,
+        0x0,
     )
     .unwrap();
 
@@ -3753,6 +3758,7 @@ fn udf() {
         &mut emitter,
         &register_file,
         00000115,
+        0x0,
     )
     .unwrap();
 
@@ -3778,6 +3784,7 @@ fn eret_post_exception() {
         &mut emitter,
         &register_file,
         0xd69f03e0,
+        0x0,
     )
     .unwrap();
 
@@ -3901,6 +3908,7 @@ fn _decodea64_profiling() {
         &mut emitter,
         &register_file,
         0xd51be000,
+        0x0,
     )
     .unwrap();
 
@@ -3944,6 +3952,7 @@ fn _branch_profiling() {
         &mut emitter,
         &register_file,
         0xd61f0100,
+        0x0,
     )
     .unwrap();
 
@@ -3978,6 +3987,7 @@ fn cond_branch() {
         &mut emitter,
         &register_file,
         0x54000020,
+        0x0,
     )
     .unwrap();
 
@@ -4114,6 +4124,7 @@ fn sbfm() {
         &mut emitter,
         &register_file,
         0x93407c63,
+        0x0,
     )
     .unwrap();
     //__DecodeA64_LoadStore
@@ -4780,6 +4791,7 @@ fn simbench_eret() {
         &mut emitter,
         &register_file,
         0xd69f03e0,
+        0x0,
     )
     .unwrap();
 
@@ -4949,6 +4961,7 @@ fn cbnz() {
         &mut emitter,
         &register_file,
         0x35000080,
+        0x0,
     )
     .unwrap();
 
@@ -4989,6 +5002,7 @@ fn mrs_current_el_1() {
         &mut emitter,
         &register_file,
         0xd5384240,
+        0x0,
     )
     .unwrap();
 
@@ -5016,6 +5030,7 @@ fn mrs_current_el_3() {
         &mut emitter,
         &register_file,
         0xd5384240,
+        0x0,
     )
     .unwrap();
 
@@ -5042,6 +5057,7 @@ fn ic_ivau() {
         &mut emitter,
         &register_file,
         0xd50b7520,
+        0x0,
     )
     .unwrap();
 
@@ -5064,6 +5080,7 @@ fn ldurb() {
         &mut emitter,
         &register_file,
         0x385fd001,
+        0x0,
     )
     .unwrap();
 
@@ -5093,6 +5110,7 @@ fn ldr_q0() {
         &mut emitter,
         &register_file,
         0x3cdd0d60,
+        0x0,
     )
     .unwrap();
 
@@ -5124,6 +5142,7 @@ fn tpidr_el0() {
         &mut emitter,
         &register_file,
         0xd51bd048,
+        0x0,
     )
     .unwrap();
 
@@ -5134,6 +5153,7 @@ fn tpidr_el0() {
         &mut emitter,
         &register_file,
         0xd53bd048,
+        0x0,
     )
     .unwrap();
 
@@ -5160,6 +5180,7 @@ fn sub_sxtw() {
         &mut emitter,
         &register_file,
         0xcb23c083,
+        0x0,
     )
     .unwrap();
 
@@ -5187,6 +5208,7 @@ fn adcs_fuzzed_0() {
         &mut emitter,
         &register_file,
         0x3a090207,
+        0x0,
     )
     .unwrap();
 
@@ -5216,6 +5238,7 @@ fn ldp_q_el1() {
         &mut emitter,
         &register_file,
         0xad480400,
+        0x0,
     )
     .unwrap();
 
@@ -5256,6 +5279,7 @@ fn stp_q() {
         &mut emitter,
         &register_file,
         0xad080400,
+        0x0,
     )
     .unwrap();
 
@@ -5305,6 +5329,7 @@ fn add_8h() {
         &mut emitter,
         &register_file,
         0x4e7585e8,
+        0x0,
     )
     .unwrap();
 
@@ -5366,6 +5391,7 @@ fn tst_x10_0x7() {
         &mut emitter,
         &register_file,
         0xf240095f,
+        0x0,
     )
     .unwrap();
 
@@ -5386,6 +5412,7 @@ fn eon0() {
         &mut emitter,
         &register_file,
         0x4a7f01c1,
+        0x0,
     )
     .unwrap();
 
@@ -5413,6 +5440,7 @@ fn eon1() {
         &mut emitter,
         &register_file,
         0x4abf0031,
+        0x0,
     )
     .unwrap();
 
@@ -5440,6 +5468,7 @@ fn ngc() {
         &mut emitter,
         &register_file,
         0x5a0803f9,
+        0x0,
     )
     .unwrap();
 
@@ -5468,6 +5497,7 @@ fn extr_fuzz0() {
         &mut emitter,
         &register_file,
         0x93d20383,
+        0x0,
     )
     .unwrap();
 
@@ -5498,6 +5528,7 @@ fn movi() {
         &mut emitter,
         &register_file,
         0x2f00e413,
+        0x0,
     )
     .unwrap();
 
@@ -5572,6 +5603,7 @@ fn and_16b_fuzz0() {
         &mut emitter,
         &register_file,
         0x4e391ef7,
+        0x0,
     )
     .unwrap();
 
@@ -5613,6 +5645,7 @@ fn and_16b_fuzz1() {
         &mut emitter,
         &register_file,
         0x4e291dc9,
+        0x0,
     )
     .unwrap();
 
@@ -5648,6 +5681,7 @@ fn ror_fuzz0() {
         &mut emitter,
         &register_file,
         0x1ac92d30,
+        0x0,
     )
     .unwrap();
 
@@ -5685,6 +5719,7 @@ fn ror_fuzz1() {
         &mut emitter,
         &register_file,
         0x1ac72fb2,
+        0x0,
     )
     .unwrap();
 
@@ -5713,6 +5748,7 @@ fn ror_fuzz2() {
         &mut emitter,
         &register_file,
         0x1ac52f1a,
+        0x0,
     )
     .unwrap();
 
@@ -5995,6 +6031,7 @@ fn cnt_8b() {
         &mut emitter,
         &register_file,
         0x0e205903,
+        0x0,
     )
     .unwrap();
 
@@ -6033,7 +6070,7 @@ fn cnt_8b() {
 //         &mut emitter,
 //         &register_file,
 //         0x4e24bc9b,
-//     )
+//      0x0)
 //     .unwrap();
 
 //     emitter.leave();
@@ -6108,6 +6145,7 @@ fn sdiv_test_0_panic() {
         &mut emitter,
         &register_file,
         0x1ad60fee,
+        0x0,
     )
     .unwrap();
 
@@ -6135,6 +6173,7 @@ fn sdiv_fuzz0() {
         &mut emitter,
         &register_file,
         0x1ad80cf5,
+        0x0,
     )
     .unwrap();
 
@@ -6162,6 +6201,7 @@ fn sdiv_fuzz1() {
         &mut emitter,
         &register_file,
         0x1ad40ea4,
+        0x0,
     )
     .unwrap();
 
@@ -6197,6 +6237,7 @@ fn sdiv_fuzz2() {
         &mut emitter,
         &register_file,
         0x1ad70e9e,
+        0x0,
     )
     .unwrap();
 
@@ -6268,6 +6309,7 @@ fn fuzz_0b2313e2_59_fixed() {
         &mut emitter,
         &register_file,
         0xb2313e2,
+        0x0,
     )
     .unwrap();
 
@@ -6295,6 +6337,7 @@ fn fuzz_1ac20abb_2645_fixed() {
         &mut emitter,
         &register_file,
         0x1ac20abb,
+        0x0,
     )
     .unwrap();
 
@@ -6323,6 +6366,7 @@ fn fuzz_9b487f10_2213_fixed() {
         &mut emitter,
         &register_file,
         0x9b487f10,
+        0x0,
     )
     .unwrap();
 
@@ -6505,6 +6549,7 @@ fn umov_fuzz0() {
         &mut emitter,
         &register_file,
         0x0e013c80,
+        0x0,
     )
     .unwrap();
 
@@ -6539,6 +6584,7 @@ fn cnt_fuzz0() {
         &mut emitter,
         &register_file,
         0x0e205879,
+        0x0,
     )
     .unwrap();
 
@@ -6667,6 +6713,7 @@ fn _crc() {
         &mut emitter,
         &register_file,
         0x9ac34c08,
+        0x0,
     )
     .unwrap();
 
@@ -6730,6 +6777,7 @@ fn cmeq_v116b() {
         &mut emitter,
         &register_file,
         0x4e209801,
+        0x0,
     )
     .unwrap();
 
@@ -6752,6 +6800,7 @@ fn addp_8h() {
         &mut emitter,
         &register_file,
         0x4e74bfd8,
+        0x0,
     )
     .unwrap();
 
@@ -7056,6 +7105,7 @@ fn umov_b3() {
         &mut emitter,
         &register_file,
         0x0e073f3c,
+        0x0,
     )
     .unwrap();
 

@@ -4,7 +4,7 @@ use {
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
         x86::{
-            X86Block,
+            TRACING_ENABLED, X86Block,
             emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
@@ -82,8 +82,13 @@ pub fn translate_instruction(
     emitter: &mut X86Emitter,
     register_file: &RegisterFile,
     opcode: u32,
+    pc: u64,
 ) -> Result<Option<X86NodeRef>, Error> {
     register_file.write("SEE", -1i64);
+
+    if TRACING_ENABLED {
+        emitter.emit_trace_instruction_start(opcode, pc);
+    }
 
     let initial_block = emitter.get_current_block();
 
@@ -130,7 +135,9 @@ pub fn translate_instruction(
         }
     };
 
-    emitter.trace_instruction_end();
+    if TRACING_ENABLED {
+        emitter.emit_trace_instruction_end();
+    }
 
     let end_block = emitter.get_current_block();
 

@@ -24,6 +24,8 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
+pub const TRACING_ENABLED: bool = false;
+
 // sysv64 ABI
 pub const ARG_REGS: &[PhysicalRegister] = &[
     PhysicalRegister::RDI,

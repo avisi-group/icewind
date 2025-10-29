@@ -33,11 +33,9 @@ use {
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
-    embedded_time::duration::Nanoseconds,
     kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         fs::Filesystem,
-        timer::GLOBAL_CLOCK,
     },
     spin::{Lazy, Mutex},
     x86_64::structures::paging::{PageSize, Size4KiB},
@@ -182,7 +180,6 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
-
         let mut instructions_executed = 0usize;
 
         // guest physical PC to translated block cache
@@ -357,14 +354,13 @@ impl ModelDevice {
 
             LAST_TRANSLATED_OPCODE.store(opcode, Ordering::Relaxed);
 
-            emitter.trace_instruction_start(opcode, current_pc);
-
             let _return_value = translate_instruction(
                 &*self.model,
                 "__DecodeA64",
                 &mut emitter,
                 &self.register_file,
                 opcode,
+                current_pc,
             )
             .unwrap();
 

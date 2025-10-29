@@ -102,11 +102,6 @@ pub trait Emitter {
 
     fn set_current_block(&mut self, block: Self::BlockRef);
     fn get_current_block(&self) -> Self::BlockRef;
-
-    fn trace_instruction_start(&mut self, opcode: u32, pc: u64);
-    fn trace_instruction_end(&mut self);
-    // fn trace_reg_read(&mut self, offset: u64, value: Self::NodeRef);
-    // fn trace_reg_write(&mut self, offset: u64, value: Self::NodeRef);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

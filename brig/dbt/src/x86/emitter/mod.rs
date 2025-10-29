@@ -4,7 +4,7 @@ use {
         emitter::{Emitter, Type},
         trampoline::ExecutionResult,
         x86::{
-            ARG_REGS, CALLER_SAVED, X86Block, X86TranslationContext,
+            ARG_REGS, CALLER_SAVED, TRACING_ENABLED, X86Block, X86TranslationContext,
             encoder::{
                 Instruction, MemoryScale, Opcode, Operand, OperandKind,
                 registers::{PhysicalRegister, Register, SegmentRegister},
@@ -439,6 +439,29 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             shifted_extracted_high,
             extracted_low,
         ))
+    }
+
+    pub fn emit_trace_instruction_start(&mut self, opcode: u32, pc: u64) {
+        let function = Operand::imm(
+            Width::_64,
+            self.ctx().callbacks.trace_instruction_start as u64,
+        );
+
+        let mut arguments = Vec::new_in(self.ctx().allocator());
+        arguments.push(Operand::imm(Width::_64, u64::from(opcode)));
+        arguments.push(Operand::imm(Width::_64, pc));
+
+        self.emit_call(function, arguments, false);
+    }
+
+    pub fn emit_trace_instruction_end(&mut self) {
+        let function = Operand::imm(
+            Width::_64,
+            self.ctx().callbacks.trace_instruction_end as u64,
+        );
+        let arguments = Vec::new_in(self.ctx().allocator());
+
+        self.emit_call(function, arguments, false);
     }
 }
 
@@ -1690,7 +1713,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             .unwrap(),
         );
 
-        {
+        if TRACING_ENABLED {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(Operand::imm(Width::_64, offset));
 
@@ -1735,9 +1758,6 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         is_unprivileged: bool,
     ) {
         let address = self.to_operand(&address);
-        let OperandKind::Register(address_reg) = address.kind() else {
-            panic!()
-        };
 
         let value = self.to_operand(&value);
         let width = value.width();
@@ -1770,13 +1790,21 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         // if we mask highest 6 nibbles we get a contiguous address space
 
-        if self.ctx().memory_mask {
+        let masked_address = if self.ctx().memory_mask {
             let mask = Operand::vreg(Width::_64, self.next_vreg());
+
             self.push_instruction(
                 Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask).unwrap(),
             );
-            self.push_instruction(Instruction::and(mask, address));
-        }
+
+            let masked = Operand::vreg(Width::_64, self.next_vreg());
+            self.push_instruction(Instruction::mov(address, masked).unwrap());
+
+            self.push_instruction(Instruction::and(mask, masked));
+            masked
+        } else {
+            address
+        };
 
         if is_unprivileged {
             self.push_instruction(
@@ -1788,11 +1816,15 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             );
         };
 
-        self.push_instruction(
-            Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
-        );
+        if let OperandKind::Register(address_reg) = masked_address.kind() {
+            self.push_instruction(
+                Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
+            );
+        } else {
+            panic!()
+        }
 
-        {
+        if TRACING_ENABLED {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 
@@ -2276,29 +2308,6 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             typ: Type::Unsigned(64),
             kind: NodeKind::CallReturnValue,
         })
-    }
-
-    fn trace_instruction_start(&mut self, opcode: u32, pc: u64) {
-        let function = Operand::imm(
-            Width::_64,
-            self.ctx().callbacks.trace_instruction_start as u64,
-        );
-
-        let mut arguments = Vec::new_in(self.ctx().allocator());
-        arguments.push(Operand::imm(Width::_64, u64::from(opcode)));
-        arguments.push(Operand::imm(Width::_64, pc));
-
-        self.emit_call(function, arguments, false);
-    }
-
-    fn trace_instruction_end(&mut self) {
-        let function = Operand::imm(
-            Width::_64,
-            self.ctx().callbacks.trace_instruction_end as u64,
-        );
-        let arguments = Vec::new_in(self.ctx().allocator());
-
-        self.emit_call(function, arguments, false);
     }
 
     // fn trace_reg_read(&mut self, offset: u64, value: Self::NodeRef) {

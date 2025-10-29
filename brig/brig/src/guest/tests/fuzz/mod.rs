@@ -126,6 +126,7 @@ fn run_test(
         &mut emitter,
         &register_file,
         instruction,
+        0x40005a5c,
     )
     .unwrap();
 
