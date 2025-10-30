@@ -1755,6 +1755,22 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         })
     }
 
+    fn compare_exchange(
+        &mut self,
+        address: Self::NodeRef,
+        compare_operand: Self::NodeRef,
+        operand: Self::NodeRef,
+    ) -> Self::NodeRef {
+        self.node(X86Node {
+            typ: operand.typ(),
+            kind: NodeKind::CompareExchange {
+                address,
+                compare_operand,
+                operand,
+            },
+        })
+    }
+
     fn write_memory(
         &mut self,
         address: Self::NodeRef,
@@ -2406,6 +2422,11 @@ pub enum NodeKind {
     ReadMemory {
         address: X86NodeRef,
     },
+    CompareExchange {
+        address: X86NodeRef,
+        compare_operand: X86NodeRef,
+        operand: X86NodeRef,
+    },
     UnaryOperation(UnaryOperationKind),
     BinaryOperation(BinaryOperationKind),
     TernaryOperation(TernaryOperationKind),
@@ -2761,12 +2782,10 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
         NodeKind::TernaryOperation(TernaryOperationKind::AddWithCarry(_, _, _)) => {
             Some(value.clone())
         }
-
         NodeKind::Constant { .. }
         | NodeKind::GuestRegister { .. }
         | NodeKind::ReadMemory { .. }
         | NodeKind::ReadStackVariable { .. } => None,
-
         NodeKind::UnaryOperation(
             UnaryOperationKind::Absolute(value)
             | UnaryOperationKind::Ceil(value)
@@ -2782,7 +2801,6 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
         | NodeKind::Select {
             condition: value, ..
         } => contains_addwithcarry(value),
-
         NodeKind::BinaryOperation(
             BinaryOperationKind::Add(a, b)
             | BinaryOperationKind::And(a, b)
@@ -2818,13 +2836,16 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
         } => todo!(),
         NodeKind::BitReplicate { pattern, count } => todo!(),
         NodeKind::CallReturnValue => todo!(),
-
         NodeKind::Tuple(x86_node_refs) => x86_node_refs
             .iter()
             .filter_map(contains_addwithcarry)
             .next(),
-
         NodeKind::FunctionPointer(_) => None,
+        NodeKind::CompareExchange {
+            address,
+            compare_operand,
+            operand,
+        } => todo!(),
     }
 }
 

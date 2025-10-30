@@ -1,6 +1,6 @@
 use {
     core::{
-        fmt::Write,
+        fmt::{self, Display, Write},
         sync::atomic::{AtomicBool, AtomicU64, Ordering},
     },
     kernel::devices::{Device, SharedDevice, manager::SharedDeviceManager},
@@ -8,7 +8,7 @@ use {
 };
 
 static INSTRUCTION_COUNT: AtomicU64 = AtomicU64::new(0);
-static ENABLED: AtomicBool = AtomicBool::new(false);
+pub static ENABLED: AtomicBool = AtomicBool::new(false);
 
 static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
     SharedDeviceManager::get()
@@ -17,12 +17,12 @@ static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
 });
 
 pub extern "sysv64" fn trace_instruction_start(opcode: u32, pc: u64) {
+    let count = INSTRUCTION_COUNT.fetch_add(1, Ordering::Relaxed);
+
     if ENABLED.load(Ordering::Relaxed) {
         let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
             panic!()
         };
-
-        let count = INSTRUCTION_COUNT.fetch_add(1, Ordering::Relaxed);
 
         write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
     }

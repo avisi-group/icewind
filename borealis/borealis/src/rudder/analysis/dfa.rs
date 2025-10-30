@@ -288,24 +288,18 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
                     self.add_use(value, stmt);
                     self.add_use(length, stmt);
                 }
-
                 Statement::SizeOf { value } => {
                     self.add_use(value, stmt);
                 }
-
                 Statement::MatchesUnion { value, .. } => self.add_use(value, stmt),
                 Statement::UnwrapUnion { value, .. } => self.add_use(value, stmt),
-
                 Statement::GetFlags { operation } => self.add_use(operation, stmt),
-
                 Statement::ReadVariable { .. }
                 | Statement::ReadPc
                 | Statement::Jump { .. }
                 | Statement::PhiNode { .. }
                 | Statement::Constant { .. } => {}
-
                 Statement::TupleAccess { source, .. } => self.add_use(source, stmt),
-
                 Statement::CreateTuple(values) => {
                     values.into_iter().for_each(|v| self.add_use(v, stmt))
                 }
@@ -313,6 +307,15 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
                     self.add_use(a, stmt);
                     self.add_use(b, stmt);
                     self.add_use(c, stmt);
+                }
+                Statement::CompareExchange {
+                    address,
+                    compare_operand,
+                    operand,
+                } => {
+                    self.add_use(address, stmt);
+                    self.add_use(compare_operand, stmt);
+                    self.add_use(operand, stmt);
                 }
             }
         }

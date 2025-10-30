@@ -981,6 +981,23 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
 
                 StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
+
+            Statement::CompareExchange {
+                address,
+                compare_operand,
+                operand,
+            } => {
+                let address = value_store.get(*address);
+                let compare_operand = value_store.get(*compare_operand);
+                let operand = value_store.get(*operand);
+
+                StatementResult::Data(Some(self.emitter.compare_exchange(
+                    address,
+                    compare_operand,
+                    operand,
+                )))
+            }
+
             Statement::WriteMemory { address, value } => {
                 let is_unprivileged = self.function.name().as_ref()
                     == "execute_aarch64_instrs_memory_single_general_immediate_signed_offset_unpriv";

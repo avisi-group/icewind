@@ -1521,6 +1521,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
+            "MemAtomic" => {
+                let address = args[0].clone();
+                let compare_operand = args[1].clone();
+                let operand = args[2].clone();
+                let modop = args[17].clone();
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CompareExchange { address, compare_operand, operand },
+                ))
+            }
+
             // val Mem_set__2 : (%bv64, %i, struct AccessDescriptor, %bool, %bool, %bv) -> %unit
             "Mem_set" | "Mem_set__1" | "Mem_set__2" => {
                 let address = args[0].clone();

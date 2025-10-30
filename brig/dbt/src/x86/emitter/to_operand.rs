@@ -18,6 +18,7 @@ use {
     alloc::vec::Vec,
     common::ktest,
     core::cmp::{Ordering, min},
+    x86::msr::IA32_BIOS_SIGN_ID,
 };
 
 impl<'a, 'ctx> X86Emitter<'ctx> {
@@ -492,7 +493,6 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     dst
                 }
             }
-
             NodeKind::BitInsert {
                 target,
                 source,
@@ -539,7 +539,6 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     self.to_operand(&out)
                 }
             }
-
             NodeKind::BitReplicate { pattern, count } => {
                 let pattern_width = pattern.typ().width();
 
@@ -653,6 +652,34 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 }
 
                 dest
+            }
+            NodeKind::CompareExchange {
+                address,
+                compare_operand,
+                operand,
+            } => {
+                let compare_operand = self.to_operand(compare_operand);
+                let operand = self.to_operand(operand);
+
+                let width = compare_operand.width();
+
+                let address = {
+                    let op = self.to_operand_reg_promote(address);
+                    let OperandKind::Register(reg) = op.kind() else {
+                        panic!()
+                    };
+
+                    Operand::mem_base_displ(width, *reg, 0)
+                };
+
+                let rax = Operand::preg(width, PhysicalRegister::RAX);
+                self.push_instruction(Instruction::mov(compare_operand, rax).unwrap());
+
+                self.push_instruction(Instruction::cmpxchg(operand, address));
+
+                let dst = Operand::vreg(width, self.next_vreg());
+                self.push_instruction(Instruction::mov(rax, dst).unwrap());
+                dst
             }
         };
 
@@ -1062,11 +1089,13 @@ fn encode_compare(
         panic!("should've been fixed earlier")
     }
 
-    let is_signed = match (left.typ(), right.typ()) {
-        (Type::Unsigned(_) | Type::Bits | Type::Int, Type::Unsigned(_) | Type::Bits) => false,
-        (Type::Signed(_) | Type::Int, Type::Signed(_) | Type::Int) => true,
-        _ => panic!("different types in comparison:\n{left:?}\nand\n{right:?}"),
-    };
+    // let is_signed = match (left.typ(), right.typ()) {
+    //     (Type::Unsigned(_) | Type::Bits | Type::Int, Type::Unsigned(_) |
+    // Type::Bits) => false,     (Type::Signed(_) | Type::Int, Type::Signed(_) |
+    // Type::Int) => true,     _ => panic!("different types in
+    // comparison:\n{left:?}\nand\n{right:?}"), };
+    let is_signed = matches!(left.typ(), Type::Signed(_) | Type::Int)
+        || matches!(right.typ(), Type::Signed(_) | Type::Int);
 
     let left_op = emitter.to_operand(&left);
     let right_op = emitter.to_operand(&right);

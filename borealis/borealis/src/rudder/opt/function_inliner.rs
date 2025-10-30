@@ -242,6 +242,12 @@ pub fn import_statement_at(
             address: statement_mapping.get(&offset).unwrap().clone(),
             size: statement_mapping.get(&size).unwrap().clone(),
         },
+
+        Statement::CompareExchange { address, compare_operand, operand } =>  Statement::CompareExchange {
+            address: statement_mapping.get(&address).unwrap().clone(),
+              compare_operand: statement_mapping.get(&compare_operand).unwrap().clone(),
+                 operand: statement_mapping.get(&operand).unwrap().clone(),
+        },
         Statement::WriteMemory {
             address: offset,
             value,

@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
-            trace_register_read, trace_register_write,
+            self, trace_instruction_end, trace_instruction_start, trace_memory_read,
+            trace_memory_write, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -48,7 +48,7 @@ const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 const SINGLE_STEP: bool = false;
 
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = true;
+const CHAIN_CACHE_ENABLED: bool = false;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
@@ -204,6 +204,11 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
+            tracing::ENABLED.store(
+                self.register_file.read::<u8>("PSTATE_EL") == 0,
+                Ordering::Relaxed,
+            );
+
             let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
 
             LAST_BLOCK_START_VIRT_PC.store(block_start_virtual_pc, Ordering::Relaxed);

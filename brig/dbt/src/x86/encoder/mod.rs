@@ -19,7 +19,7 @@ use {
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister32, AsmRegister64, AsmRegisterXmm,
-        CodeAssembler, CodeLabel, qword_ptr,
+        CodeAssembler, CodeLabel, dword_ptr, qword_ptr,
     },
 };
 
@@ -39,6 +39,9 @@ pub enum Opcode {
     CMOVE(Operand, Operand),
     /// cmovne {0}, {1}
     CMOVNE(Operand, Operand),
+
+    /// cmpxchg {0}, {1}
+    CMPXCHG(Operand, Operand),
 
     /// lea {0}, {1}
     LEA(Operand, Operand),
@@ -622,6 +625,10 @@ impl Instruction {
 
     pub fn shl(amount: Operand, op0: Operand) -> Self {
         Self(Opcode::SHL(amount, op0))
+    }
+
+    pub fn cmpxchg(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::CMPXCHG(src, dst))
     }
 
     pub fn shr(amount: Operand, op0: Operand) -> Self {
@@ -1388,6 +1395,51 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            CMPXCHG(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .cmpxchg::<AsmMemoryOperand, AsmRegister64>(
+                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
+            CMPXCHG(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .cmpxchg::<AsmMemoryOperand, AsmRegister32>(
+                    dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1510,6 +1562,12 @@ impl Instruction {
             .into_iter(),
             Opcode::CQO => [None, None, None].into_iter(),
             Opcode::LABEL => [None, None, None].into_iter(),
+            Opcode::CMPXCHG(src, dst) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst)),
+                None,
+            ]
+            .into_iter(),
         }
     }
 
@@ -1684,6 +1742,16 @@ impl Instruction {
                 (
                     OperandDirection::Out,
                     Operand::preg(Width::_64, PhysicalRegister::RDX),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::CMPXCHG(src, dst) => [
+                (OperandDirection::In, src),
+                (OperandDirection::InOut, dst),
+                (
+                    OperandDirection::In,
+                    Operand::preg(Width::_64, PhysicalRegister::RAX),
                 ),
             ]
             .into_iter()

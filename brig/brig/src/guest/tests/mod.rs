@@ -7154,3 +7154,25 @@ fn addp_16b() {
         0x4e063539c0d886f0_4e063539c0d886f0,
     );
 }
+
+#[ktest]
+fn cas() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // c8a07c41
+    // execute_aarch64_instrs_memory_atomicops_cas_single
+    translate_instruction(
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xc8a07c41,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}

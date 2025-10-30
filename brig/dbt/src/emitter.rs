@@ -71,6 +71,12 @@ pub trait Emitter {
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef, is_unprivileged: bool);
+    fn compare_exchange(
+        &mut self,
+        address: Self::NodeRef,
+        compare_operand: Self::NodeRef,
+        operand: Self::NodeRef,
+    ) -> Self::NodeRef;
 
     fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef;
     fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef);

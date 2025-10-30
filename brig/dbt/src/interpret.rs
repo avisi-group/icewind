@@ -263,7 +263,6 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         })
                     }
                 },
-
                 Statement::ShiftOperation {
                     kind,
                     value,
@@ -551,7 +550,6 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                 Statement::BitReplicate { .. } => {
                     todo!()
                 }
-
                 Statement::ReadElement { .. } => todo!(),
                 Statement::AssignElement {
                     vector,
@@ -604,7 +602,6 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                     Some(values[*index].clone())
                 }
-
                 Statement::WriteVariable { symbol, value } => {
                     self.locals.insert(symbol.name(), self.resolve(value));
                     None
@@ -625,7 +622,6 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     None
                 }
                 Statement::PhiNode { .. } => todo!(),
-
                 Statement::Jump { target } => return BlockResult::NextBlock(*target),
                 Statement::Branch {
                     condition,
@@ -640,16 +636,13 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         *false_target
                     });
                 }
-
                 Statement::Return { value } => {
                     return BlockResult::ReturnValue(value.map(|value| self.resolve(value)));
                 }
-
                 Statement::Panic(v) => {
                     let v = self.resolve(v);
                     panic!("panic! {v:?}")
                 }
-
                 Statement::Assert { condition } => {
                     let condition = self.resolve_u64(condition);
                     if condition == 0 {
@@ -661,6 +654,11 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                     None
                 }
+                Statement::CompareExchange {
+                    address,
+                    compare_operand,
+                    operand,
+                } => todo!(),
             };
 
             log::trace!(
