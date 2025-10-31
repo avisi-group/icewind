@@ -24,7 +24,7 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-pub const TRACING_ENABLED: bool = false;
+pub const EMIT_TRACING: bool = true;
 
 // sysv64 ABI
 pub const ARG_REGS: &[PhysicalRegister] = &[
@@ -342,9 +342,9 @@ impl<'a> X86TranslationContext {
                 }
             });
 
-        log::trace!("\n\n\nPRE ALLOC");
+        log::debug!("\n\n\nPRE ALLOC");
         for (idx, instr) in instructions.iter().enumerate() {
-            log::trace!("{idx}: {instr}");
+            log::debug!("{idx}: {instr}");
         }
 
         register_allocator::allocate(
@@ -353,9 +353,9 @@ impl<'a> X86TranslationContext {
             self.global_register_offset,
         );
 
-        log::trace!("\n\n\nPOST ALLOC");
+        log::debug!("\n\n\nPOST ALLOC");
         for (idx, instr) in instructions.iter().enumerate() {
-            log::trace!("{idx}: {instr}");
+            log::debug!("{idx}: {instr}");
         }
 
         // Collapse labels

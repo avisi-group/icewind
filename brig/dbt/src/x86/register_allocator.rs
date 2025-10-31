@@ -10,6 +10,7 @@ use {
         },
     },
     alloc::vec::Vec,
+    core::fmt::{self, Debug},
     strum::EnumCount,
 };
 
@@ -272,10 +273,12 @@ fn do_allocate(
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
-                                    //log::debug!(" updating preg={} vreg={}")
+                                    let vreg = avail_phys_reg_track.tracking.unwrap();
+
+                                    log::debug!(" updating preg={avail_phys_reg} vreg={vreg}, live_phys_regs={live_phys_regs:?}");
 
                                     register_tracking
-                                        .get_mut(&avail_phys_reg_track.tracking.unwrap())
+                                        .get_mut(&vreg)
                                         .interference
                                         .extend(&live_phys_regs);
                                 }
@@ -320,7 +323,7 @@ fn do_allocate(
 
                             conflicting_vreg.physical_register = Some(new_phys_reg);
                             live_phys_regs.insert(new_phys_reg);
-                            conflicting_vreg.interference = live_phys_regs.clone();
+                            conflicting_vreg.interference.extend(&live_phys_regs);
 
                             register_tracking
                                 .get_mut(&Register::Physical(new_phys_reg))
@@ -517,7 +520,7 @@ impl RegisterTracker {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy)]
 struct PhysicalRegisterSet {
     set: [bool; PhysicalRegister::COUNT],
 }
@@ -566,6 +569,14 @@ impl PhysicalRegisterSet {
             pos: 0,
             set: self.clone(),
         }
+    }
+}
+
+impl Debug for PhysicalRegisterSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PhysicalRegisterSet(")?;
+        self.iter().for_each(|r| write!(f, "{r}, ").unwrap());
+        write!(f, ")")
     }
 }
 

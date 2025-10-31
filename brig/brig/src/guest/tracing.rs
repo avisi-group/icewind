@@ -1,15 +1,14 @@
 use {
-    alloc::vec::Vec,
     core::{
-        fmt::{self, Display, Write},
-        sync::atomic::AtomicU64,
+        fmt::Write,
+        sync::atomic::{AtomicBool, AtomicU64, Ordering},
     },
-    kernel::devices::{Device, SharedDevice, TransportDevice, manager::SharedDeviceManager},
-    spin::{Lazy, Mutex},
-    x86::io::outb,
+    kernel::devices::{Device, SharedDevice, manager::SharedDeviceManager},
+    spin::Lazy,
 };
 
 static INSTRUCTION_COUNT: AtomicU64 = AtomicU64::new(0);
+static ENABLED: AtomicBool = AtomicBool::new(false);
 
 static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
     SharedDeviceManager::get()
@@ -18,51 +17,63 @@ static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
 });
 
 pub extern "sysv64" fn trace_instruction_start(opcode: u32, pc: u64) {
-    let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-        panic!()
-    };
-
-    let count = INSTRUCTION_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-
-    write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
-}
-
-pub extern "sysv64" fn trace_instruction_end() {
-    let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-        panic!()
-    };
-
-    writeln!(transport, " }}").unwrap();
-}
-
-pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
-    if offset != 0x8820 {
+    if ENABLED.load(Ordering::Relaxed) {
         let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
             panic!()
         };
-        write!(transport, "R[{offset:x}] => {value:#x}, ").unwrap();
+
+        let count = INSTRUCTION_COUNT.fetch_add(1, Ordering::Relaxed);
+
+        write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
+    }
+}
+
+pub extern "sysv64" fn trace_instruction_end() {
+    if ENABLED.load(Ordering::Relaxed) {
+        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+            panic!()
+        };
+
+        writeln!(transport, " }}").unwrap();
+    }
+}
+
+pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
+    if ENABLED.load(Ordering::Relaxed) {
+        if offset != 0x8820 {
+            let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+                panic!()
+            };
+            write!(transport, "R[{offset:x}] => {value:#x}, ").unwrap();
+        }
     }
 }
 
 pub extern "sysv64" fn trace_register_write(offset: u64, value: u64) {
-    if offset != 0x8820 {
-        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-            panic!()
-        };
-        write!(transport, "R[{offset:x}] <= {value:#x}, ").unwrap();
+    if ENABLED.load(Ordering::Relaxed) {
+        if offset != 0x8820 {
+            let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+                panic!()
+            };
+            write!(transport, "R[{offset:x}] <= {value:#x}, ").unwrap();
+        }
     }
 }
 
 pub extern "sysv64" fn trace_memory_read(address: u64, value: u64, width: u8) {
-    let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-        panic!()
-    };
-    write!(transport, "M[{address:x}:{width}] => {value:#x}, ").unwrap();
+    if ENABLED.load(Ordering::Relaxed) {
+        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+            panic!()
+        };
+        write!(transport, "M[{address:x}:{width}] => {value:#x}, ").unwrap();
+    }
 }
 
 pub extern "sysv64" fn trace_memory_write(address: u64, value: u64, width: u8) {
-    let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-        panic!()
-    };
-    write!(transport, "M[{address:x}:{width}] <= {value:#x}, ").unwrap();
+    if ENABLED.load(Ordering::Relaxed) {
+        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+            panic!()
+        };
+        write!(transport, "M[{address:x}:{width}] <= {value:#x}, ").unwrap();
+    }
 }

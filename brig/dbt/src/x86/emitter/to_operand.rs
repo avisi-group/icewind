@@ -2,7 +2,7 @@ use {
     crate::{
         emitter::{Emitter, Type},
         x86::{
-            TRACING_ENABLED,
+            EMIT_TRACING,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
                 TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
@@ -124,7 +124,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     .unwrap(),
                 );
 
-                if TRACING_ENABLED {
+                if EMIT_TRACING {
                     let mut arguments = Vec::new_in(self.ctx().allocator());
                     arguments.push(Operand::imm(Width::_64, *offset));
 
@@ -630,7 +630,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                         .unwrap(),
                 );
 
-                if TRACING_ENABLED {
+                if EMIT_TRACING {
                     let mut arguments = Vec::new_in(self.ctx().allocator());
                     arguments.push(address);
 

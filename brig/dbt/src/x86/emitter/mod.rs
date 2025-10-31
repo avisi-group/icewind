@@ -4,7 +4,7 @@ use {
         emitter::{Emitter, Type},
         trampoline::ExecutionResult,
         x86::{
-            ARG_REGS, CALLER_SAVED, TRACING_ENABLED, X86Block, X86TranslationContext,
+            ARG_REGS, CALLER_SAVED, EMIT_TRACING, X86Block, X86TranslationContext,
             encoder::{
                 Instruction, MemoryScale, Opcode, Operand, OperandKind,
                 registers::{PhysicalRegister, Register, SegmentRegister},
@@ -1717,7 +1717,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             .unwrap(),
         );
 
-        if TRACING_ENABLED {
+        if EMIT_TRACING {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(Operand::imm(Width::_64, offset));
 
@@ -1828,7 +1828,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             panic!()
         }
 
-        if TRACING_ENABLED {
+        if EMIT_TRACING {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 

@@ -21,6 +21,7 @@ static LOGGER: &Logger = &Logger {
                                            * archive */
         ("common::bits", LevelFilter::Off), // silencing overflows when generating masks
         ("brig::guest::models", LevelFilter::Info),
+        ("dbt::x86::register_allocator", LevelFilter::Info),
         ("dbt::x86", LevelFilter::Info),
         ("dbt::translate", LevelFilter::Info),
         ("dbt::interpret", LevelFilter::Info),

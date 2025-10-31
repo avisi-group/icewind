@@ -213,7 +213,6 @@ impl ModelDevice {
                     pc
                 } else {
                     let pc = guest_translate(self, block_start_virtual_pc, TranslationType::Fetch);
-
                     translation_cache.insert(block_start_virtual_pc as usize, pc);
                     pc
                 };

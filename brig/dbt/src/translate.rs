@@ -4,7 +4,7 @@ use {
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
         x86::{
-            TRACING_ENABLED, X86Block,
+            EMIT_TRACING, X86Block,
             emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
@@ -21,10 +21,7 @@ use {
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         width_helpers::unsigned_smallest_width_of_value,
     },
-    core::{
-        hash::{Hash, Hasher},
-        panic,
-    },
+    core::{hash::Hash, panic},
     itertools::Itertools,
 };
 
@@ -86,7 +83,7 @@ pub fn translate_instruction(
 ) -> Result<Option<X86NodeRef>, Error> {
     register_file.write("SEE", -1i64);
 
-    if TRACING_ENABLED {
+    if EMIT_TRACING {
         emitter.emit_trace_instruction_start(opcode, pc);
     }
 
@@ -135,7 +132,7 @@ pub fn translate_instruction(
         }
     };
 
-    if TRACING_ENABLED {
+    if EMIT_TRACING {
         emitter.emit_trace_instruction_end();
     }
 
