@@ -177,7 +177,7 @@ fn num_of_feature_const_123() {
     assert_eq!(
         *out.kind(),
         NodeKind::Constant {
-            value: 159,
+            value: 123,
             width: 64
         }
     );
@@ -2566,10 +2566,17 @@ fn current_security_state_is_const() {
     )
     .unwrap();
 
+    // enum SecurityState {
+    // 	SS_NonSecure = 0,
+    // 	SS_Root = 1,
+    // 	SS_Realm = 2,
+    // 	SS_Secure = 3,
+    // }
+
     assert_eq!(
         *state.unwrap().kind(),
         NodeKind::Constant {
-            value: 2,
+            value: 1,
             width: 32
         }
     )
@@ -7156,11 +7163,11 @@ fn addp_16b() {
 }
 
 #[ktest]
-fn cas() {
+fn cas_success() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    // c8a07c41
+    // c8a07c41        cas     x0, x1, [x2]
     // execute_aarch64_instrs_memory_atomicops_cas_single
     translate_instruction(
         &model,
@@ -7175,4 +7182,48 @@ fn cas() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut mem = Box::new(0xAAAA_AAAAu64);
+    let ptr = (&mut *mem) as *mut u64 as u64;
+
+    register_file.write::<u64>("R0", 0xAAAA_AAAA);
+    register_file.write::<u64>("R1", 0xBBBB_BBBB);
+    register_file.write::<u64>("R2", ptr);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*mem, 0xBBBB_BBBB);
+}
+
+#[ktest]
+fn cas_fail() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // c8a07c41        cas     x0, x1, [x2]
+    // execute_aarch64_instrs_memory_atomicops_cas_single
+    translate_instruction(
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xc8a07c41,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut mem = Box::new(0xAAAA_AAAAu64);
+    let ptr = (&mut *mem) as *mut u64 as u64;
+
+    register_file.write::<u64>("R0", 0xAAAA_AAAC);
+    register_file.write::<u64>("R1", 0xBBBB_BBBB);
+    register_file.write::<u64>("R2", ptr);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*mem, 0xAAAA_AAAA);
 }
