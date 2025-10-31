@@ -155,10 +155,19 @@ impl BlockDevice for VirtioBlockDevice {
     }
 
     fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), super::IoError> {
+        log::debug!(
+            "start_block_index: {start_block_index:#x}, buf.len: {:#x}",
+            buf.len()
+        );
         self.blk
             .lock()
             .read_blocks(start_block_index, buf)
-            .map_err(|e| panic!("{e:?}"))
+            .map_err(|e| {
+                panic!(
+                    "{e:?}: start_block_index: {start_block_index:#x}, buf.len: {:#x}",
+                    buf.len()
+                )
+            })
     }
 
     fn write(&mut self, buf: &[u8], start_block_index: usize) -> Result<(), super::IoError> {

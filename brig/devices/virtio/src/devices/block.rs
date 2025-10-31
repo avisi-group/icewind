@@ -83,13 +83,10 @@ fn read_callback(dest: &mut [u8], sector: usize) {
 
     log::debug!("reading {} bytes @ {sector:x}", dest.len());
 
-    let offset = (sector * 512) / blk.block_size();
+    assert_eq!(blk.block_size(), 512);
+    assert_eq!(dest.len() % 512, 0);
 
-    dest.chunks_mut(0x1000)
-        .enumerate()
-        .for_each(|(chunk_idx, dest_chunk)| {
-            blk.read(dest_chunk, offset + (chunk_idx * 0x1000)).unwrap();
-        });
+    blk.read(dest, sector).unwrap();
 }
 
 fn write_callback(source: &[u8], sector: usize) {
@@ -101,6 +98,8 @@ fn write_callback(source: &[u8], sector: usize) {
 
     log::debug!("writing {} bytes @ {sector:x}", source.len());
 
-    let offset = (sector * 512) / blk.block_size();
-    blk.write(source, offset).unwrap();
+    assert_eq!(blk.block_size(), 512);
+    assert_eq!(source.len() % 512, 0);
+
+    blk.write(source, sector).unwrap();
 }
