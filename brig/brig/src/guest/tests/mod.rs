@@ -110,50 +110,34 @@ fn static_dynamic_chaos_smoke() {
     assert_eq!(run(1, 1, 0), (1, 1, 5));
 }
 
-// #[ktest]
-// fn num_of_feature_dynamic() {
-//     let model = &*models::get("aarch64").unwrap();
+#[ktest]
+fn num_of_feature_dynamic() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let  register_file = RegisterFile::init(&*model);
-//
+    let feature = emitter.read_register(model.reg_offset("R0"), Type::Signed(32));
 
-//     let mut ctx = X86TranslationContext::new(&model, false,
-// register_file.global_register_offset());     let mut emitter =
-// X86Emitter::new(&mut ctx);
+    let out = translate(
+        &*model,
+        "num_of_Feature",
+        &[feature],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+    emitter.write_register(model.reg_offset("R1"), out);
+    emitter.leave();
 
-//     let feature = emitter.read_register(model.reg_offset("R0"),
-// Type::Signed(32));
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
 
-//     let out = translate(Global,
-//         &*model,
-//         "num_of_Feature",
-//         &[feature],
-//         &mut emitter,
-//         &register_file,
-//     )
-//     .unwrap();
-//     emitter.write_register(model.reg_offset("R1"), out);
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
+    register_file.write::<u64>("R0", 4);
 
-//     let translation = Translation::new(ctx.compile(num_regs));
+    translation.execute(&register_file);
 
-//     unsafe {
-//         let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as
-// *mut i32;         let r1 = register_file_ptr.add(model.reg_offset("R1") as
-// usize) as *mut i64;
-
-//         register_file.write::<u64,_>("R0",4);
-//         *r1 = 0;
-
-//         translation.execute(&register_file);
-
-//         assert_eq!(4, ( register_file.read::<u64,_>("R0")));
-//         assert_eq!(4, (*r1));
-//         //assert_eq!(0xe, (*see)); //// todo: re-implement depending on
-// result         // of SEE/cacheable registers work
-//     }
-// }
+    assert_eq!(register_file.read::<u32>("R1"), 4);
+}
 
 #[ktest]
 fn num_of_feature_const_123() {
