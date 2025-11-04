@@ -86,7 +86,13 @@ fn read_callback(dest: &mut [u8], sector: usize) {
     assert_eq!(blk.block_size(), 512);
     assert_eq!(dest.len() % 512, 0);
 
-    blk.read(dest, sector).unwrap();
+    // reading only one chunk at a time fixes the memory corruption bug, but I don't
+    // know why `virtio-drivers` crate's read method is supposed to work on
+    // multiple blocks (and we never had any issues loading very large model files,
+    // plugins, etc)
+    dest.chunks_mut(512)
+        .enumerate()
+        .for_each(|(i, chunk)| blk.read(chunk, sector + i).unwrap());
 }
 
 fn write_callback(source: &[u8], sector: usize) {
@@ -101,5 +107,9 @@ fn write_callback(source: &[u8], sector: usize) {
     assert_eq!(blk.block_size(), 512);
     assert_eq!(source.len() % 512, 0);
 
-    blk.write(source, sector).unwrap();
+    // see comment in read_callback
+    source
+        .chunks(512)
+        .enumerate()
+        .for_each(|(i, chunk)| blk.write(chunk, sector + i).unwrap());
 }
