@@ -463,6 +463,51 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
         self.emit_call(function, arguments, false);
     }
+
+    // It occurs to me that the Arm distribution we're running is a 39-bit address
+    // space
+
+    //  Well we've got a fucking 48-bit address space
+
+    //  So we can do high and low in one page table?
+
+    //  So, we can just treat their canonical upper addresses, as access in our
+    // canonical lower range
+
+    //  Yes
+
+    //   Just a simple bit of bit shifting and masking should do the trick
+
+    // Amazing
+
+    // wait so the high address I'm seeing in the store instruction is a bug then?
+
+    // So, Arm's address space looks like this:
+    // 0000 0000 0000 0000 .. 0000 007F FFFF FFFF
+    // FFFF FF80 0000 0000 .. FFFF FFFF FFFF FFFF
+
+    // x86_64 with 48-bit addressing looks like
+    // 0000 0000 0000 0000 .. 0000 7FFF FFFF FFFF
+    // FFFF 8000 0000 0000 .. FFFF FFFF FFFF FFFF
+
+    // if we mask highest 6 nibbles we get a contiguous address space
+    fn prepare_memory_address(&mut self, address: Operand) -> Operand {
+        let masked_address = if self.ctx().memory_mask {
+            let mask = Operand::vreg(Width::_64, self.next_vreg());
+
+            self.push_instruction(
+                Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask).unwrap(),
+            );
+
+            let masked = Operand::vreg(Width::_64, self.next_vreg());
+            self.push_instruction(Instruction::mov(address, masked).unwrap());
+            self.push_instruction(Instruction::and(mask, masked));
+            masked
+        } else {
+            address
+        };
+        masked_address
+    }
 }
 
 impl<'ctx> Emitter for X86Emitter<'ctx> {
@@ -1782,49 +1827,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         let value = self.to_operand(&value);
         let width = value.width();
 
-        // It occurs to me that the Arm distribution we're running is a 39-bit address
-        // space
-
-        //  Well we've got a fucking 48-bit address space
-
-        //  So we can do high and low in one page table?
-
-        //  So, we can just treat their canonical upper addresses, as access in our
-        // canonical lower range
-
-        //  Yes
-
-        //   Just a simple bit of bit shifting and masking should do the trick
-
-        // Amazing
-
-        // wait so the high address I'm seeing in the store instruction is a bug then?
-
-        // So, Arm's address space looks like this:
-        // 0000 0000 0000 0000 .. 0000 007F FFFF FFFF
-        // FFFF FF80 0000 0000 .. FFFF FFFF FFFF FFFF
-
-        // x86_64 with 48-bit addressing looks like
-        // 0000 0000 0000 0000 .. 0000 7FFF FFFF FFFF
-        // FFFF 8000 0000 0000 .. FFFF FFFF FFFF FFFF
-
-        // if we mask highest 6 nibbles we get a contiguous address space
-
-        let masked_address = if self.ctx().memory_mask {
-            let mask = Operand::vreg(Width::_64, self.next_vreg());
-
-            self.push_instruction(
-                Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask).unwrap(),
-            );
-
-            let masked = Operand::vreg(Width::_64, self.next_vreg());
-            self.push_instruction(Instruction::mov(address, masked).unwrap());
-
-            self.push_instruction(Instruction::and(mask, masked));
-            masked
-        } else {
-            address
-        };
+        let masked_address = self.prepare_memory_address(address);
 
         if is_unprivileged {
             self.push_instruction(

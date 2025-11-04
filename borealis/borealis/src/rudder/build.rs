@@ -1530,7 +1530,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::CompareExchange { address, compare_operand, operand },
+                    Statement::AtomicOperation { address, compare_operand, operand, operation_kind: modop },
                 ))
             }
 

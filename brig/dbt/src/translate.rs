@@ -982,20 +982,32 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
 
-            Statement::CompareExchange {
+            Statement::AtomicOperation {
                 address,
                 compare_operand,
                 operand,
+                operation_kind,
             } => {
                 let address = value_store.get(*address);
                 let compare_operand = value_store.get(*compare_operand);
                 let operand = value_store.get(*operand);
+                let operation_kind = value_store.get(*operation_kind);
 
-                StatementResult::Data(Some(self.emitter.compare_exchange(
-                    address,
-                    compare_operand,
-                    operand,
-                )))
+                match operation_kind.kind() {
+                    // SWP
+                    NodeKind::Constant { value: 9, .. } => {
+                        let typ = operand.typ();
+                        let loaded = self.emitter.read_memory(address.clone(), typ);
+                        self.emitter.write_memory(address, operand, false);
+                        StatementResult::Data(Some(loaded))
+                    }
+                    // CAS
+                    NodeKind::Constant { value: 10, .. } => StatementResult::Data(Some(
+                        self.emitter
+                            .compare_exchange(address, compare_operand, operand),
+                    )),
+                    k => panic!("{k:?}"),
+                }
             }
 
             Statement::WriteMemory { address, value } => {

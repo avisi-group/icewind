@@ -654,10 +654,11 @@ impl<'f, 'r> Interpreter<'f, 'r> {
 
                     None
                 }
-                Statement::CompareExchange {
+                Statement::AtomicOperation {
                     address,
                     compare_operand,
                     operand,
+                    operation_kind,
                 } => todo!(),
             };
 

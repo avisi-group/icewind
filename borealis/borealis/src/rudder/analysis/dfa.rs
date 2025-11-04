@@ -308,14 +308,16 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
                     self.add_use(b, stmt);
                     self.add_use(c, stmt);
                 }
-                Statement::CompareExchange {
+                Statement::AtomicOperation {
                     address,
                     compare_operand,
                     operand,
+                    operation_kind,
                 } => {
                     self.add_use(address, stmt);
                     self.add_use(compare_operand, stmt);
                     self.add_use(operand, stmt);
+                    self.add_use(operation_kind, stmt);
                 }
             }
         }

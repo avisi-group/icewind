@@ -609,20 +609,13 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
 
                 let address = self.to_operand(address);
-                let OperandKind::Register(address_reg) = address.kind() else {
-                    panic!()
-                };
-
                 let dest = Operand::vreg(width, self.next_vreg());
 
-                if self.ctx().memory_mask {
-                    let mask = Operand::vreg(Width::_64, self.next_vreg());
-                    self.push_instruction(
-                        Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask)
-                            .unwrap(),
-                    );
-                    self.push_instruction(Instruction::and(mask, address));
-                }
+                let masked_address = self.prepare_memory_address(address);
+
+                let OperandKind::Register(address_reg) = masked_address.kind() else {
+                    panic!()
+                };
 
                 self.push_instruction(
                     Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest)
@@ -664,8 +657,10 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 let width = compare_operand.width();
 
                 let address = {
-                    let op = self.to_operand_reg_promote(address);
-                    let OperandKind::Register(reg) = op.kind() else {
+                    let address = self.to_operand_reg_promote(address);
+                    let masked = self.prepare_memory_address(address);
+
+                    let OperandKind::Register(reg) = masked.kind() else {
                         panic!()
                     };
 

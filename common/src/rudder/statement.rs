@@ -117,10 +117,11 @@ pub enum Statement {
         address: Ref<Statement>,
         value: Ref<Statement>,
     },
-    CompareExchange {
+    AtomicOperation {
         address: Ref<Statement>,
         compare_operand: Ref<Statement>,
         operand: Ref<Statement>,
+        operation_kind: Ref<Statement>,
     },
 
     ReadPc,
@@ -284,7 +285,7 @@ impl Statement {
             Self::ReadRegister { typ, .. } => Some(typ.clone()),
             Self::WriteRegister { .. } => None,
             Self::ReadMemory { .. } => Some(Type::Bits),
-            Self::CompareExchange { .. } => Some(Type::Bits),
+            Self::AtomicOperation { .. } => Some(Type::Bits),
             Self::WriteMemory { .. } => None,
             Self::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
@@ -687,10 +688,11 @@ impl Statement {
                 }
             }
 
-            Self::CompareExchange {
+            Self::AtomicOperation {
                 address,
                 compare_operand,
                 operand,
+                operation_kind,
             } => {
                 let address = if address == use_of {
                     with.clone()
@@ -710,10 +712,17 @@ impl Statement {
                     operand.clone()
                 };
 
-                *self = Self::CompareExchange {
+                let operation_kind = if operation_kind == use_of {
+                    with.clone()
+                } else {
+                    operation_kind.clone()
+                };
+
+                *self = Self::AtomicOperation {
                     address,
                     compare_operand,
                     operand,
+                    operation_kind,
                 };
             }
 
@@ -948,12 +957,13 @@ impl Statement {
             } => {
                 format!("read-mem {}:{}", offset, size)
             }
-            Self::CompareExchange {
+            Self::AtomicOperation {
                 address,
                 compare_operand,
                 operand,
+                operation_kind,
             } => {
-                format!("cmp-exchg {address} {compare_operand} {operand}")
+                format!("cmp-exchg ({operation_kind}) {address} {compare_operand} {operand}")
             }
 
             Self::WriteMemory {
@@ -1521,14 +1531,16 @@ pub fn import_statement(
             address: mapping.get(&offset).unwrap().clone(),
             size: mapping.get(&size).unwrap().clone(),
         },
-        Statement::CompareExchange {
+        Statement::AtomicOperation {
             address,
             compare_operand,
             operand,
-        } => Statement::CompareExchange {
+            operation_kind,
+        } => Statement::AtomicOperation {
             address: mapping.get(&address).unwrap().clone(),
             compare_operand: mapping.get(&compare_operand).unwrap().clone(),
             operand: mapping.get(&operand).unwrap().clone(),
+            operation_kind: mapping.get(&operation_kind).unwrap().clone(),
         },
         Statement::WriteMemory {
             address: offset,
