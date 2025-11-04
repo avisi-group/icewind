@@ -3,7 +3,7 @@ use core::{
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Width {
     _8,
     _16,

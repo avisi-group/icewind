@@ -8,7 +8,7 @@ use {
     strum::{EnumCount, EnumIter, IntoEnumIterator},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
 pub enum SegmentRegister {
     /// fs
     FS,

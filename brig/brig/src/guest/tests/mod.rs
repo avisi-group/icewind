@@ -21,7 +21,7 @@ use {
         bump_alloc::BumpAllocatorRef,
         emitter::{Emitter, Type},
         interpret::{self, Value, interpret},
-        register_file::{self, RegisterFile},
+        register_file::RegisterFile,
         translate::{translate, translate_instruction},
         x86::{
             Callbacks, X86TranslationContext,
@@ -7210,4 +7210,67 @@ fn cas_fail() {
     translation.execute(&register_file);
 
     assert_eq!(*mem, 0xAAAA_AAAA);
+}
+
+#[ktest]
+fn swp() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // f8208041     swp     x0, x1, [x2]
+    translate_instruction(
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xf8208041,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut mem = Box::new(0xAAAA_AAAAu64);
+    let ptr = (&mut *mem) as *mut u64 as u64;
+
+    register_file.write::<u64>("R0", 0xBBBB_BBBB); // stored into mem
+    register_file.write::<u64>("R1", 0xCCCC_CCCC); // overwritten with previous contents of mem
+    register_file.write::<u64>("R2", ptr);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*mem, 0xBBBB_BBBB);
+    assert_eq!(register_file.read::<u64>("R0"), 0xBBBB_BBBB);
+    assert_eq!(register_file.read::<u64>("R1"), 0xAAAA_AAAA);
+}
+
+#[ktest]
+fn ldr_xzr_x3() {
+    let (model, register_file, mut ctx) = setup();
+
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  f940007f        ldr     xzr, [x3]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xf940007f,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut mem = Box::new(0xAAAA_AAAAu64);
+    let ptr = (&mut *mem) as *mut u64 as u64;
+    register_file.write("R3", ptr);
+
+    translation.execute(&register_file);
 }

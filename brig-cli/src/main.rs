@@ -393,6 +393,8 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         "-device",
         "virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4",
     ]);
+    // rootfs.ext2
+    // hello_rs.ext2
     cmd.args([
         "-drive",
         &format!("file=guest_data/hello_rs.ext2,if=none,format=raw,id=drive1",),

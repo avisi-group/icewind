@@ -204,8 +204,10 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
+            // 31089729
             tracing::ENABLED.store(
-                self.register_file.read::<u8>("PSTATE_EL") == 0,
+                self.register_file.read::<u8>("PSTATE_EL") == 1
+                    && tracing::INSTRUCTION_COUNT.load(Ordering::Relaxed) > 100_000_000,
                 Ordering::Relaxed,
             );
 

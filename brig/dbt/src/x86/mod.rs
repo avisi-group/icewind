@@ -128,19 +128,12 @@ impl Debug for X86Block {
     }
 }
 
-struct CachedFunction {
-    entry_block: Ref<X86Block>,
-    result: Option<X86NodeRef>,
-}
-
 pub struct X86TranslationContext {
     allocator: BumpAllocatorRef,
     blocks: Arena<X86Block, BumpAllocatorRef>,
     initial_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
     writes_to_pc: bool,
-
-    function_cache: HashMapA<InternedString, CachedFunction, BumpAllocatorRef>,
 
     pc_offset: u64,
     el_offset: u64,
@@ -239,7 +232,6 @@ impl<'a> X86TranslationContext {
             initial_block,
             panic_block,
             writes_to_pc: false,
-            function_cache: hashmap_in(allocator),
 
             pc_offset: model.reg_offset("_PC"),
             el_offset: model.reg_offset("PSTATE_EL"),
@@ -342,21 +334,11 @@ impl<'a> X86TranslationContext {
                 }
             });
 
-        log::debug!("\n\n\nPRE ALLOC");
-        for (idx, instr) in instructions.iter().enumerate() {
-            log::debug!("{idx}: {instr}");
-        }
-
         register_allocator::allocate(
             &mut instructions,
             num_virtual_registers,
             self.global_register_offset,
         );
-
-        log::debug!("\n\n\nPOST ALLOC");
-        for (idx, instr) in instructions.iter().enumerate() {
-            log::debug!("{idx}: {instr}");
-        }
 
         // Collapse labels
         // Go through each instruction

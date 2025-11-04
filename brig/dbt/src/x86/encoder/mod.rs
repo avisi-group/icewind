@@ -159,7 +159,7 @@ pub enum Opcode {
     LABEL,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
 pub enum MemoryScale {
     /// * 1
     S1,
@@ -182,7 +182,7 @@ impl Into<i32> for MemoryScale {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OperandKind {
     Immediate(u64),
     Memory {
@@ -261,7 +261,7 @@ impl Debug for OperandKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 
 pub struct Operand {
     pub kind: OperandKind,

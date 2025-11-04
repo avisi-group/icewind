@@ -1794,9 +1794,46 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef {
+        let width = Width::from_uncanonicalized(typ.width()).unwrap();
+
+        let address = self.to_operand(&address);
+        let dest = Operand::vreg(width, self.next_vreg());
+
+        let masked_address = self.prepare_memory_address(address);
+
+        let OperandKind::Register(address_reg) = masked_address.kind() else {
+            panic!()
+        };
+
+        self.push_instruction(
+            Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest).unwrap(),
+        );
+
+        if EMIT_TRACING {
+            let mut arguments = Vec::new_in(self.ctx().allocator());
+            arguments.push(address);
+
+            let dest = if dest.width() < Width::_64 {
+                let op = Operand::vreg(Width::_64, self.next_vreg());
+                self.push_instruction(Instruction::movzx(dest, op).unwrap());
+                op
+            } else {
+                dest
+            };
+
+            arguments.push(dest);
+            arguments.push(Operand::imm(Width::_64, u64::from(width.as_u16())));
+
+            self.emit_call(
+                Operand::imm(Width::_64, self.ctx().callbacks.trace_memory_read as u64),
+                arguments,
+                false,
+            );
+        }
+
         self.node(X86Node {
             typ,
-            kind: NodeKind::ReadMemory { address },
+            kind: NodeKind::Operand(dest),
         })
     }
 
@@ -1806,13 +1843,34 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         compare_operand: Self::NodeRef,
         operand: Self::NodeRef,
     ) -> Self::NodeRef {
+        let typ = operand.typ();
+        let compare_operand = self.to_operand(&compare_operand);
+        let operand = self.to_operand(&operand);
+
+        let width = compare_operand.width();
+
+        let address = {
+            let address = self.to_operand_reg_promote(&address);
+            let masked = self.prepare_memory_address(address);
+
+            let OperandKind::Register(reg) = masked.kind() else {
+                panic!()
+            };
+
+            Operand::mem_base_displ(width, *reg, 0)
+        };
+
+        let rax = Operand::preg(width, PhysicalRegister::RAX);
+        self.push_instruction(Instruction::mov(compare_operand, rax).unwrap());
+
+        self.push_instruction(Instruction::cmpxchg(operand, address));
+
+        let dst = Operand::vreg(width, self.next_vreg());
+        self.push_instruction(Instruction::mov(rax, dst).unwrap());
+
         self.node(X86Node {
-            typ: operand.typ(),
-            kind: NodeKind::CompareExchange {
-                address,
-                compare_operand,
-                operand,
-            },
+            typ,
+            kind: NodeKind::Operand(dst),
         })
     }
 
@@ -2418,17 +2476,10 @@ pub enum NodeKind {
         value: u64,
         width: u32,
     },
+    Operand(Operand),
     FunctionPointer(u64),
     GuestRegister {
         offset: u64,
-    },
-    ReadMemory {
-        address: X86NodeRef,
-    },
-    CompareExchange {
-        address: X86NodeRef,
-        compare_operand: X86NodeRef,
-        operand: X86NodeRef,
     },
     UnaryOperation(UnaryOperationKind),
     BinaryOperation(BinaryOperationKind),
@@ -2724,7 +2775,7 @@ fn contains_get_flags(value: &X86NodeRef) -> Option<X86NodeRef> {
 
         NodeKind::Constant { .. }
         | NodeKind::GuestRegister { .. }
-        | NodeKind::ReadMemory { .. }
+        | NodeKind::Operand(_)
         | NodeKind::ReadStackVariable { .. } => None,
 
         NodeKind::UnaryOperation(
@@ -2787,7 +2838,7 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
         }
         NodeKind::Constant { .. }
         | NodeKind::GuestRegister { .. }
-        | NodeKind::ReadMemory { .. }
+        | NodeKind::Operand(_)
         | NodeKind::ReadStackVariable { .. } => None,
         NodeKind::UnaryOperation(
             UnaryOperationKind::Absolute(value)
@@ -2844,11 +2895,6 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
             .filter_map(contains_addwithcarry)
             .next(),
         NodeKind::FunctionPointer(_) => None,
-        NodeKind::CompareExchange {
-            address,
-            compare_operand,
-            operand,
-        } => todo!(),
     }
 }
 

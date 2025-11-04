@@ -1,13 +1,13 @@
 use {
     core::{
-        fmt::{self, Display, Write},
+        fmt::Write,
         sync::atomic::{AtomicBool, AtomicU64, Ordering},
     },
     kernel::devices::{Device, SharedDevice, manager::SharedDeviceManager},
     spin::Lazy,
 };
 
-static INSTRUCTION_COUNT: AtomicU64 = AtomicU64::new(0);
+pub static INSTRUCTION_COUNT: AtomicU64 = AtomicU64::new(0);
 pub static ENABLED: AtomicBool = AtomicBool::new(false);
 
 static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
@@ -70,6 +70,16 @@ pub extern "sysv64" fn trace_memory_read(address: u64, value: u64, width: u8) {
 }
 
 pub extern "sysv64" fn trace_memory_write(address: u64, value: u64, width: u8) {
+    // // if it's not in the low half
+    // if !(address < 0x8000000000)
+    //     // and outside of this range (presumably guest stack?)
+    //     && !(0xffff_ffc0_0800_0000u64..0xffff_ffc0_0900_0000).contains(&address)
+    //      && !(0xffff_fffe_0000_0000u64..0xffff_fffe_0100_0000u64).contains(&
+    // address) {
+    //     // log it
+    //     log::error!("{address:x}");
+    // }
+
     if ENABLED.load(Ordering::Relaxed) {
         let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
             panic!()

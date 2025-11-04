@@ -29,6 +29,11 @@ pub fn allocate(
     num_virtual_registers: usize,
     global_register_offset: usize,
 ) {
+    log::debug!("\n\nPRE ALLOC");
+    for (idx, instr) in instructions.iter().enumerate() {
+        log::debug!("{idx}: {instr}");
+    }
+
     let mut register_tracking = RegisterTracker::new(num_virtual_registers);
 
     calculate_vreg_live_ranges(&mut register_tracking, instructions);
@@ -41,6 +46,11 @@ pub fn allocate(
         instructions,
         global_register_offset,
     );
+
+    log::debug!("\n\nPOST ALLOC");
+    for (idx, instr) in instructions.iter().enumerate() {
+        log::debug!("{idx}: {instr}");
+    }
 }
 
 fn calculate_vreg_live_ranges(
@@ -137,7 +147,7 @@ fn do_allocate(
         .enumerate()
         .rev()
         .for_each(|(current_instruction_index, instruction)| {
-            log::debug!("@ {} = {}", current_instruction_index, instruction);
+            log::trace!("@ {} = {}", current_instruction_index, instruction);
 
             let mut skip = false;
 
@@ -146,22 +156,45 @@ fn do_allocate(
                     continue;
                 };
 
-                log::debug!("ud def: {usedef_reg:?}");
+                log::trace!("ud def: {usedef_reg:?}");
 
                 match usedef_reg {
                     Register::Virtual(usedef_virt_reg) => {
                         // Definition of a virtual register
                         let tracked_virt_reg = register_tracking.get_mut(&usedef_reg);
 
-                        log::debug!("tracked virt reg: {tracked_virt_reg:?}");
+                        log::trace!("tracked virt reg: {tracked_virt_reg:?}");
 
                         if tracked_virt_reg.first_def == Some(current_instruction_index) {
                             if tracked_virt_reg.last_use.is_none() {
-                                log::debug!("definition of unused vreg {}", usedef_virt_reg);
-                                skip = true;
-                                break 'usedef_iter;
+                                if let Opcode::MOV(src, _) = instruction.0
+                                    && let OperandKind::Memory { .. } = src.kind()
+                                {
+                                    log::trace!(
+                                        "definition of unused vreg {} as destination of memory read",
+                                        usedef_virt_reg
+                                    );
+                                    assert!(tracked_virt_reg.physical_register.is_none());
+
+                                    tracked_virt_reg.physical_register = Some(allocate_phys_reg(
+                                        usedef.1,
+                                        &avail_phys_regs_xmm,
+                                        &avail_phys_regs_gpr,
+                                        &tracked_virt_reg.interference,
+                                    ));
+
+                                    log::trace!(
+                                        "allocated {:?} to unused vreg {} ",
+                                        tracked_virt_reg.physical_register,
+                                        usedef_virt_reg
+                                    );
+                                } else {
+                                    log::trace!("definition of unused vreg {}", usedef_virt_reg);
+                                    skip = true;
+                                    break 'usedef_iter;
+                                }
                             } else {
-                                log::debug!(
+                                log::trace!(
                                     "ending live-range of vreg {} in preg {:?}",
                                     usedef_virt_reg,
                                     tracked_virt_reg.physical_register
@@ -177,10 +210,8 @@ fn do_allocate(
                         if live_phys_regs.contains(usedef_phys_reg) {
                             live_phys_regs.remove(usedef_phys_reg);
 
-                            if let Some(Register::Virtual(conflicting_vreg_index)) =
-                                tracked_phys_reg.tracking
-                            {
-                                log::debug!(
+                            if let Some(Register::Virtual(conflicting_vreg_index)) = tracked_phys_reg.tracking {
+                                log::trace!(
                                     "def of preg {}, but it's tracking vreg {}!",
                                     usedef_phys_reg,
                                     conflicting_vreg_index
@@ -208,12 +239,10 @@ fn do_allocate(
                                     .get_mut(&Register::Virtual(conflicting_vreg_index))
                                     .interference = live_phys_regs;
 
-                                for avail_phys_reg in
-                                    avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
-                                {
+                                for avail_phys_reg in avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter()) {
                                     if live_phys_regs.contains(avail_phys_reg) {
-                                        let avail_phys_reg_track = register_tracking
-                                            .get(&Register::Physical(avail_phys_reg));
+                                        let avail_phys_reg_track =
+                                            register_tracking.get(&Register::Physical(avail_phys_reg));
 
                                         register_tracking
                                             .get_mut(&avail_phys_reg_track.tracking.unwrap())
@@ -239,7 +268,7 @@ fn do_allocate(
                     continue;
                 };
 
-                log::debug!("ud use: {usedef_reg:?}");
+                log::trace!("ud use: {usedef_reg:?}");
 
                 match usedef_reg {
                     Register::Virtual(usedef_virt_reg) => {
@@ -266,25 +295,22 @@ fn do_allocate(
                                 .get_mut(&Register::Physical(allocated_phys_reg))
                                 .tracking = Some(usedef_reg);
 
-                            for avail_phys_reg in
-                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
-                            {
+                            for avail_phys_reg in avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter()) {
                                 if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
                                     let vreg = avail_phys_reg_track.tracking.unwrap();
 
-                                    log::debug!(" updating preg={avail_phys_reg} vreg={vreg}, live_phys_regs={live_phys_regs:?}");
+                                    log::trace!(
+                                        " updating preg={avail_phys_reg} vreg={vreg}, live_phys_regs={live_phys_regs:?}"
+                                    );
 
-                                    register_tracking
-                                        .get_mut(&vreg)
-                                        .interference
-                                        .extend(&live_phys_regs);
+                                    register_tracking.get_mut(&vreg).interference.extend(&live_phys_regs);
                                 }
                             }
 
-                            log::debug!(
+                            log::trace!(
                                 "starting live-range of vreg {}, allocated to preg {}",
                                 usedef_virt_reg,
                                 allocated_phys_reg
@@ -302,7 +328,7 @@ fn do_allocate(
 
                             let conflicting_vreg = register_tracking.get_mut(&tracking_reg);
 
-                            log::debug!(
+                            log::trace!(
                                 "conflicting use of preg {}, currently tracking {:?}",
                                 usedef_phys_reg,
                                 tracking_reg
@@ -315,29 +341,21 @@ fn do_allocate(
                                 &conflicting_vreg.interference,
                             );
 
-                            log::debug!(
-                                "re-assigning vreg {} to preg {}",
-                                tracking_reg,
-                                new_phys_reg
-                            );
+                            log::trace!("re-assigning vreg {} to preg {}", tracking_reg, new_phys_reg);
 
                             conflicting_vreg.physical_register = Some(new_phys_reg);
                             live_phys_regs.insert(new_phys_reg);
                             conflicting_vreg.interference.extend(&live_phys_regs);
 
-                            register_tracking
-                                .get_mut(&Register::Physical(new_phys_reg))
-                                .tracking = Some(tracking_reg);
+                            register_tracking.get_mut(&Register::Physical(new_phys_reg)).tracking = Some(tracking_reg);
 
                             //  Update interferences
-                            for avail_phys_reg in
-                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
-                            {
+                            for avail_phys_reg in avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter()) {
                                 if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
-                                    //log::debug!(" updating preg={} vreg={}")
+                                    //log::trace!(" updating preg={} vreg={}")
 
                                     register_tracking
                                         .get_mut(&avail_phys_reg_track.tracking.unwrap())
@@ -350,17 +368,14 @@ fn do_allocate(
                         } else {
                             register_tracking.get_mut(&usedef_reg).tracking = Some(usedef_reg);
                             live_phys_regs.insert(usedef_phys_reg);
-                            register_tracking.get_mut(&usedef_reg).interference =
-                                live_phys_regs.clone();
+                            register_tracking.get_mut(&usedef_reg).interference = live_phys_regs.clone();
 
-                            for avail_phys_reg in
-                                avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter())
-                            {
+                            for avail_phys_reg in avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter()) {
                                 if live_phys_regs.contains(avail_phys_reg) {
                                     let avail_phys_reg_track =
                                         register_tracking.get(&Register::Physical(avail_phys_reg));
 
-                                    //log::debug!(" updating preg={} vreg={}")
+                                    //log::trace!(" updating preg={} vreg={}")
 
                                     register_tracking
                                         .get_mut(&avail_phys_reg_track.tracking.unwrap())
@@ -369,7 +384,7 @@ fn do_allocate(
                                 }
                             }
 
-                            log::debug!("starting live-range of preg {}", usedef_phys_reg);
+                            log::trace!("starting live-range of preg {}", usedef_phys_reg);
                         }
                     }
                     _ => {
@@ -416,7 +431,9 @@ fn commit(
                     register_tracking
                         .get(&Register::Virtual(*vreg))
                         .physical_register
-                        .unwrap_or_else(|| panic!("No physical register tracked by vreg {vreg} when committing instruction {i}")),
+                        .unwrap_or_else(|| {
+                            panic!("No physical register tracked by vreg {vreg} when committing instruction {i}")
+                        }),
                 );
             }
         });
