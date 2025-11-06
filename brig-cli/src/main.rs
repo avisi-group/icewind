@@ -19,7 +19,8 @@ use {
             Arc,
             atomic::{AtomicBool, Ordering},
         },
-        thread,
+        thread::{self, sleep},
+        time::Duration,
     },
     tar::Header,
     walkdir::WalkDir,
@@ -417,6 +418,8 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     let ready = Arc::new(AtomicBool::new(false));
     let terminate = Arc::new(AtomicBool::new(false));
 
+    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&terminate)).unwrap();
+
     let ready_clone = ready.clone();
     let terminate_clone = terminate.clone();
 
@@ -429,12 +432,18 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         )
     });
 
-    while ready.load(Ordering::Relaxed) {}
+    while ready.load(Ordering::Relaxed) {
+        println!("waiting for hyperport...");
+    }
 
     let mut child = cmd.spawn().unwrap();
-    child.wait().unwrap();
 
-    terminate.store(true, Ordering::Relaxed);
+    while !terminate.load(Ordering::Relaxed) {
+        sleep(Duration::from_millis(100));
+    }
+
+    child.kill().unwrap();
+
     handle.join().unwrap();
 }
 
@@ -525,7 +534,16 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
 
     ready.store(true, Ordering::Relaxed);
 
+    let mut flush_counter = 0u64;
+
     while !terminate.load(Ordering::Relaxed) {
+        flush_counter += 1;
+
+        if flush_counter == 10_000_000 {
+            dest.flush().unwrap();
+            flush_counter = 0;
+        }
+
         rb.read(|buffer| {
             match buffer {
                 MaybeSplitBuffer::Single(buf) => dest.write_all(buf).unwrap(),
@@ -537,4 +555,6 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
             buffer.len()
         });
     }
+
+    dest.flush().unwrap();
 }
