@@ -62,6 +62,8 @@ impl RegisterFile {
         configure_features(&register_file);
         interpret(model, "__InitSystem", &[], &register_file);
 
+        register_file.write::<u64>("ID_AA64MMFR1_EL1_bits", 0x1111_1121_1031_2120);
+
         register_file
     }
 
@@ -287,6 +289,8 @@ fn configure_features(register_file: &RegisterFile) {
         "FEAT_PAuth2_IMPLEMENTED",
         "FEAT_AES_IMPLEMENTED",
         "FEAT_SVE_IMPLEMENTED",
+        "FEAT_HAFDBS_IMPLEMENTED",
+        "FEAT_HAFT_IMPLEMENTED",
     ];
 
     disabled.into_iter().for_each(|name| {
