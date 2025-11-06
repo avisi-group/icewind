@@ -332,11 +332,17 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
                 faulting_address.align_down(0x1000u64)
             );
 
+            let flags = if is_write {
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE
+            } else {
+                PageTableFlags::PRESENT
+            };
+
             VirtualMemoryArea::current().map_page_propagate_invalidation(
                 Page::<Size4KiB>::from_start_address(faulting_address.align_down(0x1000u64))
                     .unwrap(),
                 PhysFrame::from_start_address(backing_page).unwrap(),
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                flags,
             );
         }
         GUEST_PHYS_START..GUEST_PHYS_END => {
