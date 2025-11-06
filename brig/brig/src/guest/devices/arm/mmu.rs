@@ -37,6 +37,7 @@ enum ExecutionLevel {
     EL3,
 }
 
+#[derive(Debug, Clone, Copy)]
 struct MmuTranslationContext {
     guest_virtual_address: u64,
     execution_level: ExecutionLevel,
@@ -136,6 +137,8 @@ pub fn guest_translate(
 
                 return 0;
             }
+
+            log::trace!("guest page fault {:x?} {:x?}", mmu_txl_ctx, typ,);
 
             guest_page_fault(device, &mmu_txl_ctx, error);
             unreachable!();

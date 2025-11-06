@@ -4,15 +4,14 @@ use {
         emitter::Emitter,
         register_file::GLOBAL_REGISTER_SIZE,
         x86::{
-            emitter::{X86Emitter, X86NodeRef},
+            emitter::X86Emitter,
             encoder::{Instruction, Opcode, Operand, OperandKind, registers::PhysicalRegister},
         },
     },
     alloc::{collections::vec_deque::VecDeque, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        hashmap::{HashMap, HashMapA, hashmap_in, hashset_in},
-        intern::InternedString,
+        hashmap::{HashMap, hashmap_in, hashset_in},
         rudder::Model,
     },
     core::fmt::Debug,

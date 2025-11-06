@@ -1,7 +1,7 @@
 use {
     crate::guest::{
         devices::arm::mmu::{TranslationType, guest_translate},
-        get_current_guest,
+        get_current_guest, tracing,
     },
     alloc::alloc::alloc_zeroed,
     common::{GuestExecutionContext, irq_handler, memory::AddressSpaceRegionKind},
@@ -82,6 +82,14 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
             // gp = guest_physical
             let host_virtual_in_gp_mapping =
                 (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64);
+
+            // if tracing::ENABLED.load(core::sync::atomic::Ordering::Relaxed) {
+            //     log::error!(
+            //         "[{:x}] mapped {unmasked_address:p} to {host_virtual_in_gp_mapping:p}
+            // ({})",         device.register_file.read::<u64>("_TTBR0_EL1_bits"
+            // ),         if is_write { "WRITE" } else { "READ" },
+            //     )
+            // }
 
             log::debug!("host virtual: {host_virtual_in_gp_mapping:x?}");
 

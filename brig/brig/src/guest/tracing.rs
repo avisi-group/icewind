@@ -40,7 +40,8 @@ pub extern "sysv64" fn trace_instruction_end() {
 
 pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
     if ENABLED.load(Ordering::Relaxed) {
-        if offset != 0x8820 {
+        // PC and branchtaken registers
+        if offset != 0x8820 && offset != 0x10d0 {
             let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
                 panic!()
             };
@@ -51,7 +52,8 @@ pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
 
 pub extern "sysv64" fn trace_register_write(offset: u64, value: u64) {
     if ENABLED.load(Ordering::Relaxed) {
-        if offset != 0x8820 {
+        // PC and branchtaken registers
+        if offset != 0x8820 && offset != 0x10d0 {
             let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
                 panic!()
             };
@@ -70,16 +72,6 @@ pub extern "sysv64" fn trace_memory_read(address: u64, value: u64, width: u8) {
 }
 
 pub extern "sysv64" fn trace_memory_write(address: u64, value: u64, width: u8) {
-    // // if it's not in the low half
-    // if !(address < 0x8000000000)
-    //     // and outside of this range (presumably guest stack?)
-    //     && !(0xffff_ffc0_0800_0000u64..0xffff_ffc0_0900_0000).contains(&address)
-    //      && !(0xffff_fffe_0000_0000u64..0xffff_fffe_0100_0000u64).contains(&
-    // address) {
-    //     // log it
-    //     log::error!("{address:x}");
-    // }
-
     if ENABLED.load(Ordering::Relaxed) {
         let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
             panic!()

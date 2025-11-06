@@ -7274,3 +7274,62 @@ fn ldr_xzr_x3() {
 
     translation.execute(&register_file);
 }
+
+#[ktest]
+fn ldurh() {
+    let (model, register_file, mut ctx) = setup();
+
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  785fe002        ldurh   w2, [x0, #-2]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x785fe002,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    log::error!("{translation:?}");
+
+    let mut mem = Box::new(0xAAAA_AAAAu64);
+    let ptr = (&mut *mem) as *mut u64 as u64;
+    register_file.write("R0", ptr + 2);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R2"), 0xAAAA);
+}
+
+// #[ktest]
+// fn stnp() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     //  a8300c02        stnp    x2, x3, [x0, #-256]
+
+//     translate_instruction(model, function, emitter, register_file, 0xa8300c02, 0x0).unwrap();
+
+//     emitter.leave();
+
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
+
+//     let dst = Box::<(u64, u64)>::new((0, 0));
+
+//     register_file.write("SEE", -1i64);
+//     register_file.write("R29", 0xFEEDu64);
+//     register_file.write("R30", 0xDEADu64);
+//     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
+
+//     translation.execute(&register_file);
+
+//     assert_eq!(*dst, (0xFEED, 0xDEAD));
+// }
