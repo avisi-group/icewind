@@ -1,4 +1,5 @@
 use {
+    crate::guest::get_current_guest,
     core::{
         fmt::Write,
         sync::atomic::{AtomicBool, AtomicU64, Ordering},
@@ -45,7 +46,14 @@ pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
             let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
                 panic!()
             };
-            write!(transport, "R[{offset:x}] => {value:#x}, ").unwrap();
+
+            let name = get_current_guest()
+                .core
+                .model
+                .get_register_by_offset(offset)
+                .unwrap();
+
+            write!(transport, "R[{name}] => {value:#x}, ").unwrap();
         }
     }
 }
@@ -57,7 +65,14 @@ pub extern "sysv64" fn trace_register_write(offset: u64, value: u64) {
             let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
                 panic!()
             };
-            write!(transport, "R[{offset:x}] <= {value:#x}, ").unwrap();
+
+            let name = get_current_guest()
+                .core
+                .model
+                .get_register_by_offset(offset)
+                .unwrap();
+
+            write!(transport, "R[{name}] <= {value:#x}, ").unwrap();
         }
     }
 }

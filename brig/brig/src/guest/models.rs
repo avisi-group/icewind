@@ -112,7 +112,7 @@ impl WellKnownRegisters {
 
 pub struct ModelDevice {
     name: String,
-    model: Arc<Model>,
+    pub model: Arc<Model>,
     pub register_file: RegisterFile,
     pub well_known_registers: WellKnownRegisters,
 }
