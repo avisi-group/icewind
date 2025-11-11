@@ -398,7 +398,7 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     // hello_rs.ext2
     cmd.args([
         "-drive",
-        &format!("file=guest_data/rootfs.ext2,if=none,format=raw,id=drive1",),
+        &format!("file=guest_data/hello_rs.ext2,if=none,format=raw,id=drive1",),
     ]);
 
     cmd.args(["-debugcon", "file:/tmp/debugcon"]);

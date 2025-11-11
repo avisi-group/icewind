@@ -5,7 +5,7 @@ use {
         register_file::RegisterFile,
         x86::{
             EMIT_TRACING, X86Block,
-            emitter::{CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
+            emitter::{BinaryOperationKind, CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
     },
@@ -994,12 +994,27 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 let operation_kind = value_store.get(*operation_kind);
 
                 match operation_kind.kind() {
+                    // ADD
+                    NodeKind::Constant { value: 1, .. } => {
+                        let typ = operand.typ();
+                        let oldvalue = self.emitter.read_memory(address.clone(), typ);
+
+                        let newvalue = self
+                            .emitter
+                            .binary_operation(BinaryOperationKind::Add(oldvalue.clone(), operand));
+
+                        self.emitter.write_memory(address, newvalue, false);
+                        StatementResult::Data(Some(oldvalue))
+                    }
                     // SWP
                     NodeKind::Constant { value: 9, .. } => {
                         let typ = operand.typ();
-                        let loaded = self.emitter.read_memory(address.clone(), typ);
-                        self.emitter.write_memory(address, operand, false);
-                        StatementResult::Data(Some(loaded))
+                        let oldvalue = self.emitter.read_memory(address.clone(), typ);
+
+                        let newvalue = operand;
+
+                        self.emitter.write_memory(address, newvalue, false);
+                        StatementResult::Data(Some(oldvalue))
                     }
                     // CAS
                     NodeKind::Constant { value: 10, .. } => StatementResult::Data(Some(
