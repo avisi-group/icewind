@@ -36,7 +36,7 @@ type ModelPassFn = fn(&OptimizationContext, &mut Model) -> bool;
 type ModelPass = (&'static str, ModelPassFn);
 
 // DO NOT OPTIMIZE AWAY
-pub const INTRINSICS: &[&'static str] = &["sail_tlbi"];
+pub const INTRINSICS: &[&'static str] = &["sail_tlbi", "AArch64_IC__1"];
 
 // --- MODEL PASSES --- //
 static FUNCTION_PASS_RUNNER: ModelPass = ("function-pass-runner", run_function_passes);

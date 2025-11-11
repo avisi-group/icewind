@@ -394,7 +394,9 @@ impl ModelDevice {
 
             // if we have a TLB invalidation or other non-zero status in that instruction,
             // do not translate the rest of the block
-            if emitter.execution_result.need_tlb_invalidate() {
+            if emitter.execution_result.need_tlb_invalidate()
+                || emitter.execution_result.need_code_cache_flush()
+            {
                 break false;
             }
 

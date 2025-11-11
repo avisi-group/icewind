@@ -1138,6 +1138,12 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 }
 
                 if target.as_ref() == "AArch64_IC__1" {
+                    let _0 = self.emitter.constant(0x0, Type::Unsigned(64));
+                    let condition = self.emitter.binary_operation(
+                        crate::x86::emitter::BinaryOperationKind::CompareEqual(args[0].clone(), _0),
+                    );
+                    self.emitter.assert(condition, 0x0);
+
                     self.emitter
                         .execution_result
                         .set_need_code_cache_flush(true);
