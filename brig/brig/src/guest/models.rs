@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
-            trace_register_read, trace_register_write,
+            INSTRUCTION_COUNT, trace_instruction_end, trace_instruction_start, trace_memory_read,
+            trace_memory_write, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -13,7 +13,7 @@ use {
         sync::Arc, vec::Vec,
     },
     common::{
-        device::Device,
+        device::{Device, Tickable},
         hashmap::HashMap,
         intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
@@ -29,10 +29,11 @@ use {
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
         x86::{
-            Callbacks, X86TranslationContext,
+            Callbacks, EMIT_TRACING, X86TranslationContext,
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
+    embedded_time::duration::Nanoseconds,
     kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         fs::Filesystem,
@@ -181,12 +182,10 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
-        let mut instructions_executed = 0usize;
-
         // guest physical PC to translated block cache
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
 
-        // guest virtual address
+        // guest virtual address PC to host virtual ptr to executable code
         let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
 
         // virtual to physical PCs
@@ -202,14 +201,11 @@ impl ModelDevice {
             self.register_file.read::<u64>("FAR_EL1"),
         );
 
+        // tracing::ENABLED.store(true, Ordering::Relaxed);
+
         // block translation/execution loop
         loop {
-            // tracing::ENABLED.store(
-            //     self.register_file.read::<u8>("PSTATE_EL") == 0,
-            //     Ordering::Relaxed,
-            // );
-
-            let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
+            let block_start_virtual_pc = self.well_known_registers.pc().read();
 
             LAST_BLOCK_START_VIRT_PC.store(block_start_virtual_pc, Ordering::Relaxed);
 
@@ -227,7 +223,7 @@ impl ModelDevice {
                     .entry(block_start_physical_pc)
                     .or_insert_with(|| {
                         BUMP_ALLOCATOR.clear();
-                        self.translate_block(
+                        self.translate_guest_block(
                             BumpAllocatorRef::new(&BUMP_ALLOCATOR),
                             chain_cache.table as u64,
                             block_start_virtual_pc,
@@ -257,8 +253,6 @@ impl ModelDevice {
                 );
             }
 
-            instructions_executed += translated_block.opcodes.len();
-
             // if block_start_virtual_pc == 0x43b670 {
             //     log::error!("get_meta");
             // }
@@ -273,8 +267,10 @@ impl ModelDevice {
             //     tracing::ENABLED.store(true, Ordering::Relaxed);
             // }
 
+            let before = INSTRUCTION_COUNT.load(Ordering::Relaxed);
+
             log::debug!(
-                "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
+                "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {before})",
                 translated_block.opcodes,
             );
 
@@ -285,6 +281,20 @@ impl ModelDevice {
 
             let exec_result = translated_block.translation.execute(&self.register_file);
 
+            if !EMIT_TRACING {
+                INSTRUCTION_COUNT
+                    .fetch_add(translated_block.opcodes.len() as u64, Ordering::Relaxed);
+            }
+
+            // deterministic clock
+            {
+                let guest = get_current_guest();
+                let timer = guest.timer.clone().unwrap();
+                timer.tick(Nanoseconds::new(
+                    (INSTRUCTION_COUNT.load(Ordering::Relaxed) - before) * 1000,
+                ));
+            }
+
             if exec_result.need_tlb_invalidate() {
                 chain_cache.fill_keys(1);
                 translation_cache.fill_keys(1);
@@ -292,29 +302,39 @@ impl ModelDevice {
             }
 
             // enabling breaks linux boot timestamps
-            // if exec_result.need_code_cache_flush() {
-            //     chain_cache.fill_keys(1);
-            //     block_cache.clear();
-            //     translation_cache.fill_keys(1);
-            // }
+            if exec_result.need_code_cache_flush() {
+                if EMIT_TRACING {
+                    use core::fmt::Write;
+                    let device = kernel::devices::manager::SharedDeviceManager::get()
+                        .get_device_by_alias("transport00:05.0")
+                        .unwrap();
+                    let kernel::devices::Device::Transport(transport) = &mut *device.lock() else {
+                        panic!()
+                    };
+                    writeln!(transport, "code cache flush").unwrap();
+                }
+                chain_cache.fill_keys(1);
+                block_cache.clear();
+                translation_cache.fill_keys(1);
+            }
 
             if exec_result.interrupt_pending() {
-                let masked = self.well_known_registers.i().read(); //self.register_file.read::<bool>("PSTATE_I");
+                let masked = self.well_known_registers.i().read();
 
                 if !masked {
                     let pc = self.well_known_registers.pc().read();
-                    // log::error!("interrupt pending @ {pc:x}, masked: {masked}");
+                    log::trace!("interrupt pending @ {pc:x}, masked: {masked}");
                     take_arm_exception(self, 1, 255, 0, 0, pc, 0x80);
-                    //let pc = self.well_known_registers.pc().read();
-                    //log::error!("took arm exception to {pc:x}");
+                    let pc = self.well_known_registers.pc().read();
+                    log::trace!("took arm exception to {pc:x}");
                 } else {
-                    //   log::error!("masked interrupt pending");
+                    log::trace!("masked interrupt pending");
                 }
             }
         }
     }
 
-    fn translate_block(
+    fn translate_guest_block(
         &self,
         allocator: BumpAllocatorRef,
         chain_cache: u64,

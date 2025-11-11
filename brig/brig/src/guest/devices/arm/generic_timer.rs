@@ -17,6 +17,7 @@ const CNTFRQ_EL0: u64 = encode_sysreg_id(3, 3, 14, 0, 0);
 
 const CNTPCT_EL0: u64 = encode_sysreg_id(3, 3, 14, 0, 1);
 const CNTVCT_EL0: u64 = encode_sysreg_id(3, 3, 14, 0, 2);
+const CNTVCTSS_EL0: u64 = encode_sysreg_id(3, 3, 14, 0, 6);
 const CNTP_TVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 2, 0);
 const CNTP_CTL_EL0: u64 = encode_sysreg_id(3, 3, 14, 2, 1);
 const CNTP_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 2, 2);
@@ -128,6 +129,7 @@ impl RegisterMappedDevice for GenericTimer {
             CNTFRQ_EL0 => self.frequency.load(Ordering::Relaxed),
             CNTPCT_EL0 => todo!("CNTPCT_EL0"),
             CNTVCT_EL0 => self.counter.load(Ordering::Relaxed),
+            CNTVCTSS_EL0 => self.counter.load(Ordering::Relaxed),
             CNTP_TVAL_EL0 => todo!("CNTP_TVAL_EL0"),
             CNTP_CTL_EL0 => todo!("CNTP_CTL_EL0"),
             CNTP_CVAL_EL0 => todo!("CNTP_CVAL_EL0"),
@@ -162,6 +164,7 @@ impl RegisterMappedDevice for GenericTimer {
             CNTFRQ_EL0 => (), //self.frequency.store(value, Ordering::Relaxed),
             CNTPCT_EL0 => todo!("CNTPCT_EL0"),
             CNTVCT_EL0 => todo!("CNTVCT_EL0"),
+            CNTVCTSS_EL0 => todo!("CNTVCTSS_EL0"),
             CNTP_TVAL_EL0 => todo!("CNTP_TVAL_EL0"),
             CNTP_CTL_EL0 => todo!("CNTP_CTL_EL0"),
             CNTP_CVAL_EL0 => todo!("CNTP_CVAL_EL0"),

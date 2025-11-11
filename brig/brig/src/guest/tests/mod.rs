@@ -7337,3 +7337,97 @@ fn stnp() {
 
     assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
+
+#[ktest]
+fn ic_ivau_x3() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // d50b7523        ic      ivau, x3
+    // execute_aarch64_instrs_system_sysops
+    // IC_IVAU_SysOpsWrite_f40d5c6453a840a5 (3u64)
+
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd50b7523,
+        0x0,
+    )
+    .unwrap();
+
+    assert!(emitter.execution_result.need_code_cache_flush());
+}
+
+#[ktest]
+fn ic_ialluis() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // d508711f        ic      ialluis
+    // IC_IALLUIS_SysOpsWrite_3eb8cc845c2f9444
+    // AArch64_IC (8)
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd508711f,
+        0x0,
+    )
+    .unwrap();
+
+    assert!(emitter.execution_result.need_code_cache_flush());
+}
+
+#[ktest]
+fn ic_iallu() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // d508751f        ic      iallu
+    // IC_IALLU_SysOpsWrite_11cf556c15dd6d58
+    // AArch64_IC (7)
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd508751f,
+        0x0,
+    )
+    .unwrap();
+
+    assert!(emitter.execution_result.need_code_cache_flush());
+}
+
+#[ktest]
+fn mrs_cntvctss_el0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //  d53be0c0        mrs     x0, cntvctss_el0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd53be0c0,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("SEE", -1i64);
+
+    translation.execute(&register_file);
+
+    // todo: test more here
+}

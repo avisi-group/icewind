@@ -45,6 +45,7 @@ pub static GUEST: Mutex<Option<Arc<Guest>>> = Mutex::new(None);
 pub struct Guest {
     pub address_spaces: BTreeMap<InternedString, Box<AddressSpace>>,
     pub core: Arc<ModelDevice>,
+    pub timer: Option<Arc<GenericTimer>>,
     pub devices: BTreeMap<InternedString, Arc<dyn Device>>,
 }
 
@@ -53,6 +54,7 @@ impl Guest {
         Self {
             address_spaces: Default::default(),
             core,
+            timer: None,
             devices: Default::default(),
         }
     }
@@ -288,6 +290,7 @@ pub fn linux_platform() -> Guest {
 
     // timer
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));
+    guest.timer = Some(timer.clone());
     kernel::timer::register_tickable(
         //     // Nanoseconds(1_000_000_000),
         timer.tick_interval(),
@@ -300,6 +303,7 @@ pub fn linux_platform() -> Guest {
         ("cntfrq_el0", [3, 3, 14, 0, 0]),
         ("cntpct_el0", [3, 3, 14, 0, 1]),
         ("cntvct_el0", [3, 3, 14, 0, 2]),
+        ("cntvctss_el0", [3, 3, 14, 0, 6]),
         ("cntp_tval_el0", [3, 3, 14, 2, 0]),
         ("cntp_ctl_el0", [3, 3, 14, 2, 1]),
         ("cntp_cval_el0", [3, 3, 14, 2, 2]),
