@@ -16,7 +16,7 @@
 
 	chosen {
 		stdout-path = "/uart@3c000000";
-	    bootargs = "console=ttyAMA0 earlycon=pl011,0x3c000000 earlyprintk=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug nohlt root=/dev/vda";
+	    bootargs = "console=ttyAMA0 earlycon=pl011,0x3c000000 earlyprintk=pl011,0x3c000000 loglevel=9 debug acpi=off sched_debug nohlt root=/dev/vda nokaslr norandmaps page_alloc.shuffle=false randomize_kstack_offset=false";
 	};
 
 	cpus {

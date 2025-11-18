@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            INSTRUCTION_COUNT, trace_instruction_end, trace_instruction_start, trace_memory_read,
-            trace_memory_write, trace_register_read, trace_register_write,
+            self, INSTRUCTION_COUNT, trace_instruction_end, trace_instruction_start,
+            trace_memory_read, trace_memory_write, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -201,10 +201,14 @@ impl ModelDevice {
             self.register_file.read::<u64>("FAR_EL1"),
         );
 
-        // tracing::ENABLED.store(true, Ordering::Relaxed);
-
         // block translation/execution loop
         loop {
+            // // only trace userspace
+            // tracing::ENABLED.store(
+            //     self.register_file.read::<u8>("PSTATE_EL") == 0,
+            //     Ordering::Relaxed,
+            // );
+
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
             LAST_BLOCK_START_VIRT_PC.store(block_start_virtual_pc, Ordering::Relaxed);
@@ -291,7 +295,7 @@ impl ModelDevice {
                 let guest = get_current_guest();
                 let timer = guest.timer.clone().unwrap();
                 timer.tick(Nanoseconds::new(
-                    (INSTRUCTION_COUNT.load(Ordering::Relaxed) - before) * 1000,
+                    (INSTRUCTION_COUNT.load(Ordering::Relaxed) - before) * 50,
                 ));
             }
 
@@ -301,18 +305,7 @@ impl ModelDevice {
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
-            // enabling breaks linux boot timestamps
             if exec_result.need_code_cache_flush() {
-                if EMIT_TRACING {
-                    use core::fmt::Write;
-                    let device = kernel::devices::manager::SharedDeviceManager::get()
-                        .get_device_by_alias("transport00:05.0")
-                        .unwrap();
-                    let kernel::devices::Device::Transport(transport) = &mut *device.lock() else {
-                        panic!()
-                    };
-                    writeln!(transport, "code cache flush").unwrap();
-                }
                 chain_cache.fill_keys(1);
                 block_cache.clear();
                 translation_cache.fill_keys(1);

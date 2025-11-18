@@ -26,6 +26,7 @@ pub extern "sysv64" fn trace_instruction_start(opcode: u32, pc: u64) {
         };
 
         write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
+        //  writeln!(transport, "{pc:016x}").unwrap();
     }
 }
 

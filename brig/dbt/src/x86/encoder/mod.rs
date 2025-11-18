@@ -19,7 +19,7 @@ use {
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister32, AsmRegister64, AsmRegisterXmm,
-        CodeAssembler, CodeLabel, dword_ptr, qword_ptr,
+        CodeAssembler, CodeLabel, byte_ptr, dword_ptr, qword_ptr,
     },
 };
 
@@ -1437,6 +1437,28 @@ impl Instruction {
             ) => assembler
                 .cmpxchg::<AsmMemoryOperand, AsmRegister32>(
                     dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+            CMPXCHG(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: Width::_8,
+                },
+            ) => assembler
+                .cmpxchg::<AsmMemoryOperand, AsmRegister8>(
+                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
