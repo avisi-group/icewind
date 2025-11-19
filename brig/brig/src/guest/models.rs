@@ -33,7 +33,6 @@ use {
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
-    embedded_time::duration::Nanoseconds,
     kernel::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         fs::Filesystem,
@@ -49,7 +48,7 @@ const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 const SINGLE_STEP: bool = false;
 
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = false;
+const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
@@ -59,8 +58,6 @@ pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
-pub static LAST_BLOCK_START_VIRT_PC: AtomicU64 = AtomicU64::new(0);
-pub static LAST_EXECUTED_OPCODE: AtomicU32 = AtomicU32::new(0);
 
 pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -211,8 +208,6 @@ impl ModelDevice {
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
-            LAST_BLOCK_START_VIRT_PC.store(block_start_virtual_pc, Ordering::Relaxed);
-
             let block_start_physical_pc =
                 if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
                     pc
@@ -285,19 +280,19 @@ impl ModelDevice {
 
             let exec_result = translated_block.translation.execute(&self.register_file);
 
-            if !EMIT_TRACING {
+            if EMIT_TRACING {
                 INSTRUCTION_COUNT
                     .fetch_add(translated_block.opcodes.len() as u64, Ordering::Relaxed);
             }
 
-            // deterministic clock
-            {
-                let guest = get_current_guest();
-                let timer = guest.timer.clone().unwrap();
-                timer.tick(Nanoseconds::new(
-                    (INSTRUCTION_COUNT.load(Ordering::Relaxed) - before) * 50,
-                ));
-            }
+            // // deterministic clock
+            // {
+            //     let guest = get_current_guest();
+            //     let timer = guest.timer.clone().unwrap();
+            //     timer.tick(Nanoseconds::new(
+            //         (INSTRUCTION_COUNT.load(Ordering::Relaxed) - before) * 50,
+            //     ));
+            // }
 
             if exec_result.need_tlb_invalidate() {
                 chain_cache.fill_keys(1);

@@ -100,14 +100,14 @@ impl Measurement {
 }
 
 fn handle_tickables(current_time: Nanoseconds<u64>) {
-    // TICKABLES
-    //     .lock()
-    //     .iter_mut()
-    //     .filter(|s| current_time >= s.time_at_last_tick + s.interval)
-    //     .for_each(|s| {
-    //         s.tickable.tick(current_time - s.time_at_last_tick);
-    //         s.time_at_last_tick = current_time;
-    //     });
+    TICKABLES
+        .lock()
+        .iter_mut()
+        .filter(|s| current_time >= s.time_at_last_tick + s.interval)
+        .for_each(|s| {
+            s.tickable.tick(current_time - s.time_at_last_tick);
+            s.time_at_last_tick = current_time;
+        });
 }
 
 pub fn register_tickable(interval: Nanoseconds<u64>, tickable: Arc<dyn Tickable>) {

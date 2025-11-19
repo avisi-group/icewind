@@ -15,7 +15,7 @@ members = [
 debug = true
 debug-assertions = false
 overflow-checks = false
-lto = "thin"
+lto = "fat"
 incremental = true
 codegen-units = 1
 
