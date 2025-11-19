@@ -2,49 +2,67 @@ use {
     crate::devices::{ReadRegister, VIRTIO_DEV_BLK, Virtio, WriteRegister},
     alloc::sync::Arc,
     common::device::{Device, IrqController, MemoryMappedDevice},
-    kernel::{devices::manager::SharedDeviceManager, util::any_as_u8_slice},
+    kernel::{
+        devices::{BlockDevice, manager::SharedDeviceManager},
+        util::any_as_u8_slice,
+    },
     spin::Mutex,
     virtio_bindings::virtio_blk::virtio_blk_config,
 };
 
-pub struct VirtioBlock {
-    virtio: Mutex<Virtio>,
+pub struct VirtioBlock<S, ReadCallback, WriteCallback> {
+    virtio: Mutex<Virtio<S, ReadCallback, WriteCallback>>,
     config: virtio_blk_config,
 }
 
-impl VirtioBlock {
-    pub fn new(irq_line: usize, controller: Arc<dyn IrqController>) -> Self {
-        let mut celf = Self {
-            virtio: Mutex::new(Virtio::new(
-                1,
-                VIRTIO_DEV_BLK,
-                irq_line,
-                controller,
-                read_callback,
-                write_callback,
-            )),
-            config: virtio_blk_config::default(),
-        };
+pub fn new_virtio_block<B: BlockDevice>(
+    irq_line: usize,
+    controller: Arc<dyn IrqController>,
+    // B is the callback state (S in lower levels)
+    block: B,
+) -> VirtioBlock<B, impl Fn(&mut B, &mut [u8], usize) + Send, impl Fn(&mut B, &[u8], usize) + Send>
+{
+    let mut config = virtio_blk_config::default();
 
-        // in 512 byte sectors
-        //  62914560 b
-        // /home/fm208/Documents/Sync/icewind/brig-cli/guest_data/rootfs.ext2
-        celf.config.capacity = 62914560 / 512; // = 122880
-        celf.config.blk_size = 512;
+    // in 512 byte sectors
+    assert_eq!(block.block_size(), 512);
+    config.capacity = u64::try_from(block.size() / block.block_size()).unwrap();
+    config.blk_size = u32::try_from(block.block_size()).unwrap();
 
-        celf.virtio.lock().set_host_feature(6);
-        celf.virtio.lock().set_host_feature(32);
+    let celf = VirtioBlock {
+        virtio: Mutex::new(Virtio::new(
+            VIRTIO_DEV_BLK,
+            irq_line,
+            controller,
+            block,
+            read_callback,
+            write_callback,
+        )),
+        config,
+    };
 
-        celf
-    }
+    celf.virtio.lock().set_host_feature(6);
+    celf.virtio.lock().set_host_feature(32);
+
+    celf
 }
 
-impl Device for VirtioBlock {
+impl<
+    B: BlockDevice,
+    ReadCallback: Fn(&mut B, &mut [u8], usize) + Send,
+    WriteCallback: Fn(&mut B, &[u8], usize) + Send,
+> Device for VirtioBlock<B, ReadCallback, WriteCallback>
+{
     fn start(&self) {}
     fn stop(&self) {}
 }
 
-impl MemoryMappedDevice for VirtioBlock {
+impl<
+    B: BlockDevice,
+    ReadCallback: Fn(&mut B, &mut [u8], usize) + Send,
+    WriteCallback: Fn(&mut B, &[u8], usize) + Send,
+> MemoryMappedDevice for VirtioBlock<B, ReadCallback, WriteCallback>
+{
     fn address_space_size(&self) -> u64 {
         0x1000
     }
@@ -74,13 +92,7 @@ impl MemoryMappedDevice for VirtioBlock {
     }
 }
 
-fn read_callback(dest: &mut [u8], sector: usize) {
-    let dev = SharedDeviceManager::get()
-        .get_device_by_alias("disk00:04.0")
-        .unwrap();
-    let mut dev = dev.lock();
-    let blk = dev.as_block();
-
+fn read_callback<B: BlockDevice>(blk: &mut B, dest: &mut [u8], sector: usize) {
     log::debug!("reading {} bytes @ {sector:x}", dest.len());
 
     assert_eq!(blk.block_size(), 512);
@@ -95,13 +107,7 @@ fn read_callback(dest: &mut [u8], sector: usize) {
         .for_each(|(i, chunk)| blk.read(chunk, sector + i).unwrap());
 }
 
-fn write_callback(source: &[u8], sector: usize) {
-    let dev = SharedDeviceManager::get()
-        .get_device_by_alias("disk00:04.0")
-        .unwrap();
-    let mut dev = dev.lock();
-    let blk = dev.as_block();
-
+fn write_callback<B: BlockDevice>(blk: &mut B, source: &[u8], sector: usize) {
     log::debug!("writing {} bytes @ {sector:x}", source.len());
 
     assert_eq!(blk.block_size(), 512);

@@ -27,10 +27,13 @@ use {
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
     iced_x86::{Formatter, Instruction},
-    kernel::{arch::x86::memory::VirtualMemoryArea, fs::Filesystem},
+    kernel::{
+        arch::x86::memory::VirtualMemoryArea, devices::virtio::block::DeviceFunction,
+        fs::Filesystem,
+    },
     pl011::Pl011,
     spin::Mutex,
-    virtio::devices::block::VirtioBlock,
+    virtio::devices::block::{VirtioBlock, new_virtio_block},
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
@@ -283,7 +286,12 @@ pub fn linux_platform() -> Guest {
     );
 
     // block
-    let block = Arc::new(VirtioBlock::new(64, gic.clone()));
+    let backing_dev = kernel::devices::virtio::block::get(&DeviceFunction {
+        bus: 0,
+        device: 4,
+        function: 0,
+    });
+    let block = Arc::new(new_virtio_block(64, gic.clone(), backing_dev));
     guest.devices.insert("block".into(), block.clone());
 
     attach_mmap_device(&mut guest, "block".into(), block, "as0".into(), 0x3d00_0000);

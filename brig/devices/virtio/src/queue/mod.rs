@@ -54,7 +54,7 @@ struct VirtRingUsedHeader {
 }
 
 #[derive(Debug)]
-pub struct VirtQueue {
+pub struct VirtQueue<S, ReadCallback, WriteCallback> {
     ready: bool,
     queue_num: usize,
     descriptor_gpa: u64,
@@ -64,12 +64,19 @@ pub struct VirtQueue {
     available_hva: u64,
     used_hva: u64,
     prev_idx: u16,
-    read_callback: fn(&mut [u8], usize),
-    write_callback: fn(&[u8], usize),
+    read_callback: ReadCallback,
+    write_callback: WriteCallback,
+    callback_state: S,
 }
 
-impl VirtQueue {
-    pub fn new(read_callback: fn(&mut [u8], usize), write_callback: fn(&[u8], usize)) -> Self {
+impl<S, ReadCallback: Fn(&mut S, &mut [u8], usize), WriteCallback: Fn(&mut S, &[u8], usize) + Send>
+    VirtQueue<S, ReadCallback, WriteCallback>
+{
+    pub fn new(
+        callback_state: S,
+        read_callback: ReadCallback,
+        write_callback: WriteCallback,
+    ) -> Self {
         Self {
             ready: false,
             queue_num: 0,
@@ -82,6 +89,7 @@ impl VirtQueue {
             prev_idx: 0,
             read_callback,
             write_callback,
+            callback_state,
         }
     }
 
@@ -301,7 +309,16 @@ impl VirtQueueEvent {
         }
     }
 
-    fn process(&mut self, queue: &mut VirtQueue, irq: &Irq, isr: &AtomicU32) {
+    fn process<
+        S,
+        ReadCallback: Fn(&mut S, &mut [u8], usize),
+        WriteCallback: Fn(&mut S, &[u8], usize) + Send,
+    >(
+        &mut self,
+        queue: &mut VirtQueue<S, ReadCallback, WriteCallback>,
+        irq: &Irq,
+        isr: &AtomicU32,
+    ) {
         log::debug!("processing event");
 
         let Some(first) = self.read_buffers.first() else {
@@ -326,10 +343,14 @@ impl VirtQueueEvent {
         }
     }
 
-    fn handle_read_event(
+    fn handle_read_event<
+        S,
+        ReadCallback: Fn(&mut S, &mut [u8], usize),
+        WriteCallback: Fn(&mut S, &[u8], usize) + Send,
+    >(
         &mut self,
         sector: u64,
-        queue: &mut VirtQueue,
+        queue: &mut VirtQueue<S, ReadCallback, WriteCallback>,
         irq: &Irq,
         isr: &AtomicU32,
     ) {
@@ -351,7 +372,11 @@ impl VirtQueueEvent {
             )
         };
 
-        (queue.read_callback)(destination, usize::try_from(sector).unwrap());
+        (queue.read_callback)(
+            &mut queue.callback_state,
+            destination,
+            usize::try_from(sector).unwrap(),
+        );
 
         // callback logic just inlined here
         unsafe { self.write_buffers[1].data.write(0x00) }; // success
@@ -360,10 +385,14 @@ impl VirtQueueEvent {
         self.submit(queue, irq, isr);
     }
 
-    fn handle_write_event(
+    fn handle_write_event<
+        S,
+        ReadCallback: Fn(&mut S, &mut [u8], usize),
+        WriteCallback: Fn(&mut S, &[u8], usize) + Send,
+    >(
         &mut self,
         sector: u64,
-        queue: &mut VirtQueue,
+        queue: &mut VirtQueue<S, ReadCallback, WriteCallback>,
         irq: &Irq,
         isr: &AtomicU32,
     ) {
@@ -392,7 +421,11 @@ impl VirtQueueEvent {
             )
         };
 
-        (queue.write_callback)(source, usize::try_from(sector).unwrap());
+        (queue.write_callback)(
+            &mut queue.callback_state,
+            source,
+            usize::try_from(sector).unwrap(),
+        );
 
         // 	if (!_bdev.submit_request(rq, write_event_callback)) {
         // 		*(uint8_t *)evt->write_buffers.back().data = 1;
@@ -409,7 +442,16 @@ impl VirtQueueEvent {
         self.submit(queue, irq, isr);
     }
 
-    fn submit(&mut self, queue: &mut VirtQueue, irq: &Irq, isr: &AtomicU32) {
+    fn submit<
+        S,
+        ReadCallback: Fn(&mut S, &mut [u8], usize),
+        WriteCallback: Fn(&mut S, &[u8], usize) + Send,
+    >(
+        &mut self,
+        queue: &mut VirtQueue<S, ReadCallback, WriteCallback>,
+        irq: &Irq,
+        isr: &AtomicU32,
+    ) {
         queue.push(self.descriptor_index, self.response_size);
 
         let idx = 0;

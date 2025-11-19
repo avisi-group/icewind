@@ -17,7 +17,7 @@ use {
                 VirtualMemoryArea,
             },
         },
-        devices::manager::SharedDeviceManager,
+        devices::virtio::{self, block::DeviceFunction},
         fs::{Filesystem, tar::TarFilesystem},
         logger, qemu_exit, rand, scheduler, tasks, timer,
     },
@@ -72,13 +72,12 @@ fn continue_start() {
     // let serial_in_task = tasks::create_task(serial_in);
     // serial_in_task.start();
 
-    let device_manager = SharedDeviceManager::get();
-    let device = device_manager
-        .get_device_by_alias("disk00:03.0")
-        .expect("disk not found");
-
-    let mut dev = device.lock();
-    let mut fs = TarFilesystem::mount(dev.as_block());
+    let mut block = virtio::block::get(&DeviceFunction {
+        bus: 0,
+        device: 3,
+        function: 0,
+    });
+    let mut fs = TarFilesystem::mount(&mut block);
 
     models::load_all(&mut fs);
 

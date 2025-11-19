@@ -1,29 +1,31 @@
 use {
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
-        devices::{
-            BlockDevice, Device, SharedDevice, manager::SharedDeviceManager,
-            pcie::bar::allocate_bars,
-        },
+        devices::{self, BlockDevice, pcie::bar::allocate_bars},
     },
-    alloc::{
-        alloc::{alloc_zeroed, dealloc},
-        boxed::Box,
-        format,
-    },
-    common::bytes,
+    alloc::alloc::{alloc_zeroed, dealloc},
+    common::{bytes, hashmap::HashMap},
     core::{alloc::Layout, fmt::Debug, ptr::NonNull},
     log::trace,
-    spin::Mutex,
+    spin::{Lazy, Mutex},
     virtio_drivers::{
         device::blk::{SECTOR_SIZE, VirtIOBlk},
         transport::pci::{
             PciTransport,
-            bus::{Command, DeviceFunction, MmioCam, PciRoot},
+            bus::{Command, MmioCam, PciRoot},
         },
     },
     x86_64::{PhysAddr, VirtAddr},
 };
+
+pub use virtio_drivers::transport::pci::bus::DeviceFunction;
+
+static VIRTIO_BLOCK_DEVICES: Lazy<Mutex<HashMap<DeviceFunction, VirtioBlockDevice>>> =
+    Lazy::new(|| Mutex::new(HashMap::default()));
+
+pub fn get(device_function: &DeviceFunction) -> VirtioBlockDevice {
+    VIRTIO_BLOCK_DEVICES.lock().remove(device_function).unwrap()
+}
 
 struct VirtioHal;
 
@@ -98,7 +100,7 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
     }
 }
 
-pub fn probe_virtio_block(root: &mut PciRoot<MmioCam>, device_function: DeviceFunction) {
+pub fn probe(root: &mut PciRoot<MmioCam>, device_function: DeviceFunction) {
     trace!("probing virtio block device");
 
     root.set_command(
@@ -110,28 +112,19 @@ pub fn probe_virtio_block(root: &mut PciRoot<MmioCam>, device_function: DeviceFu
 
     let transport = PciTransport::new::<VirtioHal, _>(root, device_function).unwrap();
 
-    let blk = Mutex::new(VirtIOBlk::<VirtioHal, _>::new(transport).unwrap());
-
-    let dev_mgr = SharedDeviceManager::get();
-
-    let id = dev_mgr.register_device(SharedDevice::from_device(Device::Block(Box::new(
+    VIRTIO_BLOCK_DEVICES.lock().insert(
+        device_function,
         VirtioBlockDevice {
-            blk,
+            blk: VirtIOBlk::<VirtioHal, _>::new(transport).unwrap(),
             device_function,
         },
-    ))));
-
-    dev_mgr.add_alias(id, format!("disk{}", device_function));
+    );
 }
 
-struct VirtioBlockDevice {
-    blk: Mutex<VirtIOBlk<VirtioHal, PciTransport>>,
+pub struct VirtioBlockDevice {
+    blk: VirtIOBlk<VirtioHal, PciTransport>,
     device_function: DeviceFunction,
 }
-
-// safe as blk is accessed through mutex
-unsafe impl Sync for VirtioBlockDevice {}
-unsafe impl Send for VirtioBlockDevice {}
 
 impl Debug for VirtioBlockDevice {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -151,28 +144,24 @@ impl BlockDevice for VirtioBlockDevice {
     }
 
     fn size(&self) -> usize {
-        usize::try_from(self.blk.lock().capacity()).unwrap() * self.block_size()
+        usize::try_from(self.blk.capacity()).unwrap() * self.block_size()
     }
 
-    fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), super::IoError> {
+    fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), devices::IoError> {
         log::debug!(
             "start_block_index: {start_block_index:#x}, buf.len: {:#x}",
             buf.len()
         );
-        self.blk
-            .lock()
-            .read_blocks(start_block_index, buf)
-            .map_err(|e| {
-                panic!(
-                    "{e:?}: start_block_index: {start_block_index:#x}, buf.len: {:#x}",
-                    buf.len()
-                )
-            })
+        self.blk.read_blocks(start_block_index, buf).map_err(|e| {
+            panic!(
+                "{e:?}: start_block_index: {start_block_index:#x}, buf.len: {:#x}",
+                buf.len()
+            )
+        })
     }
 
-    fn write(&mut self, buf: &[u8], start_block_index: usize) -> Result<(), super::IoError> {
+    fn write(&mut self, buf: &[u8], start_block_index: usize) -> Result<(), devices::IoError> {
         self.blk
-            .lock()
             .write_blocks(start_block_index, buf)
             .map_err(|e| panic!("{e:?}"))
     }

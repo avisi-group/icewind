@@ -120,7 +120,7 @@ impl WriteRegister {
     }
 }
 
-pub struct Virtio {
+pub struct Virtio<S, ReadCallback, WriteCallback> {
     device_id: u16,
     device_feature_select: bool,
     device_features: [u32; 2],
@@ -128,31 +128,29 @@ pub struct Virtio {
     driver_features: u32,
     isr: AtomicU32,
     status: Status,
-    queues: Vec<VirtQueue>,
+    queue: VirtQueue<S, ReadCallback, WriteCallback>,
     queue_select: usize,
     irq: Irq,
 }
 
-impl Virtio {
+impl<S, ReadCallback: Fn(&mut S, &mut [u8], usize), WriteCallback: Fn(&mut S, &[u8], usize) + Send>
+    Virtio<S, ReadCallback, WriteCallback>
+{
     fn new(
-        num_queues: usize,
         device_id: u16,
         irq_line: usize,
         irq_controller: Arc<dyn IrqController>,
-        read_callback: fn(&mut [u8], usize),
-        write_callback: fn(&[u8], usize),
-    ) -> Virtio {
-        assert!(num_queues > 0);
+        callback_state: S,
+        read_callback: ReadCallback,
+        write_callback: WriteCallback,
+    ) -> Virtio<S, ReadCallback, WriteCallback> {
         Self {
             device_id,
             device_feature_select: false,
             device_features: [0, 0],
             isr: AtomicU32::new(0),
             status: Status::new(),
-            queues: (0..num_queues)
-                .into_iter()
-                .map(|_| VirtQueue::new(read_callback, write_callback))
-                .collect(),
+            queue: VirtQueue::new(callback_state, read_callback, write_callback),
             queue_select: 0,
             driver_features_select: 0,
             driver_features: 0,
@@ -163,11 +161,14 @@ impl Virtio {
         }
     }
 
-    fn selected_queue(&self) -> &VirtQueue {
-        &self.queues[self.queue_select]
+    fn selected_queue(&self) -> &VirtQueue<S, ReadCallback, WriteCallback> {
+        assert_eq!(self.queue_select, 0);
+        &self.queue
     }
-    fn selected_queue_mut(&mut self) -> &mut VirtQueue {
-        &mut self.queues[self.queue_select]
+
+    fn selected_queue_mut(&mut self) -> &mut VirtQueue<S, ReadCallback, WriteCallback> {
+        assert_eq!(self.queue_select, 0);
+        &mut self.queue
     }
 
     fn selected_device_feature(&self) -> u32 {
@@ -254,7 +255,7 @@ impl Virtio {
             }
             R::QueueSelect => {
                 let idx = usize::try_from(value).unwrap();
-                assert!(idx < self.queues.len());
+                assert_eq!(idx, 0);
                 self.queue_select = idx;
             }
             R::QueueNum => {
@@ -271,7 +272,7 @@ impl Virtio {
             }
             R::QueueNotify => {
                 let queue_idx = usize::try_from(value).unwrap();
-                self.queues[queue_idx].process(&self.irq, &self.isr)
+                self.queue.process(&self.irq, &self.isr)
             }
             R::InterruptAcknowledge => {
                 let isr = self

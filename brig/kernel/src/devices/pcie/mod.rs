@@ -2,7 +2,7 @@ use {
     super::Bus,
     crate::{
         arch::x86::memory::PhysAddrExt,
-        devices::{ivshmem::probe_ivshmem, virtio::probe_virtio_block},
+        devices::{ivshmem::probe_ivshmem, virtio},
     },
     acpi::{platform::PciConfigRegions, sdt::mcfg::McfgEntry},
     common::hashmap::HashMap,
@@ -38,7 +38,7 @@ pub fn enumerate(
 
     // todo: load me from plugins?
     let pci_driver_map = [
-        (PciId::new(0x1af4, 0x1001), probe_virtio_block as ProbeFn),
+        (PciId::new(0x1af4, 0x1001), virtio::block::probe as ProbeFn),
         (PciId::new(0x8086, 0x2922), probe_ich9r),
         (PciId::new(0x1af4, 0x1110), probe_ivshmem),
     ]
