@@ -15,3 +15,6 @@
 **/_build
 
 /brig-cli/guest_data/aarch64.postcard
+/brig-cli/guest_data/rootfs.ext2
+/brig-cli/guest_data/Image
+/brig-cli/guest_data/vmlinux
