@@ -7,7 +7,7 @@ extern crate alloc;
 use {
     crate::memory::AddressSpace,
     alloc::boxed::Box,
-    core::{alloc::Allocator, fmt::Debug, sync::atomic::AtomicU64},
+    core::sync::atomic::AtomicU64,
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
 
@@ -23,6 +23,7 @@ pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,
     pub interrupt_pending: AtomicU64,
     pub unprivileged_access: u64,
+    pub instruction_count: u64,
 }
 
 impl GuestExecutionContext {

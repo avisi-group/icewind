@@ -61,6 +61,8 @@ pub enum Opcode {
     ADC(Operand, Operand, Operand),
     /// sub {0}, {1}
     SUB(Operand, Operand),
+    /// inc {0}
+    INC(Operand),
     /// or {0}, {1},
     OR(Operand, Operand),
     /// xor {0}, {1},
@@ -540,6 +542,10 @@ fn segment_memory_operand_to_iced(
 impl Instruction {
     pub fn adc(a: Operand, b: Operand, c: Operand) -> Self {
         Self(Opcode::ADC(a, b, c))
+    }
+
+    pub fn inc(op: Operand) -> Self {
+        Self(Opcode::INC(op))
     }
 
     pub fn mov(src: Operand, dst: Operand) -> Result<Self, Error> {
@@ -1462,6 +1468,27 @@ impl Instruction {
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
+
+            INC(Operand {
+                kind:
+                    M {
+                        base: None,
+                        index,
+                        scale,
+                        displacement,
+                        segment_override: Some(seg_reg),
+                    },
+                width_in_bits: Width::_64,
+            }) => {
+                assembler
+                    .inc(qword_ptr(segment_memory_operand_to_iced(
+                        *seg_reg,
+                        *index,
+                        *scale,
+                        *displacement,
+                    )))
+                    .unwrap();
+            }
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1573,6 +1600,7 @@ impl Instruction {
                 Some((OperandDirection::Out, dst)),
             ]
             .into_iter(),
+            Opcode::INC(value) => [Some((OperandDirection::InOut, value)), None, None].into_iter(),
             Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
             Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
             Opcode::DEAD => panic!(),
@@ -1755,6 +1783,7 @@ impl Instruction {
                         .map(|reg| (OperandDirection::Out, Operand::preg(Width::_64, reg))),
                 )
                 .collect(),
+            Opcode::INC(value) => [(OperandDirection::InOut, value)].into_iter().collect(),
             Opcode::LABEL => alloc::vec::Vec::default(),
             Opcode::CQO => [
                 (

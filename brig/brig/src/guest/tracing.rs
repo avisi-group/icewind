@@ -1,14 +1,14 @@
 use {
     crate::guest::get_current_guest,
+    common::GuestExecutionContext,
     core::{
         fmt::Write,
-        sync::atomic::{AtomicBool, AtomicU64, Ordering},
+        sync::atomic::{AtomicBool, Ordering},
     },
     kernel::devices::{Device, SharedDevice, manager::SharedDeviceManager},
     spin::Lazy,
 };
 
-pub static INSTRUCTION_COUNT: AtomicU64 = AtomicU64::new(0);
 pub static ENABLED: AtomicBool = AtomicBool::new(false);
 
 static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
@@ -18,12 +18,12 @@ static CURRENT_TRACE_PACKET: Lazy<SharedDevice> = Lazy::new(|| {
 });
 
 pub extern "sysv64" fn trace_instruction_start(opcode: u32, pc: u64) {
-    let count = INSTRUCTION_COUNT.fetch_add(1, Ordering::Relaxed);
-
     if ENABLED.load(Ordering::Relaxed) {
         let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
             panic!()
         };
+
+        let count = GuestExecutionContext::current().instruction_count;
 
         write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
         //  writeln!(transport, "{pc:016x}").unwrap();

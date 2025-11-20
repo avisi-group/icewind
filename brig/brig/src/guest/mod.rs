@@ -76,6 +76,7 @@ pub fn run_guest<F: FnOnce()>(mut guest: Guest, f: F) {
         current_address_space,
         interrupt_pending: AtomicU64::new(0),
         unprivileged_access: 0,
+        instruction_count: 0,
     });
 
     log::debug!("activating guest execution context");

@@ -6,11 +6,12 @@ use {
         x86::{
             EMIT_TRACING, X86Block,
             emitter::{BinaryOperationKind, CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
-            encoder::Instruction,
+            encoder::{Instruction, Operand, registers::SegmentRegister},
         },
     },
     alloc::{collections::BTreeMap, vec::Vec},
     common::{
+        GuestExecutionContext,
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in},
         intern::InternedString,
@@ -21,7 +22,7 @@ use {
         sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
         width_helpers::unsigned_smallest_width_of_value,
     },
-    core::{hash::Hash, panic},
+    core::{hash::Hash, mem::offset_of, panic},
     itertools::Itertools,
 };
 
@@ -131,6 +132,12 @@ pub fn translate_instruction(
             }
         }
     };
+
+    emitter.push_instruction(Instruction::inc(Operand::mem_seg_displ(
+        64,
+        SegmentRegister::FS,
+        i32::try_from(offset_of!(GuestExecutionContext, instruction_count)).unwrap(),
+    )));
 
     if EMIT_TRACING {
         emitter.emit_trace_instruction_end();
@@ -1153,6 +1160,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 }
 
                 if target.as_ref() == "AArch64_IC__1" {
+                    // address to flush, todo handling if non-zero (flush everything)
                     let _0 = self.emitter.constant(0x0, Type::Unsigned(64));
                     let condition = self.emitter.binary_operation(
                         crate::x86::emitter::BinaryOperationKind::CompareEqual(args[0].clone(), _0),
