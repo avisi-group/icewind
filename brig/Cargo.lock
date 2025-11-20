@@ -483,7 +483,7 @@ dependencies = [
  "thiserror",
  "uart_16550",
  "uuid",
- "virtio-drivers 0.12.0 (git+https://github.com/fmckeogh/virtio-drivers.git)",
+ "virtio-drivers",
  "x2apic",
  "x86",
  "x86_64",
@@ -1129,7 +1129,7 @@ dependencies = [
  "log",
  "spin 0.10.0",
  "virtio-bindings",
- "virtio-drivers 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "virtio-drivers",
  "x86",
 ]
 
@@ -1144,22 +1144,7 @@ dependencies = [
 [[package]]
 name = "virtio-drivers"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a6012590bf8cc11f57abb1b5a8470e2366353bf352386b48650a87b5538204"
-dependencies = [
- "bitflags 2.9.4",
- "embedded-io 0.6.1",
- "enumn",
- "log",
- "safe-mmio",
- "thiserror",
- "zerocopy",
-]
-
-[[package]]
-name = "virtio-drivers"
-version = "0.12.0"
-source = "git+https://github.com/fmckeogh/virtio-drivers.git#df3fe62afe6f282ad38d1ca7151349fb46b1aa51"
+source = "git+https://github.com/rcore-os/virtio-drivers.git?rev=3967727#396772722151998ae168ca60251f70f8f84502cc"
 dependencies = [
  "bitflags 2.9.4",
  "embedded-io 0.6.1",

@@ -76,6 +76,9 @@ impl TaskManager {
     pub fn create_task(&mut self, entry_point: fn()) -> Task {
         let task = Task::new(entry_point);
         self.tasks.push_back(task.clone());
+        if self.tasks.len() > 1 {
+            panic!("only 1 thread until we fix vmx stuff")
+        }
         task
     }
 

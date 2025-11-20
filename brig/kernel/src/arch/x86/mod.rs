@@ -6,7 +6,10 @@ use {
     bootloader_api::BootInfo,
     core::fmt::Display,
     log::trace,
-    x86::controlregs::{Cr0, Cr4, cr0, cr0_write, cr4, cr4_write},
+    x86::{
+        controlregs::{Cr0, Cr4, cr0, cr0_write, cr4, cr4_write},
+        msr::{IA32_FEATURE_CONTROL, rdmsr, wrmsr},
+    },
     x86_64::{
         PhysAddr, VirtAddr,
         registers::model_specific::{Efer, EferFlags},
@@ -19,6 +22,7 @@ mod gdt;
 pub mod irq;
 pub mod memory;
 pub mod safepoint;
+pub mod vmx;
 
 pub fn init(
     BootInfo {
@@ -42,6 +46,9 @@ pub fn init(
         PHYSICAL_MEMORY_OFFSET
     );
 
+    has_intel_cpu().unwrap();
+    has_vmx_support().unwrap();
+
     // pass physical and virtual addresses of kernel for backtrace symbol
     // resolution, if we crash from here on out we want a nice pretty backtrace
     backtrace::init(
@@ -52,6 +59,7 @@ pub fn init(
 
     // update control-regs
     update_cregs();
+    adjust_feature_control_msr().unwrap();
 
     // initialize heap, from here on out we have a global allocator and the `alloc`
     // crate works
@@ -61,6 +69,8 @@ pub fn init(
     gdt::init();
     irq::init(page_fault_exception);
     dbg::init();
+
+    vmx::init();
 
     // initialize device manager ready to register detected devices
     devices::manager::init();
@@ -74,7 +84,7 @@ pub fn init(
 fn update_cregs() {
     // enable wp
     let mut cr0 = unsafe { cr0() };
-    cr0 |= Cr0::CR0_WRITE_PROTECT;
+    cr0 |= Cr0::CR0_WRITE_PROTECT | Cr0::CR0_NUMERIC_ERROR | Cr0::CR0_ENABLE_PAGING;
 
     trace!("cr0={cr0:?}");
     unsafe {
@@ -84,7 +94,10 @@ fn update_cregs() {
     // enable fsgsbase, pse, pge
     let mut cr4 = unsafe { cr4() };
 
-    cr4 |= Cr4::CR4_ENABLE_FSGSBASE | Cr4::CR4_ENABLE_PSE | Cr4::CR4_ENABLE_GLOBAL_PAGES;
+    cr4 |= Cr4::CR4_ENABLE_FSGSBASE
+        | Cr4::CR4_ENABLE_PSE
+        | Cr4::CR4_ENABLE_GLOBAL_PAGES
+        | Cr4::CR4_ENABLE_VMX;
     cr4 &= !Cr4::CR4_ENABLE_SMEP;
     trace!("cr4={cr4:?}");
 
@@ -187,4 +200,77 @@ impl Display for MachineContext {
         writeln!(f, "R14={:016x}  R15={:016x}", self.r14, self.r15)*/
         writeln!(f, "x")
     }
+}
+
+/// Verifies the CPU is from Intel.
+///
+/// https://memn0ps.github.io/hypervisor-development-in-rust-part-1/
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the CPU vendor is GenuineIntel, otherwise
+/// `Err(HypervisorError::CPUUnsupported)`.
+fn has_intel_cpu() -> Result<(), HypervisorError> {
+    let cpuid = x86::cpuid::CpuId::new();
+    if let Some(vi) = cpuid.get_vendor_info() {
+        if vi.as_str() == "GenuineIntel" {
+            return Ok(());
+        }
+    }
+    Err(HypervisorError::CPUUnsupported)
+}
+
+/// Checks for Virtual Machine Extension (VMX) support on the CPU.
+///
+/// https://memn0ps.github.io/hypervisor-development-in-rust-part-1/
+///
+/// # Returns
+///
+/// Returns `Ok(())` if VMX is supported, otherwise
+/// `Err(HypervisorError::VMXUnsupported)`.
+fn has_vmx_support() -> Result<(), HypervisorError> {
+    let cpuid = x86::cpuid::CpuId::new();
+    if let Some(fi) = cpuid.get_feature_info() {
+        if fi.has_vmx() {
+            return Ok(());
+        }
+    }
+    Err(HypervisorError::VMXUnsupported)
+}
+
+/// Adjusts the IA32_FEATURE_CONTROL MSR to set the lock bit and enable VMXON
+/// outside SMX if necessary.
+///
+/// # Returns
+///
+/// Returns `Ok(())` if the MSR is successfully adjusted, or a `HypervisorError`
+/// if the lock bit is set but VMXON outside SMX is disabled.
+fn adjust_feature_control_msr() -> Result<(), HypervisorError> {
+    const VMX_LOCK_BIT: u64 = 1 << 0;
+    const VMXON_OUTSIDE_SMX: u64 = 1 << 2;
+
+    let ia32_feature_control = unsafe { rdmsr(IA32_FEATURE_CONTROL) };
+
+    if (ia32_feature_control & VMX_LOCK_BIT) == 0 {
+        unsafe {
+            wrmsr(
+                IA32_FEATURE_CONTROL,
+                VMXON_OUTSIDE_SMX | VMX_LOCK_BIT | ia32_feature_control,
+            )
+        };
+    } else if (ia32_feature_control & VMXON_OUTSIDE_SMX) == 0 {
+        return Err(HypervisorError::VMXBIOSLock);
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+enum HypervisorError {
+    /// Virtual Machine Extentions unsupported
+    VMXUnsupported,
+    /// VCPU vendor is not `GenuineIntel`
+    CPUUnsupported,
+    /// VMXON outside SMX is disabled
+    VMXBIOSLock,
 }

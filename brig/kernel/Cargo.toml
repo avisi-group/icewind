@@ -13,7 +13,7 @@ x86 = "0.52.0"
 x2apic = "0.5.0"
 uart_16550 = "0.4.0"
 acpi = "6.0.1"
-virtio-drivers = { git = "https://github.com/fmckeogh/virtio-drivers.git", features = ["alloc"] }
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers.git", rev = "3967727", features = ["alloc"] }
 
 buddy_system_allocator = "0.11.0"
 #talc = { version = "4.4.2", features = ["counters"] } // weirdly slow

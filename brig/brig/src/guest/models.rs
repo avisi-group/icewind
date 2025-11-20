@@ -4,16 +4,17 @@ use {
         devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            self, INSTRUCTION_COUNT, trace_instruction_end, trace_instruction_start,
-            trace_memory_read, trace_memory_write, trace_register_read, trace_register_write,
+            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
+            trace_register_read, trace_register_write,
         },
     },
     alloc::{
-        alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
-        sync::Arc, vec::Vec,
+        alloc::alloc_zeroed, borrow::ToOwned, boxed::Box, collections::btree_map::BTreeMap,
+        string::String, sync::Arc, vec::Vec,
     },
     common::{
-        device::{Device, Tickable},
+        GuestExecutionContext,
+        device::Device,
         hashmap::HashMap,
         intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
@@ -29,7 +30,7 @@ use {
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
         x86::{
-            Callbacks, EMIT_TRACING, X86TranslationContext,
+            Callbacks, X86TranslationContext,
             emitter::{BinaryOperationKind, X86Emitter},
         },
     },
@@ -51,6 +52,10 @@ const SINGLE_STEP: bool = false;
 const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
+
+/// Limit flushes as part of evaluating the performance cost of emptying the
+/// code cache
+static REMAINING_FLUSHES: AtomicU64 = AtomicU64::new(5);
 
 pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
     Lazy::new(|| BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE));
@@ -180,14 +185,19 @@ impl ModelDevice {
 
     fn block_exec(&self, single_step_mode: bool) {
         // guest physical PC to translated block cache
-        let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
+        let mut block_cache = Box::new(HashMap::<u64, TranslatedBlock>::default());
 
         // guest virtual address PC to host virtual ptr to executable code
-        let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
+        let mut chain_cache =
+            Box::new(DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1));
 
-        // virtual to physical PCs
-        let mut translation_cache = DirectMappedCache::<1024, u64>::new(1);
+        // let mut translation_time = Nanoseconds::<u64>::new(0);
+        // let mut execution_time = Nanoseconds::<u64>::new(0);
+        // let start_time = GLOBAL_CLOCK.now();
 
+        // boxed above stack variables because restoring safepoint restores original
+        // values, if theyre pointers that's fine, if they're values we will get
+        // corruption
         let _status = record_safepoint();
 
         log::debug!(
@@ -198,36 +208,47 @@ impl ModelDevice {
             self.register_file.read::<u64>("FAR_EL1"),
         );
 
+        let mut region_virt_base = 1u64;
+        let mut region_phys_base = 1u64;
+
+        // only trace userspace
+        crate::guest::tracing::ENABLED.store(
+            true, //  self.register_file.read::<u8>("PSTATE_EL") == 0,
+            Ordering::Relaxed,
+        );
+
         // block translation/execution loop
         loop {
-            // // only trace userspace
-            // tracing::ENABLED.store(
-            //     self.register_file.read::<u8>("PSTATE_EL") == 0,
-            //     Ordering::Relaxed,
-            // );
-
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
-            let block_start_physical_pc =
-                if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
-                    pc
-                } else {
-                    let pc = guest_translate(self, block_start_virtual_pc, TranslationType::Fetch);
-                    translation_cache.insert(block_start_virtual_pc as usize, pc);
-                    pc
-                };
+            if (block_start_virtual_pc & !0xFFF) != region_virt_base {
+                let block_start_physical_pc =
+                    guest_translate(self, block_start_virtual_pc, TranslationType::Fetch);
+                region_virt_base = block_start_virtual_pc & !0xFFF;
+                region_phys_base = block_start_physical_pc & !0xFFF;
+            }
+
+            let block_start_physical_pc = region_phys_base | (block_start_virtual_pc & 0xFFF);
 
             let translated_block =
                 block_cache
                     .entry(block_start_physical_pc)
                     .or_insert_with(|| {
                         BUMP_ALLOCATOR.clear();
-                        self.translate_guest_block(
+
+                        //   VirtualMemoryArea::current().smc_protect();
+
+                        //   let before = GLOBAL_CLOCK.now();
+                        let block = self.translate_guest_block(
                             BumpAllocatorRef::new(&BUMP_ALLOCATOR),
                             chain_cache.table as u64,
                             block_start_virtual_pc,
                             single_step_mode,
-                        )
+                        );
+                        //  let delta = GLOBAL_CLOCK.now() - before;
+                        // translation_time = translation_time + delta;
+
+                        block
                     });
 
             // block_freq_hist
@@ -266,10 +287,11 @@ impl ModelDevice {
             //     tracing::ENABLED.store(true, Ordering::Relaxed);
             // }
 
-            let before = INSTRUCTION_COUNT.load(Ordering::Relaxed);
+            // let before = INSTRUCTION_COUNT.load(Ordering::Relaxed);
 
+            let count = GuestExecutionContext::current().instruction_count;
             log::debug!(
-                "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {before})",
+                "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {count})",
                 translated_block.opcodes,
             );
 
@@ -278,12 +300,19 @@ impl ModelDevice {
             //     Ordering::Relaxed,
             // );
 
+            //   let before = GLOBAL_CLOCK.now();
             let exec_result = translated_block.translation.execute(&self.register_file);
+            // let delta = GLOBAL_CLOCK.now() - before;
+            // execution_time = execution_time + delta;
 
-            if EMIT_TRACING {
-                INSTRUCTION_COUNT
-                    .fetch_add(translated_block.opcodes.len() as u64, Ordering::Relaxed);
-            }
+            // if GLOBAL_CLOCK.now() >= start_time + Nanoseconds::<u64>::new(20_000_000_000)
+            // {     panic!("{execution_time} {translation_time}");
+            // }
+
+            // if EMIT_TRACING {
+            //     INSTRUCTION_COUNT
+            //         .fetch_add(translated_block.opcodes.len() as u64, Ordering::Relaxed);
+            // }
 
             // // deterministic clock
             // {
@@ -296,14 +325,19 @@ impl ModelDevice {
 
             if exec_result.need_tlb_invalidate() {
                 chain_cache.fill_keys(1);
-                translation_cache.fill_keys(1);
                 VirtualMemoryArea::current().invalidate_guest_mappings();
             }
 
             if exec_result.need_code_cache_flush() {
-                chain_cache.fill_keys(1);
-                block_cache.clear();
-                translation_cache.fill_keys(1);
+                let flushes = REMAINING_FLUSHES.load(Ordering::Relaxed);
+                if flushes > 0 {
+                    log::error!("flush {flushes}");
+                    chain_cache.fill_keys(1);
+                    block_cache.clear();
+                    REMAINING_FLUSHES.fetch_sub(1, Ordering::Relaxed);
+                } else {
+                    log::error!("out of flushes");
+                }
             }
 
             if exec_result.interrupt_pending() {

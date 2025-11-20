@@ -130,6 +130,32 @@ impl VirtualMemoryArea {
         self.invalidate();
     }
 
+    pub fn smc_protect(&mut self) {
+        self.opt
+            .level_4_table_mut()
+            .iter_mut()
+            .take(0x100) //only clear guest half of address space
+            .for_each(|e| {
+                let mut flags = e.flags();
+                flags.remove(PageTableFlags::WRITABLE);
+                e.set_flags(flags)
+            });
+        self.invalidate();
+    }
+
+    pub fn release_smc_protection(&mut self, address: VirtAddr) -> bool {
+        let l3_table =
+            walk_table_smc_reset(self.opt.level_4_table_mut(), address, PageTableLevel::Four);
+        let l2_table = walk_table_smc_reset(l3_table, address, PageTableLevel::Three);
+        let l1_table = walk_table_smc_reset(l2_table, address, PageTableLevel::Two);
+
+        let l1_entry = &mut l1_table[address.p1_index()];
+
+        l1_entry.set_flags(l1_entry.flags().union(PageTableFlags::WRITABLE));
+
+        false
+    }
+
     pub fn invalidate(&self) {
         assert!(Self::get_current_cr3() == self.pml4_base);
         self.activate();
@@ -168,13 +194,13 @@ impl VirtualMemoryArea {
     ) where
         OffsetPageTable<'static>: Mapper<S>,
     {
-        let l3_table = walk_table(
+        let l3_table = walk_and_reset_table(
             self.opt.level_4_table_mut(),
             page.start_address(),
             PageTableLevel::Four,
         );
-        let l2_table = walk_table(l3_table, page.start_address(), PageTableLevel::Three);
-        let l1_table = walk_table(l2_table, page.start_address(), PageTableLevel::Two);
+        let l2_table = walk_and_reset_table(l3_table, page.start_address(), PageTableLevel::Three);
+        let l1_table = walk_and_reset_table(l2_table, page.start_address(), PageTableLevel::Two);
 
         let l1_entry = &mut l1_table[page.start_address().p1_index()];
 
@@ -270,7 +296,11 @@ fn clear_all_present_bits(table: &mut PageTable) {
     });
 }
 
-fn walk_table(table: &mut PageTable, address: VirtAddr, level: PageTableLevel) -> &mut PageTable {
+fn walk_and_reset_table(
+    table: &mut PageTable,
+    address: VirtAddr,
+    level: PageTableLevel,
+) -> &mut PageTable {
     let entry = &mut table[address.page_table_index(level)];
     let mut should_clear = false;
 
@@ -298,4 +328,46 @@ fn walk_table(table: &mut PageTable, address: VirtAddr, level: PageTableLevel) -
     }
 
     next_table
+}
+
+fn walk_table_smc_reset(
+    table: &mut PageTable,
+    address: VirtAddr,
+    level: PageTableLevel,
+) -> &mut PageTable {
+    let entry = &mut table[address.page_table_index(level)];
+    let mut should_clear = false;
+
+    if !entry.flags().contains(PageTableFlags::WRITABLE) {
+        if entry.is_unused() {
+            let frame = HeapStealingFrameAllocator.allocate_frame().unwrap();
+            entry.set_addr(
+                frame.start_address(),
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            );
+        } else {
+            entry.set_flags(entry.flags().union(PageTableFlags::WRITABLE));
+            should_clear = true;
+        }
+    }
+
+    if entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+        panic!();
+    }
+
+    let next_table = unsafe { &mut *entry.addr().to_virt().as_mut_ptr::<PageTable>() };
+
+    if should_clear {
+        clear_all_writeable_bits(next_table);
+    }
+
+    next_table
+}
+
+fn clear_all_writeable_bits(table: &mut PageTable) {
+    table.iter_mut().for_each(|e| {
+        let mut flags = e.flags();
+        flags.remove(PageTableFlags::WRITABLE);
+        e.set_flags(flags)
+    });
 }
