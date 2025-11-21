@@ -367,7 +367,7 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     #[cfg(target_arch = "x86_64")]
     {
-        cmd.args(["-enable-kvm", "-cpu", "host"]);
+        cmd.args(["-enable-kvm", "-cpu", "host,vmx=on"]);
     }
 
     cmd.arg("-no-reboot");

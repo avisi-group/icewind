@@ -1,5 +1,8 @@
 use {
-    alloc::alloc::{Global, alloc_zeroed},
+    alloc::{
+        alloc::{Global, alloc_zeroed},
+        boxed::Box,
+    },
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     common::bytes,
@@ -274,6 +277,17 @@ pub trait VirtAddrExt {
 impl VirtAddrExt for VirtAddr {
     fn to_phys(&self) -> PhysAddr {
         PhysAddr::new(self.as_u64() - PHYSICAL_MEMORY_OFFSET.as_u64())
+    }
+}
+
+/// Gets the VirtAddr of a Box's pointer
+pub trait BoxToVirtAddrExt {
+    fn as_virt(&self) -> VirtAddr;
+}
+
+impl<T> BoxToVirtAddrExt for Box<T> {
+    fn as_virt(&self) -> VirtAddr {
+        VirtAddr::from_ptr(&**self as *const T)
     }
 }
 

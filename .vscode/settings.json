@@ -7,5 +7,9 @@
     "brig/Cargo.toml",
     "common/Cargo.toml"
   ],
-  "liveshare.allowGuestTaskControl": true
+  "liveshare.allowGuestTaskControl": true,
+  "liveshare.allowGuestDebugControl": true,
+  "liveshare.increasedGuestLimit": false,
+  "liveshare.languages.allowGuestCommandControl": true,
+  "liveshare.notebooks.allowGuestExecuteCells": true
 }

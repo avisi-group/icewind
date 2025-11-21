@@ -31,3 +31,5 @@ fastrand = { version = "2.3.0", default-features = false, features = ["alloc"] }
 bitset-core = { version = "0.1.1", default-features = false }
 linkme = "0.3.35"
 embedded-time = "0.12.1"
+paste = "1.0.15"
+bitfields = "1.0.2"

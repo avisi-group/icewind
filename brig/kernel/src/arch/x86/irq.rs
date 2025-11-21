@@ -10,7 +10,7 @@ use {
     x86_64::{VirtAddr, structures::idt::InterruptDescriptorTable},
 };
 
-static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
+pub static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
 
 pub fn init(page_fault_exception: unsafe extern "C" fn()) {
     unsafe {
@@ -28,8 +28,8 @@ pub fn assign_irq(nr: u8, handler: IrqHandlerFn) -> Result<(), IrqError> {
     Ok(())
 }
 
-struct IrqManager {
-    idt: InterruptDescriptorTable,
+pub struct IrqManager {
+    pub idt: InterruptDescriptorTable,
     used: UsedInterruptVectors,
 }
 

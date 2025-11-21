@@ -17,17 +17,15 @@ use {
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
-static TSS: Once<TaskStateSegment> = Once::INIT;
-static GDT: Once<(GlobalDescriptorTable, Selectors)> = Once::INIT;
+pub static TSS: Once<TaskStateSegment> = Once::INIT;
+pub static GDT: Once<(GlobalDescriptorTable, Selectors)> = Once::INIT;
 
-struct Selectors {
-    kernel_code_selector: SegmentSelector,
-    kernel_data_selector: SegmentSelector,
-    #[allow(unused)]
-    user_data_selector: SegmentSelector,
-    #[allow(unused)]
-    user_code_selector: SegmentSelector,
-    tss_selector: SegmentSelector,
+pub struct Selectors {
+    pub kernel_code_selector: SegmentSelector,
+    pub kernel_data_selector: SegmentSelector,
+    pub user_data_selector: SegmentSelector,
+    pub user_code_selector: SegmentSelector,
+    pub tss_selector: SegmentSelector,
 }
 
 pub fn init() {
