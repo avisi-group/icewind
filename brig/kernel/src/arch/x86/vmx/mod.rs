@@ -289,27 +289,27 @@ fn init_vmcs(vmcs: &mut Vmcs, ept: &Ept, io_bitmap: &IoBitmap) -> Result<(), Vmc
 
     vmcs.write_guest_cs_selector(vmcs.read_host_cs_selector()?)?;
     vmcs.write_guest_cs_base(0)?;
-    vmcs.write_guest_cs_limit(0xffff_ffff)?;
-    vmcs.write_guest_cs_ar_bytes(0b1001_1011)?;
+    vmcs.write_guest_cs_limit(0xf_ffff)?;
+    vmcs.write_guest_cs_ar_bytes(0b10_0000_1001_1011)?;
 
     vmcs.write_guest_ds_selector(vmcs.read_host_ds_selector()?)?;
     vmcs.write_guest_ds_base(0)?;
-    vmcs.write_guest_ds_limit(0xffff_ffff)?;
+    vmcs.write_guest_ds_limit(0xf_ffff)?;
     vmcs.write_guest_ds_ar_bytes(0b1001_0011)?;
 
     vmcs.write_guest_es_selector(vmcs.read_host_es_selector()?)?;
     vmcs.write_guest_es_base(0)?;
-    vmcs.write_guest_es_limit(0xffff_ffff)?;
+    vmcs.write_guest_es_limit(0xf_ffff)?;
     vmcs.write_guest_es_ar_bytes(0b1001_0011)?;
 
     vmcs.write_guest_fs_selector(vmcs.read_host_fs_selector()?)?;
     vmcs.write_guest_fs_base(0)?;
-    vmcs.write_guest_fs_limit(0xffff_ffff)?;
+    vmcs.write_guest_fs_limit(0xf_ffff)?;
     vmcs.write_guest_fs_ar_bytes(0b1001_0011)?;
 
     vmcs.write_guest_gs_selector(vmcs.read_host_gs_selector()?)?;
     vmcs.write_guest_gs_base(0)?;
-    vmcs.write_guest_gs_limit(0xffff_ffff)?;
+    vmcs.write_guest_gs_limit(0xf_ffff)?;
     vmcs.write_guest_gs_ar_bytes(0b1001_0011)?;
 
     // bit 6:5 (DPL)
@@ -321,7 +321,7 @@ fn init_vmcs(vmcs: &mut Vmcs, ept: &Ept, io_bitmap: &IoBitmap) -> Result<(), Vmc
     // (corresponding to CR0.PE) is 0.1
     vmcs.write_guest_ss_selector(vmcs.read_host_ss_selector()?)?;
     vmcs.write_guest_ss_base(0)?;
-    vmcs.write_guest_ss_limit(0xffff_ffff)?;
+    vmcs.write_guest_ss_limit(0xf_ffff)?;
     vmcs.write_guest_ss_ar_bytes(0b1001_0011)?;
 
     vmcs.write_guest_tr_selector(vmcs.read_host_tr_selector()?)?;
