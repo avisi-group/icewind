@@ -182,7 +182,6 @@ impl Vmcs {
     expose_field!(ple_gap, control::PLE_GAP);
     expose_field!(ple_window, control::PLE_WINDOW);
 
-    expose_field!(vm_exit_reason, ro::EXIT_REASON);
     expose_field!(vm_exit_intr_info, ro::VMEXIT_INTERRUPTION_INFO);
     expose_field!(vm_exit_intr_error_code, ro::VMEXIT_INTERRUPTION_ERR_CODE);
     expose_field!(idt_vectoring_info_field, ro::IDT_VECTORING_INFO);

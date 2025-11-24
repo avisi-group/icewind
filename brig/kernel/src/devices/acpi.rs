@@ -15,6 +15,7 @@ impl Bus<PhysAddr> for ACPIBus {
         let tables =
             unsafe { AcpiTables::from_rsdp(Handler, probe_data.as_u64() as usize) }.unwrap();
 
+        log::error!("pcie probe");
         PCIEBus.probe(PciConfigRegions::new(&tables).unwrap())
     }
 }
@@ -29,6 +30,9 @@ impl AcpiHandler for Handler {
         size: usize,
     ) -> acpi::PhysicalMapping<Self, T> {
         let virt_addr = PhysAddr::new(u64::try_from(physical_address).unwrap()).to_virt();
+
+        // log::error!("acpi map {:x} -> {:?} ({:#x})", physical_address, virt_addr,
+        // size);
 
         PhysicalMapping {
             physical_start: physical_address,

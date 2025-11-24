@@ -26,6 +26,7 @@ unsafe impl Sync for LocalApic {}
 
 impl LocalApic {
     pub fn new() -> Self {
+        log::error!("reading xapic base");
         let base = PhysAddr::new(unsafe { xapic_base() }).to_virt();
 
         let mut lapic = LocalApicBuilder::new()
@@ -36,10 +37,14 @@ impl LocalApic {
             .build()
             .unwrap_or_else(|err| panic!("{}", err));
 
+        log::error!("built");
+
         unsafe {
             lapic.enable();
             lapic.disable_timer();
         }
+
+        log::error!("enabled");
 
         let frequency = calibrate_timer_frequency(&mut lapic);
         trace!("lapic frequency={}", frequency);

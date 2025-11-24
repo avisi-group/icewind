@@ -59,3 +59,21 @@ impl IoBitmap {
         self.get_a_phys() + 4096
     }
 }
+
+pub struct MsrBitmap {
+    // four contiguous MSR bitmaps, which are each 1-KByte in size
+    region: Box<AlignedArray<4096>>,
+}
+
+impl MsrBitmap {
+    pub fn new() -> Self {
+        let mut region = AlignedArray::new();
+        region.fill(0xff);
+
+        Self { region }
+    }
+
+    pub fn get_phys(&self) -> u64 {
+        self.region.as_virt().to_phys().as_u64()
+    }
+}

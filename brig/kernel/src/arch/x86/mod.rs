@@ -70,15 +70,39 @@ pub fn init(
     irq::init(page_fault_exception);
     dbg::init();
 
-    vmx::init();
+    vmx::init(
+        continuation as *const fn() as u64,
+        rsdp_addr.into_option().unwrap(),
+    );
+
+    panic!("shouldn't get here");
+}
+
+extern "C" fn continuation(rsdp_addr: u64) {
+    log::error!("In VM continuation");
 
     // initialize device manager ready to register detected devices
     devices::manager::init();
 
+    // OK - I have found a problem.
+    // It is a terrible deadlock.
+    // Basically, the VM is running in the memory allocator
+    // And it causes an EPT violation
+    // Then the EPT resolver tries to allocate a page
+    // But the memory allocator is already locked by the guest
+    // So it deadlocks.
+    // Possible solution: reserve a bunch of pages for EPT usage -- but how many?
+    //
+    // I have just tried this, and it gets further -- but then crashes on something
+    // else.
+
+    log::error!("Probing system bus");
     // probe system bus, this bootstraps device enumeration and initialization
     SYSTEM_BUS.probe(X86SystemBusProbeData {
-        rsdp_phys: PhysAddr::new(rsdp_addr.into_option().unwrap()),
+        rsdp_phys: PhysAddr::new(rsdp_addr),
     });
+
+    panic!("continuation");
 }
 
 fn update_cregs() {
@@ -125,7 +149,10 @@ struct X86SystemBusProbeData {
 
 impl Bus<X86SystemBusProbeData> for X86SystemBus {
     fn probe(&self, probe_data: X86SystemBusProbeData) {
+        log::error!("acpi probe");
         acpi::ACPIBus.probe(probe_data.rsdp_phys);
+
+        log::error!("lapic init");
         lapic::init();
     }
 }

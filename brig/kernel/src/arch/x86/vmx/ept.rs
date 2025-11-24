@@ -3,10 +3,10 @@ use {
         memory::{PhysAddrExt, VirtAddrExt},
         vmx::allocate_page,
     },
-    alloc::boxed::Box,
+    alloc::{alloc::alloc_zeroed, boxed::Box},
     bitfields::bitfield,
     common::bits::bit_extract,
-    core::array,
+    core::{alloc::Layout, array, ptr::null_mut},
     x86_64::{PhysAddr, VirtAddr},
 };
 
@@ -45,26 +45,56 @@ impl EptTable {
 }
 
 pub struct Ept {
-    pml4: Box<EptTable>,
+    pml4: PhysAddr,
+    next_table: PhysAddr,
+    end_table: PhysAddr,
 }
 
 impl Ept {
     pub fn new() -> Self {
-        Self {
-            pml4: Box::new(EptTable {
-                entries: array::from_fn(|_| EptEntry::from_bits(0)),
-            }),
+        let num_tables = 1024;
+        // 1024 tables
+        let tables = VirtAddr::from_ptr(unsafe {
+            alloc_zeroed(Layout::from_size_align(num_tables * 4096, 4096).unwrap())
+        })
+        .to_phys();
+
+        let mut selph = Self {
+            pml4: PhysAddr::zero(),
+            next_table: tables,
+            end_table: tables + u64::try_from(num_tables * 4096).unwrap(),
+        };
+
+        selph.pml4 = selph.allocate_page_table();
+
+        selph
+    }
+
+    fn allocate_page_table(&mut self) -> PhysAddr {
+        if self.next_table >= self.end_table {
+            panic!("ept out of tables");
         }
+
+        let table = self.next_table;
+        self.next_table += 4096;
+
+        table
     }
 
     pub fn map_page(&mut self, guest_phys_addr: u64, host_phys_addr: u64) {
         let PageTableIndices { pml4, pdp, pd, pt } =
             PageTableIndices::from_address(guest_phys_addr);
 
-        let pml4_entry = &mut self.pml4.entries[usize::from(pml4)];
+        // log::error!(
+        //     "ept map {guest_phys_addr:x} -> {host_phys_addr:x} {:x} {:x}",
+        //     self.next_table,
+        //     self.end_table
+        // );
+
+        let pml4_entry = &mut EptTable::from_phys_addr(self.pml4).entries[usize::from(pml4)];
 
         if pml4_entry.address() == 0 {
-            pml4_entry.set_address(allocate_page().to_phys().as_u64() >> 12);
+            pml4_entry.set_address(self.allocate_page_table().as_u64() >> 12);
             pml4_entry.set_read(true);
             pml4_entry.set_write(true);
             pml4_entry.set_execute(true);
@@ -74,23 +104,23 @@ impl Ept {
             .entries[usize::from(pdp)];
 
         if pdp_entry.address() == 0 {
-            pdp_entry.set_address(allocate_page().to_phys().as_u64() >> 12);
+            pdp_entry.set_address(self.allocate_page_table().as_u64() >> 12);
             pdp_entry.set_read(true);
             pdp_entry.set_write(true);
             pdp_entry.set_execute(true);
         }
 
-        let pd_entry = &mut EptTable::from_phys_addr(PhysAddr::new(pml4_entry.address() << 12))
+        let pd_entry = &mut EptTable::from_phys_addr(PhysAddr::new(pdp_entry.address() << 12))
             .entries[usize::from(pd)];
 
         if pd_entry.address() == 0 {
-            pd_entry.set_address(allocate_page().to_phys().as_u64() >> 12);
+            pd_entry.set_address(self.allocate_page_table().as_u64() >> 12);
             pd_entry.set_read(true);
             pd_entry.set_write(true);
             pd_entry.set_execute(true);
         }
 
-        let pt_entry = &mut EptTable::from_phys_addr(PhysAddr::new(pml4_entry.address() << 12))
+        let pt_entry = &mut EptTable::from_phys_addr(PhysAddr::new(pd_entry.address() << 12))
             .entries[usize::from(pt)];
 
         pt_entry.set_address(host_phys_addr >> 12);
@@ -99,8 +129,12 @@ impl Ept {
         pt_entry.set_execute(true);
     }
 
+    pub fn invalidate(&self) {
+        // todo
+    }
+
     pub fn phys_addr(&self) -> PhysAddr {
-        VirtAddr::from_ptr((&*self.pml4) as *const EptTable).to_phys()
+        self.pml4
     }
 }
 
@@ -114,10 +148,10 @@ struct PageTableIndices {
 impl PageTableIndices {
     fn from_address(address: u64) -> Self {
         Self {
-            pml4: u16::try_from(bit_extract(address, 39, 47)).unwrap(),
-            pdp: u16::try_from(bit_extract(address, 30, 38)).unwrap(),
-            pd: u16::try_from(bit_extract(address, 21, 29)).unwrap(),
-            pt: u16::try_from(bit_extract(address, 12, 20)).unwrap(),
+            pml4: u16::try_from(bit_extract(address, 39, 9)).unwrap(),
+            pdp: u16::try_from(bit_extract(address, 30, 9)).unwrap(),
+            pd: u16::try_from(bit_extract(address, 21, 9)).unwrap(),
+            pt: u16::try_from(bit_extract(address, 12, 9)).unwrap(),
         }
     }
 }

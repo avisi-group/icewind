@@ -4,7 +4,7 @@ use {
     x86::{
         bits64::vmx::{vmclear, vmptrld, vmread, vmwrite},
         msr::{IA32_VMX_BASIC, rdmsr},
-        vmx::vmcs::ro::VM_INSTRUCTION_ERROR,
+        vmx::vmcs::ro::{EXIT_REASON, VM_INSTRUCTION_ERROR},
     },
     x86_64::{PhysAddr, VirtAddr},
 };
@@ -116,6 +116,10 @@ impl Vmcs {
         self.get_field(VM_INSTRUCTION_ERROR)
             .map(|i| INSTRUCTION_ERROR_MESSAGES[usize::try_from(i).unwrap()])
     }
+
+    pub fn read_vm_exit_reason(&self) -> Result<VmxExitReason, VmcsError> {
+        self.get_field(EXIT_REASON).map(|i| VmxExitReason::from(i))
+    }
 }
 
 #[repr(C, align(4096))]
@@ -187,3 +191,75 @@ const INSTRUCTION_ERROR_MESSAGES: &[&'static str] = &[
     "vm entry with non-launched executive vmcs",
     "vm entry with executive-vmcs pointer not vmxon pointer",
 ];
+
+#[derive(Debug)]
+pub enum VmxExitReason {
+    Exception = 0,
+    ExternalInterrupt = 1,
+    TripleFault = 2,
+    InitSignal = 3,
+    StartupIpi = 4,
+    SystemManagementInterrupt = 5,
+    OtherSmi = 6,
+    InterruptWindow = 7,
+    NmiWindow = 8,
+    TaskSwitch = 9,
+    CpuId = 10,
+    GetSec = 11,
+    Hlt = 12,
+    Invd = 13,
+    InvlPg = 14,
+    RdPmc = 15,
+    RdTsc = 16,
+    Rsm = 17,
+    VmCall = 18,
+    VmClear = 19,
+    VmLaunch = 20,
+    VmPtrLd = 21,
+    VmPtrSt = 22,
+    VmRead = 23,
+    IoInstruction = 30,
+    RdMsr = 31,
+    WrMsr = 32,
+    VmEntryFailureInvalidGuestState = 33,
+    EptViolation = 48,
+    VmxPreemptionTimerExpired = 52,
+}
+impl From<u64> for VmxExitReason {
+    fn from(value: u64) -> Self {
+        use VmxExitReason::*;
+        match value {
+            0 => Exception,
+            1 => ExternalInterrupt,
+            2 => TripleFault,
+            3 => InitSignal,
+            4 => StartupIpi,
+            5 => SystemManagementInterrupt,
+            6 => OtherSmi,
+            7 => InterruptWindow,
+            8 => NmiWindow,
+            9 => TaskSwitch,
+            10 => CpuId,
+            11 => GetSec,
+            12 => Hlt,
+            13 => Invd,
+            14 => InvlPg,
+            15 => RdPmc,
+            16 => RdTsc,
+            17 => Rsm,
+            18 => VmCall,
+            19 => VmClear,
+            20 => VmLaunch,
+            21 => VmPtrLd,
+            22 => VmPtrSt,
+            23 => VmRead,
+            30 => IoInstruction,
+            31 => RdMsr,
+            32 => WrMsr,
+            33 => VmEntryFailureInvalidGuestState,
+            48 => EptViolation,
+            52 => VmxPreemptionTimerExpired,
+            _ => panic!("unknown exit reason"),
+        }
+    }
+}
