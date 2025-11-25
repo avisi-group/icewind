@@ -22,6 +22,7 @@ mod gdt;
 pub mod irq;
 pub mod memory;
 pub mod safepoint;
+pub mod system_bus;
 pub mod vmx;
 
 pub fn init(
@@ -35,6 +36,7 @@ pub fn init(
         ..
     }: &BootInfo,
     page_fault_exception: unsafe extern "C" fn(),
+    continuation: extern "C" fn(u64),
 ) {
     // if physical memory offset was wrong, all phys-virt conversions would be wrong
     assert_eq!(
@@ -70,39 +72,9 @@ pub fn init(
     irq::init(page_fault_exception);
     dbg::init();
 
-    vmx::init(
-        continuation as *const fn() as u64,
-        rsdp_addr.into_option().unwrap(),
-    );
+    vmx::init(continuation, rsdp_addr.into_option().unwrap());
 
     panic!("shouldn't get here");
-}
-
-extern "C" fn continuation(rsdp_addr: u64) {
-    log::error!("In VM continuation");
-
-    // initialize device manager ready to register detected devices
-    devices::manager::init();
-
-    // OK - I have found a problem.
-    // It is a terrible deadlock.
-    // Basically, the VM is running in the memory allocator
-    // And it causes an EPT violation
-    // Then the EPT resolver tries to allocate a page
-    // But the memory allocator is already locked by the guest
-    // So it deadlocks.
-    // Possible solution: reserve a bunch of pages for EPT usage -- but how many?
-    //
-    // I have just tried this, and it gets further -- but then crashes on something
-    // else.
-
-    log::error!("Probing system bus");
-    // probe system bus, this bootstraps device enumeration and initialization
-    SYSTEM_BUS.probe(X86SystemBusProbeData {
-        rsdp_phys: PhysAddr::new(rsdp_addr),
-    });
-
-    panic!("continuation");
 }
 
 fn update_cregs() {
@@ -136,24 +108,6 @@ fn update_cregs() {
 
     unsafe {
         Efer::write(efer);
-    }
-}
-
-static SYSTEM_BUS: X86SystemBus = X86SystemBus;
-
-struct X86SystemBus;
-
-struct X86SystemBusProbeData {
-    rsdp_phys: PhysAddr,
-}
-
-impl Bus<X86SystemBusProbeData> for X86SystemBus {
-    fn probe(&self, probe_data: X86SystemBusProbeData) {
-        log::error!("acpi probe");
-        acpi::ACPIBus.probe(probe_data.rsdp_phys);
-
-        log::error!("lapic init");
-        lapic::init();
     }
 }
 

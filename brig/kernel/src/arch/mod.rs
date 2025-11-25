@@ -17,9 +17,13 @@ pub const PAGE_SIZE: usize = 4096;
 
 /// Platform initialization, triggers device enumeration and
 /// initialization
-pub fn platform_init(boot_info: &BootInfo, page_fault_exception: unsafe extern "C" fn()) {
+pub fn platform_init(
+    boot_info: &BootInfo,
+    page_fault_exception: unsafe extern "C" fn(),
+    continuation: extern "C" fn(u64),
+) {
     trace!("initializing platform");
-    x86::init(boot_info, page_fault_exception);
+    x86::init(boot_info, page_fault_exception, continuation);
 }
 
 #[derive(Default)]

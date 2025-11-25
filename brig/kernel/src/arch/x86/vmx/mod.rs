@@ -17,6 +17,7 @@ use {
             vmx::vmxon,
         },
         controlregs::{cr0, cr3, cr4},
+        cpuid::{CpuIdResult, cpuid},
         msr::{
             IA32_EFER, IA32_VMX_BASIC, IA32_VMX_CR0_FIXED0, IA32_VMX_CR0_FIXED1,
             IA32_VMX_CR4_FIXED0, IA32_VMX_CR4_FIXED1, IA32_VMX_ENTRY_CTLS, IA32_VMX_EXIT_CTLS,
@@ -58,26 +59,33 @@ struct VmMachineContext {
     r15: u64,
 }
 
-pub fn init(continuation: u64, continuation_arg: u64) {
-    log::error!("starting vmx init");
+impl VmMachineContext {
+    pub fn set(boxed: &Box<Self>) {
+        unsafe { wrgsbase(boxed.as_virt().as_u64()) }
+    }
+
+    pub fn get() -> &'static mut Self {
+        let virt = VirtAddr::new(unsafe { rdgsbase() });
+        unsafe { &mut *virt.as_mut_ptr() }
+    }
+}
+
+pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
+    log::trace!("initializing VMX");
 
     let vmxon_region = Vmxon::new();
 
     unsafe { vmxon(vmxon_region.as_phys().as_u64()).unwrap() };
-    log::error!("vmxon");
 
     // Setup VM context
     let mut vm_context = Box::new(VmMachineContext::default());
-    unsafe {
-        wrgsbase(vm_context.as_virt().as_u64());
-    }
+    VmMachineContext::set(&vm_context);
 
     vm_context.rdi = continuation_arg;
 
     // Setup VMCS
     let mut vmcs = Vmcs::new();
     vmcs.activate().unwrap();
-    log::error!("activated vmcs");
 
     // IO Bitmap
     let mut io_bitmap = IoBitmap::new();
@@ -99,18 +107,15 @@ pub fn init(continuation: u64, continuation_arg: u64) {
     //ept.map_page(0, 0, flags);
 
     init_vmcs(&mut vmcs, &ept, &io_bitmap, &msr_bitmap).unwrap();
-    vmcs.write_guest_rip(continuation).unwrap();
+    vmcs.write_guest_rip(continuation as u64).unwrap();
 
     // Enter VM loop
     let mut launched = vmcs.is_launched();
     if !launched {
         vmcs.set_launched();
     }
-    log::error!("launched");
 
     loop {
-        //log::error!("start of loop");
-
         x86_64::instructions::interrupts::disable();
         let rc = vmx_run(!launched);
         launched = true;
@@ -123,6 +128,7 @@ pub fn init(continuation: u64, continuation_arg: u64) {
 
         let result = match vmcs.read_vm_exit_reason().unwrap() {
             VmxExitReason::EptViolation => handle_ept_violation(&mut vmcs, &mut ept),
+            VmxExitReason::CpuId => handle_cpuid(),
             _ => {
                 log::error!(
                     "unhandled vm exit reason: {:?}, qualification: {}",
@@ -150,8 +156,6 @@ pub fn init(continuation: u64, continuation_arg: u64) {
             }
         }
     }
-
-    panic!("shouldn't get here");
 }
 
 enum ExitHandleResult {
@@ -175,6 +179,23 @@ fn handle_ept_violation(vmcs: &mut Vmcs, ept: &mut Ept) -> ExitHandleResult {
     ept.invalidate();
 
     ExitHandleResult::ContinueRetry
+}
+
+fn handle_cpuid() -> ExitHandleResult {
+    let ctx = VmMachineContext::get();
+
+    log::trace!("cpuid handling: {:x} {:x}", ctx.rax, ctx.rcx);
+
+    let CpuIdResult { eax, ebx, ecx, edx } = cpuid!(ctx.rax, ctx.rcx);
+
+    log::trace!("cpuid result: {:x?}", CpuIdResult { eax, ebx, ecx, edx });
+
+    ctx.rax = u64::from(eax);
+    ctx.rbx = u64::from(ebx);
+    ctx.rcx = u64::from(ecx);
+    ctx.rdx = u64::from(edx);
+
+    ExitHandleResult::ContinueAdvance
 }
 
 pub fn compute_vmx_control(msr: u32, required: u32) -> u32 {
@@ -206,8 +227,6 @@ fn init_vmcs(
     let vmx_basic = unsafe { rdmsr(IA32_VMX_BASIC) };
     let use_true = vmx_basic.bit_test(55);
 
-    log::error!("use true: {use_true}");
-
     vmcs.write_pin_based_vm_exec_control(
         compute_vmx_control(
             if use_true {
@@ -215,7 +234,10 @@ fn init_vmcs(
             } else {
                 IA32_VMX_PINBASED_CTLS
             },
-            (PinbasedControls::VMX_PREEMPTION_TIMER).bits(),
+            (PinbasedControls::VMX_PREEMPTION_TIMER
+                | PinbasedControls::EXTERNAL_INTERRUPT_EXITING
+                | PinbasedControls::NMI_EXITING)
+                .bits(),
         )
         .into(),
     )?;
@@ -251,7 +273,7 @@ fn init_vmcs(
             } else {
                 IA32_VMX_PROCBASED_CTLS
             },
-            (PrimaryControls::SECONDARY_CONTROLS).bits(),
+            (PrimaryControls::SECONDARY_CONTROLS | PrimaryControls::USE_MSR_BITMAPS).bits(),
         )
         .into(),
     )?;
@@ -285,7 +307,7 @@ fn init_vmcs(
 
     vmcs.write_vmx_preemption_timer_value(0xffff_ffff)?;
 
-    // vmcs.write_msr_bitmap(msr_bitmap.get_phys())?;
+    vmcs.write_msr_bitmap(msr_bitmap.get_phys())?;
     vmcs.write_io_bitmap_a(io_bitmap.get_a_phys())?;
     vmcs.write_io_bitmap_b(io_bitmap.get_b_phys())?;
 

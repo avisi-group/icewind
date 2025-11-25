@@ -47,13 +47,28 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 
     VirtualMemoryArea::current().opt.level_4_table_mut()[0].set_unused();
 
-    arch::CoreStorage::init_self();
-
     // required for generating UUIDs
     rand::init();
 
-    // Host machine initialisation
-    arch::platform_init(boot_info, page_fault_exception);
+    // Host machine initialisation, starts virtual machine with continuation
+    // function
+    arch::platform_init(boot_info, page_fault_exception, continuation);
+
+    unreachable!();
+}
+
+extern "C" fn continuation(rsdp_addr: u64) {
+    log::trace!("VM continuation");
+
+    // initialize device manager ready to register detected devices
+    kernel::devices::manager::init();
+
+    // probe system bus, this bootstraps device enumeration and initialization
+    log::trace!("Probing system bus");
+    kernel::arch::x86::system_bus::probe(rsdp_addr);
+
+    arch::CoreStorage::init_self();
+
     timer::init();
     tasks::init();
 
