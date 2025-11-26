@@ -1,6 +1,12 @@
 use {
     crate::{
-        arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
+        arch::x86::{
+            memory::{
+                PhysAddrExt, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END,
+                VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtAddrExt, VirtualMemoryArea,
+            },
+            vmx::ept::EPT,
+        },
         devices::{self, BlockDevice, pcie::bar::allocate_bars},
     },
     alloc::alloc::{alloc_zeroed, dealloc},
@@ -84,12 +90,20 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         _direction: virtio_drivers::BufferDirection,
     ) -> virtio_drivers::PhysAddr {
-        VirtualMemoryArea::current()
-            .translate_address(VirtAddr::from_ptr(buffer.as_ptr() as *const u8))
-            .unwrap()
-            .as_u64()
-            .try_into()
-            .unwrap()
+        let virt_addr = VirtAddr::from_ptr(buffer.as_ptr() as *const u8);
+        let phys = VirtualMemoryArea::current()
+            .translate_address(virt_addr)
+            .unwrap();
+
+        if (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START..VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END)
+            .contains(&phys)
+        {
+            // need to do an extra layer of translation
+
+            (EPT.lock().translate(phys.as_u64()).address() << 12) | (virt_addr.as_u64() & 0xFFF)
+        } else {
+            phys.as_u64()
+        }
     }
 
     unsafe fn unshare(
@@ -149,7 +163,8 @@ impl BlockDevice for VirtioBlockDevice {
 
     fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), devices::IoError> {
         log::debug!(
-            "start_block_index: {start_block_index:#x}, buf.len: {:#x}",
+            "start_block_index: {start_block_index:#x}, buf: {:p} buf.len: {:#x}",
+            buf,
             buf.len()
         );
         self.blk.read_blocks(start_block_index, buf).map_err(|e| {

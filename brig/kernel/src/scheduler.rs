@@ -1,6 +1,7 @@
 use {
     crate::{
-        {arch::CoreStorage, devices::lapic::LAPIC},
+        arch::CoreStorage,
+        devices::lapic::LAPIC,
         tasks::{Task, TaskControlBlock, create_idle_task},
     },
     alloc::collections::LinkedList,

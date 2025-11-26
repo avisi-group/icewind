@@ -301,8 +301,16 @@ pub enum VmxExitReason {
     /// An attempt to access memory with a guest-physical address was disallowed
     /// by the configuration of the EPT paging structures.
     EptViolation = 48,
+    /// An attempt to access memory with a guest-physical address encountered a
+    /// misconfigured EPT paging-structure entry.
+    EptMisconfiguration = 49,
     /// The preemption timer counted down to zero.
     VmxPreemptionTimerExpired = 52,
+
+    /// Guest software invoked a VM function with the VMFUNC instruction and the
+    /// VM function either was not enabled or generated a function-specific
+    /// condition causing a VM exit.
+    VmFunc = 59,
 }
 impl From<u64> for VmxExitReason {
     fn from(value: u64) -> Self {
@@ -337,8 +345,10 @@ impl From<u64> for VmxExitReason {
             32 => WrMsr,
             33 => VmEntryFailureInvalidGuestState,
             48 => EptViolation,
+            49 => EptMisconfiguration,
             52 => VmxPreemptionTimerExpired,
-            _ => panic!("unknown exit reason"),
+            59 => VmFunc,
+            i => panic!("unknown exit reason: {i}"),
         }
     }
 }

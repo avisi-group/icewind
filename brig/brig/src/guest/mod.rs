@@ -137,15 +137,20 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS) {
     // go go go (start all devices)
     log::warn!("starting guest");
 
-    for (_, device) in get_current_guest()
+    for (name, device) in get_current_guest()
         .devices
         .iter()
         .filter(|(name, _)| **name != InternedString::from_static("core0"))
     {
+        log::debug!("starting device: {name:?}");
         device.start();
     }
 
-    get_current_guest().core.start();
+    log::debug!("getting guest");
+    let guest = try_get_current_guest().unwrap();
+
+    log::debug!("starting core");
+    guest.core.start();
 }
 
 pub fn _simbench_platform() -> Guest {

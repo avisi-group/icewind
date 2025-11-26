@@ -22,7 +22,8 @@ use {
     core::{
         alloc::Layout,
         fmt::{self, Debug},
-        sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+        panic,
+        sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::{
         bump_alloc::{BumpAllocator, BumpAllocatorRef},
@@ -35,11 +36,21 @@ use {
         },
     },
     kernel::{
-        arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
+        arch::x86::{
+            memory::{
+                GUEST_PHYSICAL_START, STALE_CODE_PAGES, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START,
+                VirtAddrExt, VirtualMemoryArea,
+            },
+            safepoint::record_safepoint,
+            vmx::ept::{self, EPT},
+        },
         fs::Filesystem,
     },
     spin::{Lazy, Mutex},
-    x86_64::structures::paging::{PageSize, Size4KiB},
+    x86_64::{
+        PhysAddr, VirtAddr,
+        structures::paging::{PageSize, Size4KiB},
+    },
 };
 
 /// Size in bytes for the per-translation bump allocator
@@ -52,10 +63,6 @@ const SINGLE_STEP: bool = false;
 const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
-
-/// Limit flushes as part of evaluating the performance cost of emptying the
-/// code cache
-static REMAINING_FLUSHES: AtomicU64 = AtomicU64::new(5);
 
 pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
     Lazy::new(|| BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE));
@@ -184,8 +191,10 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
+        log::trace!("start block exec");
         // guest physical PC to translated block cache
-        let mut block_cache = Box::new(HashMap::<u64, TranslatedBlock>::default());
+        // (2-stage, first stage is the page, second stage is the offset within a paage)
+        let mut block_cache = Box::new(HashMap::<u64, HashMap<u64, TranslatedBlock>>::default());
 
         // guest virtual address PC to host virtual ptr to executable code
         let mut chain_cache =
@@ -219,6 +228,27 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
+            {
+                let mut stale_code_pages = STALE_CODE_PAGES.lock();
+
+                if !stale_code_pages.is_empty() {
+                    chain_cache.fill_keys(1);
+                }
+
+                while let Some(stale_code_page) = stale_code_pages.pop() {
+                    // remove all translations for that page
+                    log::trace!("clearing {stale_code_page:x}");
+
+                    if let Some(page_block_cache) = block_cache.get_mut(&stale_code_page) {
+                        page_block_cache.clear();
+                    } else {
+                        panic!(
+                            "weird internal state where we are trying to clear a stale page that isn't in the cache"
+                        )
+                    }
+                }
+            }
+
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
             if (block_start_virtual_pc & !0xFFF) != region_virt_base {
@@ -228,28 +258,33 @@ impl ModelDevice {
                 region_phys_base = block_start_physical_pc & !0xFFF;
             }
 
-            let block_start_physical_pc = region_phys_base | (block_start_virtual_pc & 0xFFF);
+            let block_start_physical_pc_page_base = region_phys_base;
+            let block_start_pc_offset = block_start_virtual_pc & 0xFFF;
 
-            let translated_block =
-                block_cache
-                    .entry(block_start_physical_pc)
-                    .or_insert_with(|| {
-                        BUMP_ALLOCATOR.clear();
+            let block_start_physical_pc = block_start_physical_pc_page_base | block_start_pc_offset;
 
-                        //   VirtualMemoryArea::current().smc_protect();
+            let translated_block = block_cache
+                .entry(block_start_physical_pc_page_base)
+                .or_default()
+                .entry(block_start_pc_offset)
+                .or_insert_with(|| {
+                    BUMP_ALLOCATOR.clear();
 
-                        //   let before = GLOBAL_CLOCK.now();
-                        let block = self.translate_guest_block(
-                            BumpAllocatorRef::new(&BUMP_ALLOCATOR),
-                            chain_cache.table as u64,
-                            block_start_virtual_pc,
-                            single_step_mode,
-                        );
-                        //  let delta = GLOBAL_CLOCK.now() - before;
-                        // translation_time = translation_time + delta;
+                    //   VirtualMemoryArea::current().smc_protect();
 
-                        block
-                    });
+                    let block = self.translate_guest_block(
+                        BumpAllocatorRef::new(&BUMP_ALLOCATOR),
+                        chain_cache.table as u64,
+                        block_start_virtual_pc,
+                        single_step_mode,
+                    );
+
+                    EPT.lock().smc_protect(
+                        VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64() + region_phys_base,
+                    );
+
+                    block
+                });
 
             // block_freq_hist
             //     .entry(block_start_virtual_pc)
@@ -329,15 +364,8 @@ impl ModelDevice {
             }
 
             if exec_result.need_code_cache_flush() {
-                let flushes = REMAINING_FLUSHES.load(Ordering::Relaxed);
-                if flushes > 0 {
-                    log::error!("flush {flushes}");
-                    chain_cache.fill_keys(1);
-                    block_cache.clear();
-                    REMAINING_FLUSHES.fetch_sub(1, Ordering::Relaxed);
-                } else {
-                    log::error!("out of flushes");
-                }
+                chain_cache.fill_keys(1);
+                //   block_cache.clear();
             }
 
             if exec_result.interrupt_pending() {

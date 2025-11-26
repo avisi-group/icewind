@@ -84,14 +84,16 @@ extern "C" fn continuation(rsdp_addr: u64) {
 }
 
 fn continue_start() {
+    log::debug!("continue start");
+
     // let serial_in_task = tasks::create_task(serial_in);
     // serial_in_task.start();
-
     let mut block = virtio::block::get(&DeviceFunction {
         bus: 0,
         device: 3,
         function: 0,
     });
+    log::debug!("mounting tarfs");
     let mut fs = TarFilesystem::mount(&mut block);
 
     models::load_all(&mut fs);

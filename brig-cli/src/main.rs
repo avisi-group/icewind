@@ -376,7 +376,7 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         cmd.args(["-gdb", "tcp::1234", "-S"]); //  freeze CPU at startup
     }
 
-    cmd.args(["-m", "16g"]);
+    cmd.args(["-m", "24g"]);
 
     cmd.args([
         "-device",

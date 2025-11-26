@@ -1,15 +1,19 @@
 use {
     crate::arch::x86::{
         gdt::{GDT, TSS},
-        memory::{BoxToVirtAddrExt, VirtAddrExt},
+        memory::{
+            BoxToVirtAddrExt, STALE_CODE_PAGES, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END,
+            VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtAddrExt,
+        },
         vmx::{
             bitmap::{IoBitmap, MsrBitmap},
-            ept::Ept,
+            ept::{EPT, Ept, invalidation::invept_all_contexts},
             vmcs::{Vmcs, VmcsError, VmxExitReason},
         },
     },
     alloc::{alloc::alloc_zeroed, boxed::Box},
     bitset_core::BitSet,
+    common::GuestExecutionContext,
     core::{alloc::Layout, arch::naked_asm},
     x86::{
         bits64::{
@@ -19,7 +23,7 @@ use {
         controlregs::{cr0, cr3, cr4},
         cpuid::{CpuIdResult, cpuid},
         msr::{
-            IA32_EFER, IA32_VMX_BASIC, IA32_VMX_CR0_FIXED0, IA32_VMX_CR0_FIXED1,
+            IA32_APIC_BASE, IA32_EFER, IA32_VMX_BASIC, IA32_VMX_CR0_FIXED0, IA32_VMX_CR0_FIXED1,
             IA32_VMX_CR4_FIXED0, IA32_VMX_CR4_FIXED1, IA32_VMX_ENTRY_CTLS, IA32_VMX_EXIT_CTLS,
             IA32_VMX_PINBASED_CTLS, IA32_VMX_PROCBASED_CTLS, IA32_VMX_PROCBASED_CTLS2,
             IA32_VMX_TRUE_ENTRY_CTLS, IA32_VMX_TRUE_EXIT_CTLS, IA32_VMX_TRUE_PINBASED_CTLS,
@@ -36,7 +40,7 @@ use {
     },
 };
 mod bitmap;
-mod ept;
+pub mod ept;
 mod vmcs;
 
 #[repr(C)]
@@ -73,6 +77,11 @@ impl VmMachineContext {
 pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
     log::trace!("initializing VMX");
 
+    // x86_64::registers::model_specific::Msr::new(IA32_APIC_BASE).read()
+    //     & 0xFFFFFF000 as u64
+
+    //panic!("{:x}", unsafe { rdmsr(IA32_APIC_BASE) });
+
     let vmxon_region = Vmxon::new();
 
     unsafe { vmxon(vmxon_region.as_phys().as_u64()).unwrap() };
@@ -102,11 +111,10 @@ pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
 
     let msr_bitmap = MsrBitmap::new();
 
-    // EPT
-    let mut ept = Ept::new();
+    ept::init();
     //ept.map_page(0, 0, flags);
 
-    init_vmcs(&mut vmcs, &ept, &io_bitmap, &msr_bitmap).unwrap();
+    init_vmcs(&mut vmcs, &io_bitmap, &msr_bitmap).unwrap();
     vmcs.write_guest_rip(continuation as u64).unwrap();
 
     // Enter VM loop
@@ -115,11 +123,11 @@ pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
         vmcs.set_launched();
     }
 
+    x86_64::instructions::interrupts::disable();
     loop {
-        x86_64::instructions::interrupts::disable();
         let rc = vmx_run(!launched);
         launched = true;
-        x86_64::instructions::interrupts::enable();
+        //        x86_64::instructions::interrupts::enable();
 
         if rc != 0 {
             let vm_error = vmcs.read_vm_instruction_error().unwrap();
@@ -127,8 +135,14 @@ pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
         }
 
         let result = match vmcs.read_vm_exit_reason().unwrap() {
-            VmxExitReason::EptViolation => handle_ept_violation(&mut vmcs, &mut ept),
+            VmxExitReason::EptViolation => handle_ept_violation(&mut vmcs),
+            VmxExitReason::EptMisconfiguration => handle_ept_misconfiguration(&mut vmcs),
             VmxExitReason::CpuId => handle_cpuid(),
+            VmxExitReason::VmCall => {
+                log::trace!("vmcall invept");
+                invept_all_contexts();
+                ExitHandleResult::ContinueAdvance
+            }
             _ => {
                 log::error!(
                     "unhandled vm exit reason: {:?}, qualification: {}",
@@ -151,8 +165,7 @@ pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
                 .unwrap();
             }
             ExitHandleResult::Abort => {
-                log::error!("{}", vmcs);
-                panic!("VMX ABORT");
+                panic!("VMX ABORT: vmcs: {vmcs}");
             }
         }
     }
@@ -164,21 +177,64 @@ enum ExitHandleResult {
     ContinueAdvance,
 }
 
-fn handle_ept_violation(vmcs: &mut Vmcs, ept: &mut Ept) -> ExitHandleResult {
+fn handle_ept_violation(vmcs: &mut Vmcs) -> ExitHandleResult {
     let guest_phys_addr = vmcs.read_guest_physical_address().unwrap();
     let guest_linear_addr = vmcs.read_guest_linear_address().unwrap();
     let qual = vmcs.read_exit_qualification().unwrap();
 
-    //  log::error!(
-    //      "ept violation: phys={guest_phys_addr:x}, linear={guest_linear_addr:x},
-    // qual={qual}, rsp={:x}",      vmcs.read_guest_rsp().unwrap()
-    //  );
+    let ept = &mut *EPT.lock();
 
-    // TODO: Check known phys memory regions
-    ept.map_page(guest_phys_addr, guest_phys_addr);
+    let entry = ept.translate(guest_phys_addr);
+
+    if (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64()
+        ..VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END.as_u64())
+        .contains(&guest_phys_addr)
+    {
+        if entry.read() && !entry.write() && entry.execute() {
+            entry.set_write(true);
+
+            let stale_page =
+                (guest_phys_addr & !0xFFF) - VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64();
+            log::trace!("adding stale page {stale_page:x}",);
+            STALE_CODE_PAGES.lock().push(stale_page);
+        } else {
+            log::debug!("access to emulated guest physical address {guest_phys_addr:x}");
+            let backing_page = VirtAddr::from_ptr(unsafe {
+                alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+            })
+            .to_phys();
+            log::debug!("allocated backing page {backing_page:x} for {guest_phys_addr:x}");
+            entry.set_address(backing_page.as_u64() >> 12);
+            entry.set_read(true);
+            entry.set_write(true);
+            entry.set_execute(true);
+        }
+    } else {
+        entry.set_address(guest_phys_addr >> 12);
+        entry.set_read(true);
+        entry.set_write(true);
+        entry.set_execute(true);
+    }
+
+    // log::error!(
+    //     "ept violation: phys={guest_phys_addr:x}, linear={guest_linear_addr:x},
+    // qual={qual}, rsp={:x}",     vmcs.read_guest_rsp().unwrap()
+    // );
+
     ept.invalidate();
 
     ExitHandleResult::ContinueRetry
+}
+
+fn handle_ept_misconfiguration(vmcs: &mut Vmcs) -> ExitHandleResult {
+    let guest_phys_addr = vmcs.read_guest_physical_address().unwrap();
+    let guest_linear_addr = vmcs.read_guest_linear_address().unwrap();
+    let qual = vmcs.read_exit_qualification().unwrap();
+
+    panic!(
+        "ept misconfiguration: phys={guest_phys_addr:x}, linear={guest_linear_addr:x}, qual={qual}, rsp={:x}",
+        vmcs.read_guest_rsp().unwrap()
+    );
 }
 
 fn handle_cpuid() -> ExitHandleResult {
@@ -220,7 +276,6 @@ pub fn compute_vmx_control(msr: u32, required: u32) -> u32 {
 
 fn init_vmcs(
     vmcs: &mut Vmcs,
-    ept: &Ept,
     io_bitmap: &IoBitmap,
     msr_bitmap: &MsrBitmap,
 ) -> Result<(), VmcsError> {
@@ -234,10 +289,7 @@ fn init_vmcs(
             } else {
                 IA32_VMX_PINBASED_CTLS
             },
-            (PinbasedControls::VMX_PREEMPTION_TIMER
-                | PinbasedControls::EXTERNAL_INTERRUPT_EXITING
-                | PinbasedControls::NMI_EXITING)
-                .bits(),
+            0,
         )
         .into(),
     )?;
@@ -282,7 +334,7 @@ fn init_vmcs(
         compute_vmx_control(
             IA32_VMX_PROCBASED_CTLS2,
             (
-                SecondaryControls::ENABLE_EPT
+                SecondaryControls::ENABLE_EPT | SecondaryControls::ENABLE_VM_FUNCTIONS
                 // | SecondaryControls::VIRTUALIZE_X2APIC
                 // | SecondaryControls::VIRTUALIZE_APIC_REGISTER
             )
@@ -297,7 +349,7 @@ fn init_vmcs(
     vmcs.write_vmcs_link_pointer(!0)?;
     vmcs.write_virtual_processor_id(0)?;
     vmcs.write_exception_bitmap(0)?;
-    //   vmcs.write_apic_access_addr(0xfee00000)?; // TODO: Read host
+    vmcs.write_apic_access_addr(0xfee00000)?; // TODO: Read host
     let virtual_apic = allocate_page();
     // page needs to be mapped?
     unsafe {
@@ -311,7 +363,17 @@ fn init_vmcs(
     vmcs.write_io_bitmap_a(io_bitmap.get_a_phys())?;
     vmcs.write_io_bitmap_b(io_bitmap.get_b_phys())?;
 
-    vmcs.write_ept_pointer(ept.phys_addr().as_u64() | 0x1e)?;
+    vmcs.write_ept_pointer(EPT.lock().phys_addr().as_u64() | 0x1e)?;
+
+    let eptp_list_address = allocate_page();
+    unsafe {
+        eptp_list_address
+            .as_mut_ptr::<u64>()
+            .write_volatile(vmcs.read_ept_pointer()?);
+    }
+
+    vmcs.write_eptp_list_address(eptp_list_address.to_phys().as_u64())?;
+    vmcs.write_vm_function_control(1)?;
 
     // Host State
     vmcs.write_host_cr0(u64::try_from(unsafe { cr0().bits() }).unwrap())?;

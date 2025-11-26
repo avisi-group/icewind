@@ -2,6 +2,7 @@ use {
     alloc::{
         alloc::{Global, alloc_zeroed},
         boxed::Box,
+        vec::Vec,
     },
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
@@ -11,6 +12,7 @@ use {
         ops::{Deref, Range},
         ptr::NonNull,
     },
+    spin::{Lazy, Mutex},
     x86_64::{
         PhysAddr, VirtAddr,
         registers::control::{Cr3, Cr3Flags},
@@ -34,12 +36,18 @@ pub const GUEST_PHYSICAL_START: VirtAddr = VirtAddr::new_truncate(0xffff_9000_00
 pub const GUEST_PHYSICAL_END: VirtAddr =
     VirtAddr::new_truncate(0xffff_9000_0000_0000 + GUEST_PHYSICAL_SIZE);
 
+pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START: PhysAddr = PhysAddr::new(0x40_0000_0000); // 256 GB
+pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END: PhysAddr = PhysAddr::new(0x50_0000_0000);
+
 pub fn guest_physical_to_host_virt(guest_physical: u64) -> VirtAddr {
     GUEST_PHYSICAL_START + guest_physical
 }
 
 #[global_allocator]
 pub static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
+
+/// Guest physical addresses of pages that should be flushed from the code cache
+pub static STALE_CODE_PAGES: Lazy<Mutex<Vec<u64>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 /// Initialize the global heap allocator backed by the usable memory regions
 /// supplied by the bootloader
@@ -197,6 +205,10 @@ impl VirtualMemoryArea {
     ) where
         OffsetPageTable<'static>: Mapper<S>,
     {
+        log::trace!(
+            "map page propagate invalidation: page: {page:x?}, frame: {frame:x?}, flags: {flags:?}"
+        );
+
         let l3_table = walk_and_reset_table(
             self.opt.level_4_table_mut(),
             page.start_address(),

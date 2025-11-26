@@ -16,6 +16,7 @@ impl<'device, B: BlockDevice> TarFilesystem<'device, B> {
     pub fn mount(dev: &'device mut B) -> Self {
         // read entire file into memory and create tar archive
         let archive = {
+            // todo: slow because it's zero initialized
             let mut buf = alloc::vec![0u8; dev.size()];
 
             // workaround for https://github.com/rcore-os/virtio-drivers/issues/135

@@ -93,7 +93,11 @@ impl<
 }
 
 fn read_callback<B: BlockDevice>(blk: &mut B, dest: &mut [u8], sector: usize) {
-    log::debug!("reading {} bytes @ {sector:x}", dest.len());
+    log::trace!(
+        "reading {} bytes @ {sector:x} into {:x}",
+        dest.len(),
+        dest.as_ptr() as u64
+    );
 
     assert_eq!(blk.block_size(), 512);
     assert_eq!(dest.len() % 512, 0);

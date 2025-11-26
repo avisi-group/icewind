@@ -354,11 +354,12 @@ impl VirtQueueEvent {
         irq: &Irq,
         isr: &AtomicU32,
     ) {
-        log::debug!("read event: {sector:x}");
+        log::trace!("read event: {sector:x}");
         assert_eq!(self.write_buffers.len(), 2);
 
         // Fill the buffer with zeroes, to make sure the underlying storage has been
         // allocated.
+        log::trace!("clearing buffer: {:p}", self.write_buffers[0].data);
         unsafe {
             self.write_buffers[0]
                 .data

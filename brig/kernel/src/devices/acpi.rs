@@ -15,7 +15,7 @@ impl Bus<PhysAddr> for ACPIBus {
         let tables =
             unsafe { AcpiTables::from_rsdp(Handler, probe_data.as_u64() as usize) }.unwrap();
 
-        log::error!("pcie probe");
+        log::debug!("PCIE probe");
         PCIEBus.probe(PciConfigRegions::new(&tables).unwrap())
     }
 }

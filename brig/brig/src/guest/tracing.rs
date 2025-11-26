@@ -41,57 +41,57 @@ pub extern "sysv64" fn trace_instruction_end() {
 }
 
 pub extern "sysv64" fn trace_register_read(offset: u64, value: u64) {
-    if ENABLED.load(Ordering::Relaxed) {
-        // PC and branchtaken registers
-        if offset != 0x8820 && offset != 0x10d0 {
-            let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-                panic!()
-            };
+    // if ENABLED.load(Ordering::Relaxed) {
+    //     // PC and branchtaken registers
+    //     if offset != 0x8820 && offset != 0x10d0 {
+    //         let Device::Transport(transport) = &mut
+    // *CURRENT_TRACE_PACKET.lock() else {             panic!()
+    //         };
 
-            let name = get_current_guest()
-                .core
-                .model
-                .get_register_by_offset(offset)
-                .unwrap();
+    //         let name = get_current_guest()
+    //             .core
+    //             .model
+    //             .get_register_by_offset(offset)
+    //             .unwrap();
 
-            write!(transport, "R[{name}] => {value:#x}, ").unwrap();
-        }
-    }
+    //         write!(transport, "R[{name}] => {value:#x}, ").unwrap();
+    //     }
+    // }
 }
 
 pub extern "sysv64" fn trace_register_write(offset: u64, value: u64) {
-    if ENABLED.load(Ordering::Relaxed) {
-        // PC and branchtaken registers
-        if offset != 0x8820 && offset != 0x10d0 {
-            let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-                panic!()
-            };
+    // if ENABLED.load(Ordering::Relaxed) {
+    //     // PC and branchtaken registers
+    //     if offset != 0x8820 && offset != 0x10d0 {
+    //         let Device::Transport(transport) = &mut
+    // *CURRENT_TRACE_PACKET.lock() else {             panic!()
+    //         };
 
-            let name = get_current_guest()
-                .core
-                .model
-                .get_register_by_offset(offset)
-                .unwrap();
+    //         let name = get_current_guest()
+    //             .core
+    //             .model
+    //             .get_register_by_offset(offset)
+    //             .unwrap();
 
-            write!(transport, "R[{name}] <= {value:#x}, ").unwrap();
-        }
-    }
+    //         write!(transport, "R[{name}] <= {value:#x}, ").unwrap();
+    //     }
+    // }
 }
 
 pub extern "sysv64" fn trace_memory_read(address: u64, value: u64, width: u8) {
-    if ENABLED.load(Ordering::Relaxed) {
-        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-            panic!()
-        };
-        write!(transport, "M[{address:x}:{width}] => {value:#x}, ").unwrap();
-    }
+    // if ENABLED.load(Ordering::Relaxed) {
+    //     let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock()
+    // else {         panic!()
+    //     };
+    //     write!(transport, "M[{address:x}:{width}] => {value:#x}, ").unwrap();
+    // }
 }
 
 pub extern "sysv64" fn trace_memory_write(address: u64, value: u64, width: u8) {
-    if ENABLED.load(Ordering::Relaxed) {
-        let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
-            panic!()
-        };
-        write!(transport, "M[{address:x}:{width}] <= {value:#x}, ").unwrap();
-    }
+    // if ENABLED.load(Ordering::Relaxed) {
+    //     let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock()
+    // else {         panic!()
+    //     };
+    //     write!(transport, "M[{address:x}:{width}] <= {value:#x}, ").unwrap();
+    // }
 }
