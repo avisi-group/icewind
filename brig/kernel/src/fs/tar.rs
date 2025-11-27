@@ -4,6 +4,7 @@ use {
         fs::{Error, Filesystem},
     },
     alloc::{borrow::ToOwned, string::String, vec::Vec},
+    core::cmp::min,
     tar_no_std::{ArchiveEntry, TarArchive},
 };
 
@@ -16,11 +17,15 @@ impl<'device, B: BlockDevice> TarFilesystem<'device, B> {
     pub fn mount(dev: &'device mut B) -> Self {
         // read entire file into memory and create tar archive
         let archive = {
-            // todo: slow because it's zero initialized
-            let mut buf = alloc::vec![0u8; dev.size()];
+            let mut buf = Vec::with_capacity(dev.size());
+
+            // safe because we're going to read the whole block device or die trying
+            // but also probably UB to be modifying it without initializing:(
+            unsafe {
+                buf.set_len(dev.size());
+            }
 
             // workaround for https://github.com/rcore-os/virtio-drivers/issues/135
-
             // 1GiB chunks
             const G: usize = 1024 * 1024 * 1024;
             buf.chunks_mut(G).enumerate().for_each(|(i, chunk)| {

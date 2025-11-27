@@ -162,11 +162,6 @@ impl BlockDevice for VirtioBlockDevice {
     }
 
     fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), devices::IoError> {
-        log::debug!(
-            "start_block_index: {start_block_index:#x}, buf: {:p} buf.len: {:#x}",
-            buf,
-            buf.len()
-        );
         self.blk.read_blocks(start_block_index, buf).map_err(|e| {
             panic!(
                 "{e:?}: start_block_index: {start_block_index:#x}, buf.len: {:#x}",
