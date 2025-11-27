@@ -476,6 +476,7 @@ dependencies = [
  "elf",
  "embedded-time",
  "fastrand",
+ "iced-x86",
  "linkme",
  "log",
  "paste",

@@ -33,3 +33,11 @@ linkme = "0.3.35"
 embedded-time = "0.12.1"
 paste = "1.0.15"
 bitfields = "1.0.2"
+iced-x86 = { version = "1.21.0", default-features = false, features = [
+    "decoder",
+    "encoder",
+    "block_encoder",
+    "gas",
+    "no_std",
+    "code_asm"
+] }

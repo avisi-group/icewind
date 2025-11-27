@@ -11,10 +11,11 @@ use {
             vmcs::{Vmcs, VmcsError, VmxExitReason},
         },
     },
-    alloc::{alloc::alloc_zeroed, boxed::Box},
+    alloc::{alloc::alloc_zeroed, boxed::Box, sync::Arc},
     bitset_core::BitSet,
-    common::GuestExecutionContext,
+    common::{GuestExecutionContext, device::MemoryMappedDevice, memory::AddressSpaceRegionKind},
     core::{alloc::Layout, arch::naked_asm},
+    iced_x86::{OpKind, Register},
     x86::{
         bits64::{
             segmentation::{rdfsbase, rdgsbase, wrgsbase},
@@ -39,6 +40,7 @@ use {
         structures::tss::TaskStateSegment,
     },
 };
+
 mod bitmap;
 pub mod ept;
 mod vmcs;
@@ -179,8 +181,6 @@ enum ExitHandleResult {
 
 fn handle_ept_violation(vmcs: &mut Vmcs) -> ExitHandleResult {
     let guest_phys_addr = vmcs.read_guest_physical_address().unwrap();
-    let guest_linear_addr = vmcs.read_guest_linear_address().unwrap();
-    let qual = vmcs.read_exit_qualification().unwrap();
 
     let ept = &mut *EPT.lock();
 
@@ -197,17 +197,22 @@ fn handle_ept_violation(vmcs: &mut Vmcs) -> ExitHandleResult {
                 (guest_phys_addr & !0xFFF) - VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64();
             log::trace!("adding stale page {stale_page:x}",);
             STALE_CODE_PAGES.lock().push(stale_page);
-        } else {
+        } else if !entry.read() && !entry.write() && !entry.execute() {
             log::debug!("access to emulated guest physical address {guest_phys_addr:x}");
+
             let backing_page = VirtAddr::from_ptr(unsafe {
                 alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
             })
             .to_phys();
+
             log::debug!("allocated backing page {backing_page:x} for {guest_phys_addr:x}");
+
             entry.set_address(backing_page.as_u64() >> 12);
             entry.set_read(true);
             entry.set_write(true);
             entry.set_execute(true);
+        } else {
+            panic!("violation on unsupported bits");
         }
     } else {
         entry.set_address(guest_phys_addr >> 12);

@@ -63,7 +63,7 @@ impl Guest {
     }
 }
 
-pub fn run_guest<F: FnOnce()>(mut guest: Guest, f: F) {
+pub fn activate_guest_context(mut guest: Guest) {
     let current_address_space = guest
         .address_spaces
         .get_mut(&("as0".into()))
@@ -81,8 +81,6 @@ pub fn run_guest<F: FnOnce()>(mut guest: Guest, f: F) {
 
     log::debug!("activating guest execution context");
     temp_exec_ctx.activate();
-
-    f()
 }
 
 /// Super hacky way of getting the currently executing `ModelDevice`
@@ -306,7 +304,7 @@ pub fn linux_platform() -> Guest {
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));
     guest.timer = Some(timer.clone());
     kernel::timer::register_tickable(
-        //     // Nanoseconds(1_000_000_000),
+        // Nanoseconds(1_000_000_000),
         timer.tick_interval(),
         timer.clone(),
     );

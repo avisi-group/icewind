@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use {
-    crate::guest::{linux_platform, models, run_guest, try_get_current_guest},
+    crate::guest::{activate_guest_context, linux_platform, models, try_get_current_guest},
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     common::{TestConfig, bytes},
     core::{panic::PanicInfo, sync::atomic::Ordering},
@@ -105,14 +105,15 @@ fn continue_start() {
         postcard::from_bytes::<TestConfig>(&file).unwrap()
     };
 
+    // alternatively simbench_platform
+    let guest = linux_platform();
+    activate_guest_context(guest);
+
     if test_config == TestConfig::None {
-        // simbench_platform
-        run_guest(linux_platform(), || guest::start(&mut fs));
+        guest::start(&mut fs);
     } else {
-        run_guest(linux_platform(), || {
-            common::tests::run(test_config);
-            qemu_exit();
-        });
+        common::tests::run(test_config);
+        qemu_exit();
     }
 }
 

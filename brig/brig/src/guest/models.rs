@@ -1,7 +1,7 @@
 use {
     crate::guest::{
         Translation,
-        devices::arm::mmu::{TranslationType, guest_translate, take_arm_exception},
+        devices::arm::mmu::{TranslationType, flush_tlb, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
             trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
@@ -108,6 +108,8 @@ pub fn load_all<FS: Filesystem>(fs: &mut FS) {
 pub struct WellKnownRegisters {
     pc: WellKnownRegister<u64>,
     i: WellKnownRegister<bool>,
+    sctlr_el1: WellKnownRegister<u64>,
+    pstate_el: WellKnownRegister<u8>,
 }
 
 impl WellKnownRegisters {
@@ -117,6 +119,14 @@ impl WellKnownRegisters {
 
     pub fn i(&self) -> WellKnownRegister<bool> {
         self.i
+    }
+
+    pub fn sctlr_el1(&self) -> WellKnownRegister<u64> {
+        self.sctlr_el1
+    }
+
+    pub fn pstate_el(&self) -> WellKnownRegister<u8> {
+        self.pstate_el
     }
 }
 
@@ -150,6 +160,8 @@ impl ModelDevice {
         let well_known_registers = WellKnownRegisters {
             pc: register_file.as_wellknown::<u64>("_PC"),
             i: register_file.as_wellknown::<bool>("PSTATE_I"),
+            sctlr_el1: register_file.as_wellknown::<u64>("SCTLR_EL1_bits"),
+            pstate_el: register_file.as_wellknown::<u8>("PSTATE_EL"),
         };
 
         // interpret(
@@ -361,6 +373,7 @@ impl ModelDevice {
             if exec_result.need_tlb_invalidate() {
                 chain_cache.fill_keys(1);
                 VirtualMemoryArea::current().invalidate_guest_mappings();
+                flush_tlb();
             }
 
             if exec_result.need_code_cache_flush() {
@@ -658,5 +671,6 @@ pub extern "sysv64" fn write_to_el(old: u8, new: u8) {
         // chain_cache.fill_keys(1);
         // translation_cache.fill_keys(1);
         VirtualMemoryArea::current().invalidate_guest_mappings();
+        flush_tlb();
     }
 }

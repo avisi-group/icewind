@@ -8,6 +8,7 @@ use {
     },
     aarch64_paging::paging::{Attributes, Descriptor},
     common::sysreg_helpers::encode_sysreg_id,
+    spin::Mutex,
 };
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);
@@ -43,21 +44,56 @@ struct MmuTranslationContext {
     execution_level: ExecutionLevel,
 }
 
+static RTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
+static WTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
+static FTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
+
+pub fn flush_tlb() {
+    RTLB.lock().fill((u64::MAX, 0));
+    WTLB.lock().fill((u64::MAX, 0));
+    FTLB.lock().fill((u64::MAX, 0));
+}
+
 // returns guest physical address
 pub fn guest_translate(
     device: &ModelDevice,
     guest_virtual_address: u64,
     typ: TranslationType,
 ) -> u64 {
-    let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
+    let mmu_enabled = (device.well_known_registers.sctlr_el1().read() & 1) == 1;
     if !mmu_enabled {
         return guest_virtual_address;
     }
-    // let ttbcr = device.register_file.read::<u32>("TTBCR_S_bits");
-    // log::trace!("{ttbcr:032b}");
-    // let ttbcr_n = ttbcr & 0b111;
-    // panic!("{ttbcr_n:03b}");
 
+    raw_guest_translate(device, guest_virtual_address, typ)
+
+    // let guest_virtual_page = guest_virtual_address >> 12;
+    // let guest_virtual_offset = guest_virtual_address & 0xFFF;
+
+    // let mut tlb = match typ {
+    //     TranslationType::Read => RTLB.lock(),
+    //     TranslationType::Write => WTLB.lock(),
+    //     TranslationType::Fetch => FTLB.lock(),
+    //     TranslationType::Translate => {
+    //         return raw_guest_translate(device, guest_virtual_address,
+    // TranslationType::Translate);     }
+    // };
+
+    // let tlb_entry = &mut tlb[(guest_virtual_page % 4096) as usize];
+
+    // if tlb_entry.0 != guest_virtual_page {
+    //     tlb_entry.1 = raw_guest_translate(device, guest_virtual_page << 12,
+    // typ);     tlb_entry.0 = guest_virtual_page;
+    // }
+
+    // tlb_entry.1 | guest_virtual_offset
+}
+
+fn raw_guest_translate(
+    device: &ModelDevice,
+    guest_virtual_address: u64,
+    typ: TranslationType,
+) -> u64 {
     let ttbr0_el1 = device.register_file.read::<u64>("_TTBR0_EL1_bits");
     let ttbr1_el1 = device.register_file.read::<u64>("_TTBR1_EL1_bits");
     log::trace!("ttbr0_el1: {ttbr0_el1:x}");
@@ -85,7 +121,7 @@ pub fn guest_translate(
 
     // Skip L0, because 3-level page tables.
 
-    let current_el = match device.register_file.read::<u8>("PSTATE_EL") {
+    let current_el = match device.well_known_registers.pstate_el().read() {
         0 => ExecutionLevel::EL0,
         1 => ExecutionLevel::EL1,
         2 => ExecutionLevel::EL2,
@@ -283,7 +319,7 @@ fn guest_page_fault(
         mmu_txl_ctx.guest_virtual_address
     );
 
-    let retaddr = device.register_file.read::<u64>("_PC");
+    let retaddr = device.well_known_registers.pc().read();
 
     let typ = if error.translation_type == TranslationType::Fetch {
         4
@@ -322,7 +358,7 @@ pub fn take_arm_exception(
     let spsr = get_psr_from_pstate(device);
     log::trace!("spsr: {spsr:032b}");
 
-    let current_el = device.register_file.read::<u8>("PSTATE_EL");
+    let current_el = device.well_known_registers.pstate_el().read();
     log::trace!("current_el: {current_el}");
 
     if target_el > current_el {

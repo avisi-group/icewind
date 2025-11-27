@@ -6030,44 +6030,6 @@ fn cnt_8b() {
     );
 }
 
-// #[ktest]
-// fn scvtf() {
-//     let model = models::get("aarch64").unwrap();
-
-//     let register_file = RegisterFile::init(&*model);
-//     let mut ctx = X86TranslationContext::new(&model, false,
-// register_file.global_register_offset());     let mut emitter =
-// X86Emitter::new(&mut ctx);
-
-//     //1e22007e        scvtf   s30, w3
-//     translate_instruction(
-//
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x1e22007e,
-//     )
-//     .unwrap();
-
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
-//     let translation = Translation::new(ctx.compile(num_regs));
-
-//     let z_offset = model.reg_offset("_Z");
-
-//     let q30 = z_offset + (30 * 256);
-
-//     register_file.write::<u64>("R3", 0xecf92f9fcd4d46f7);
-
-//     translation.execute(&register_file);
-
-//     assert_eq!(
-//         register_file.read_raw::<u128>(q30.try_into().unwrap()),
-//         0xce4acae4,
-//     );
-// }
-
 #[ktest]
 fn sdiv_test_0_panic() {
     let (model, register_file, mut ctx) = setup();
@@ -7431,3 +7393,86 @@ fn mrs_cntvctss_el0() {
 
     // todo: test more here
 }
+
+// #[ktest]
+// fn scvtf() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     // 5e61d800        scvtf   d0, d0
+//     // decode_scvtf_float_int_aarch64_instrs_float_convert_int
+//     // execute_aarch64_instrs_float_convert_int
+//     // FixedToFP
+//     translate_instruction(
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x5e61d800,
+//         0x0,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
+
+//     let z_offset = model.reg_offset("_Z");
+
+//     let q30 = z_offset + (30 * 256);
+
+//     register_file.write::<u64>("R3", 0xecf92f9fcd4d46f7);
+
+//     translation.execute(&register_file);
+
+//     assert_eq!(
+//         register_file.read_raw::<u128>(q30.try_into().unwrap()),
+//         0xce4acae4,
+//     );
+// }
+
+// #[ktest]
+// fn fixedtofp() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     // enum FPRounding {
+//     //   FPRounding_TIEEVEN,
+//     //   FPRounding_POSINF,
+//     //   FPRounding_NEGINF,
+//     //   FPRounding_ZERO,
+//     //   FPRounding_TIEAWAY,
+//     //   FPRounding_ODD,
+//     // }
+//     let rounding = emitter.constant(3, Type::Signed(32));
+//     emitter.write_stack_variable(0, rounding);
+
+//     let mut arguments = Vec::new_in(emitter.ctx().allocator());
+
+//     arguments.push(emitter.read_register(0x5280, Type::Unsigned(64)));
+
+//     arguments.push(emitter.constant(0, Type::Signed(64)));
+
+//     arguments.push(emitter.constant(0, Type::Unsigned(1)));
+
+//     let a = emitter.read_register(0x19392, Type::Unsigned(64));
+//     let b = emitter.constant(134201095, Type::Unsigned(64));
+//     arguments.push(emitter.binary_operation(BinaryOperationKind::And(a, b)));
+
+//     arguments.push(emitter.read_stack_variable(0, Type::Signed(32)));
+
+//     arguments.push(emitter.constant(64, Type::Unsigned(64)));
+
+//     translate(
+//         &model,
+//         "FixedToFP",
+//         &arguments,
+//         &mut emitter,
+//         &register_file,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let _translation = Translation::new(ctx.compile(num_regs));
+// }
