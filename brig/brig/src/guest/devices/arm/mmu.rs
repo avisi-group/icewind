@@ -8,7 +8,7 @@ use {
     },
     aarch64_paging::paging::{Attributes, Descriptor},
     common::sysreg_helpers::encode_sysreg_id,
-    spin::Mutex,
+    core::sync::atomic::{AtomicU64, Ordering},
 };
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);
@@ -44,14 +44,34 @@ struct MmuTranslationContext {
     execution_level: ExecutionLevel,
 }
 
-static RTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
-static WTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
-static FTLB: Mutex<[(u64, u64); 4096]> = Mutex::new([(u64::MAX, 0); 4096]);
+static RTLB: [TlbEntry; 4096] = [const { TlbEntry::new() }; 4096];
+static WTLB: [TlbEntry; 4096] = [const { TlbEntry::new() }; 4096];
+static FTLB: [TlbEntry; 4096] = [const { TlbEntry::new() }; 4096];
+
+struct TlbEntry {
+    guest_virt_page: AtomicU64,
+    guest_phys_page: AtomicU64,
+}
+
+impl TlbEntry {
+    pub const fn new() -> Self {
+        Self {
+            guest_virt_page: AtomicU64::new(u64::MAX),
+            guest_phys_page: AtomicU64::new(0),
+        }
+    }
+
+    pub fn clear(&self) {
+        self.guest_virt_page.store(u64::MAX, Ordering::Relaxed);
+        self.guest_phys_page.store(0, Ordering::Relaxed);
+    }
+}
 
 pub fn flush_tlb() {
-    RTLB.lock().fill((u64::MAX, 0));
-    WTLB.lock().fill((u64::MAX, 0));
-    FTLB.lock().fill((u64::MAX, 0));
+    RTLB.iter()
+        .chain(WTLB.iter())
+        .chain(FTLB.iter())
+        .for_each(|entry| entry.clear());
 }
 
 // returns guest physical address
@@ -65,28 +85,39 @@ pub fn guest_translate(
         return guest_virtual_address;
     }
 
-    raw_guest_translate(device, guest_virtual_address, typ)
+    let tlb = match typ {
+        TranslationType::Read => &RTLB,
+        TranslationType::Write => &WTLB,
+        TranslationType::Fetch => &FTLB,
+        TranslationType::Translate => {
+            return raw_guest_translate(device, guest_virtual_address, TranslationType::Translate);
+        }
+    };
 
-    // let guest_virtual_page = guest_virtual_address >> 12;
-    // let guest_virtual_offset = guest_virtual_address & 0xFFF;
+    let guest_virtual_page = guest_virtual_address >> 12;
+    let guest_virtual_offset = guest_virtual_address & 0xFFF;
 
-    // let mut tlb = match typ {
-    //     TranslationType::Read => RTLB.lock(),
-    //     TranslationType::Write => WTLB.lock(),
-    //     TranslationType::Fetch => FTLB.lock(),
-    //     TranslationType::Translate => {
-    //         return raw_guest_translate(device, guest_virtual_address,
-    // TranslationType::Translate);     }
-    // };
+    let tlb_entry = &tlb[(guest_virtual_page % 4096) as usize];
 
-    // let tlb_entry = &mut tlb[(guest_virtual_page % 4096) as usize];
+    // if entry matches
+    if tlb_entry.guest_virt_page.load(Ordering::Relaxed) == guest_virtual_page {
+        // use cached value
+        tlb_entry.guest_phys_page.load(Ordering::Relaxed) | guest_virtual_offset
+    } else {
+        // otherwise translate
+        let translated_phys_page = raw_guest_translate(device, guest_virtual_page << 12, typ);
 
-    // if tlb_entry.0 != guest_virtual_page {
-    //     tlb_entry.1 = raw_guest_translate(device, guest_virtual_page << 12,
-    // typ);     tlb_entry.0 = guest_virtual_page;
-    // }
+        // insert into cache
+        tlb_entry
+            .guest_phys_page
+            .store(translated_phys_page, Ordering::Relaxed);
+        tlb_entry
+            .guest_virt_page
+            .store(guest_virtual_page, Ordering::Relaxed);
 
-    // tlb_entry.1 | guest_virtual_offset
+        // return translated value
+        translated_phys_page | guest_virtual_offset
+    }
 }
 
 fn raw_guest_translate(
