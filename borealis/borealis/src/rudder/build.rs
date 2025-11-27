@@ -156,11 +156,13 @@ impl BuildContext {
             // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
             boom::Type::Float => Type::f64(),
-            boom::Type::Real | boom::Type::Union { .. } | boom::Type::Struct { .. } => {
+            boom::Type::Union { .. } | boom::Type::Struct { .. } => {
                 // todo: panic
                 log::warn!("should be removed by pass: {:?}", &*typ.get());
                 Type::new_primitive(PrimitiveType::UnsignedInteger(9999))
             }
+
+            boom::Type::Real => Type::Real,
 
             boom::Type::Vector { element_type } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
@@ -1852,7 +1854,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.fn_ctx().rudder_fn.name()
                 );
             }
-
             boom::Value::Literal(literal) => self.build_literal(&literal.get()),
             boom::Value::Operation(op) => self.build_operation(op),
             boom::Value::Tuple(values) => {
@@ -1876,12 +1877,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //      panic!("got struct {name} {fields:?} but structs should
                 // have been removed in boom")
             }
-
             boom::Value::Field { .. } => panic!(
                 "fields should have already been flattened: {:?}",
                 self.function_build_context.rudder_fn.name()
             ),
-
             boom::Value::CtorKind {
                 value, identifier, ..
             } => {
@@ -1976,6 +1975,22 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 );
             }
+            boom::Value::Real {
+                numerator,
+                denominator,
+            } => {
+                let numerator = self.build_value(numerator.clone());
+                let denominator = self.build_value(denominator.clone());
+
+                return build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateReal {
+                        numerator,
+                        denominator,
+                    },
+                );
+            }
         }
     }
 
@@ -2048,6 +2063,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Type::Bits => todo!(),
                     Type::Int => todo!(),
                     Type::Tuple(_) => todo!(),
+                    Type::Real => panic!("absolutely not"),
                 };
 
                 build(

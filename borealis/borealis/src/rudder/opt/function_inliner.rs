@@ -419,6 +419,10 @@ pub fn import_statement_at(
                 .cloned()
                 .collect(),
         ),
+          Statement::CreateReal { numerator, denominator } => Statement::CreateReal {
+            numerator: statement_mapping.get(&numerator).unwrap().clone(),
+            denominator:  statement_mapping.get(&denominator).unwrap().clone(),
+        },
     };
 
     let target_statement = build_at(target_block, target_arena, mapped_kind, location);

@@ -42,6 +42,9 @@ pub enum Type {
 
     // Used for debugging
     String,
+
+    // Wrapper around an `(i, i)`
+    Real,
 }
 
 macro_rules! type_def_helper {
@@ -88,6 +91,9 @@ impl Type {
             Self::String => 32,
 
             Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits_alinged()).sum(),
+
+            // shouldn't be calling this, we want reals to not exist at codegen time
+            Self::Real => todo!(),
         }
     }
 
@@ -158,6 +164,7 @@ impl Display for Type {
                 }
                 write!(f, ")")
             }
+            Type::Real => write!(f, "real"),
         }
     }
 }

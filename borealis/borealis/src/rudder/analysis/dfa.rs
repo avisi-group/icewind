@@ -303,6 +303,13 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
                 Statement::CreateTuple(values) => {
                     values.into_iter().for_each(|v| self.add_use(v, stmt))
                 }
+                Statement::CreateReal {
+                    numerator,
+                    denominator,
+                } => {
+                    self.add_use(numerator, stmt);
+                    self.add_use(denominator, stmt);
+                }
                 Statement::TernaryOperation { a, b, c, .. } => {
                     self.add_use(a, stmt);
                     self.add_use(b, stmt);

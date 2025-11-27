@@ -19,6 +19,11 @@ pub trait Emitter {
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
     fn create_tuple(&mut self, values: Vec<Self::NodeRef, BumpAllocatorRef>) -> Self::NodeRef;
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
+    fn create_real(
+        &mut self,
+        numerator: Self::NodeRef,
+        denominator: Self::NodeRef,
+    ) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
@@ -118,6 +123,7 @@ pub enum Type {
     Bits,
     Int,
     Tuple,
+    Real,
 }
 
 impl Type {
@@ -127,6 +133,7 @@ impl Type {
             Type::Bits => 64, // todo: should this be the runtime length?
             Type::Int => 64,
             Type::Tuple => todo!(),
+            Type::Real => todo!(),
         }
     }
 }

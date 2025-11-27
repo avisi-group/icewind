@@ -449,6 +449,18 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, " as {identifier}").unwrap();
             }
+            Value::Real {
+                numerator,
+                denominator,
+            } => {
+                write!(self.writer, "Real(").unwrap();
+
+                self.visit_value(numerator.clone());
+                write!(self.writer, ", ").unwrap();
+                self.visit_value(denominator.clone());
+
+                write!(self.writer, ")").unwrap();
+            }
             Value::Tuple(values) => {
                 write!(self.writer, "(").unwrap();
                 values.iter().for_each(|v| {

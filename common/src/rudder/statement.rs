@@ -257,6 +257,11 @@ pub enum Statement {
         variant: InternedString,
     },
 
+    CreateReal {
+        numerator: Ref<Statement>,
+        denominator: Ref<Statement>,
+    },
+
     CreateTuple(Vec<Ref<Statement>>),
     TupleAccess {
         index: usize,
@@ -418,6 +423,7 @@ impl Statement {
                     })
                     .collect(),
             )),
+            Self::CreateReal { ..} => Some(Type::Real),
         }
     }
 
@@ -927,6 +933,27 @@ impl Statement {
 
                 *self = Self::GetFlags { operation };
             }
+            Self::CreateReal {
+                numerator,
+                denominator,
+            } => {
+                let numerator = if numerator == use_of {
+                    with.clone()
+                } else {
+                    numerator.clone()
+                };
+
+                let denominator = if denominator == use_of {
+                    with.clone()
+                } else {
+                    denominator.clone()
+                };
+
+                *self = Self::CreateReal {
+                    numerator,
+                    denominator,
+                };
+            }
         }
     }
 
@@ -1151,6 +1178,14 @@ impl Statement {
             } => {
                 format!("create-bits {} {}", value, length)
             }
+
+            Self::CreateReal {
+                numerator,
+                denominator,
+            } => {
+                format!("create-real {} / {}", numerator, denominator)
+            }
+
             Self::MatchesUnion { value, variant } => {
                 format!("matches-union {} {variant}", value)
             }
@@ -1435,47 +1470,46 @@ pub fn cast_at(
             location,
         ),
 
-        (Type::String, Type::Tuple(t)) => {
-            if *t == [Type::Int, Type::Int] {
-                let Statement::Constant(value) = source.get(s_arena) else {
-                    panic!("{:?}", source.get(s_arena).to_string(s_arena))
-                };
+        (Type::String, Type::Real) => {
+            let Statement::Constant(value) = source.get(s_arena) else {
+                panic!("{:?}", source.get(s_arena).to_string(s_arena))
+            };
 
-                let Constant::String(s) = value else { panic!() };
+            let Constant::String(s) = value else { panic!() };
 
-                // todo: fix this silliness
-                let (num, den) = match s.as_ref() {
-                    "0.0" => (0, 1),
-                    "0.5" => (1, 2),
-                    "1.0" => (1, 1),
-                    "2.0" => (2, 1),
-                    "3.0" => (3, 1),
-                    _ => todo!("{s:?}"),
-                };
+            // todo: fix this silliness
+            let (num, den) = match s.as_ref() {
+                "0.0" => (0, 1),
+                "0.5" => (1, 2),
+                "1.0" => (1, 1),
+                "2.0" => (2, 1),
+                "3.0" => (3, 1),
+                _ => todo!("{s:?}"),
+            };
 
-                let num = build_at(
-                    block,
-                    arena,
-                    Statement::Constant(Constant::new_signed(num, 64)),
-                    location,
-                );
+            let num = build_at(
+                block,
+                arena,
+                Statement::Constant(Constant::new_signed(num, 64)),
+                location,
+            );
 
-                let den = build_at(
-                    block,
-                    arena,
-                    Statement::Constant(Constant::new_signed(den, 64)),
-                    location,
-                );
+            let den = build_at(
+                block,
+                arena,
+                Statement::Constant(Constant::new_signed(den, 64)),
+                location,
+            );
 
-                build_at(
-                    block,
-                    arena,
-                    Statement::CreateTuple(alloc::vec![num, den]),
-                    location,
-                )
-            } else {
-                panic!();
-            }
+            build_at(
+                block,
+                arena,
+                Statement::CreateReal {
+                    numerator: num,
+                    denominator: den,
+                },
+                location,
+            )
         }
 
         (src, dst) => {
@@ -1680,6 +1714,13 @@ pub fn import_statement(
         } => Statement::CreateBits {
             value: mapping.get(&value).unwrap().clone(),
             width: mapping.get(&length).unwrap().clone(),
+        },
+        Statement::CreateReal {
+            numerator,
+            denominator,
+        } => Statement::CreateReal {
+            numerator: mapping.get(&numerator).unwrap().clone(),
+            denominator: mapping.get(&denominator).unwrap().clone(),
         },
         Statement::SizeOf { value } => Statement::SizeOf {
             value: mapping.get(&value).unwrap().clone(),

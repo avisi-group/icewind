@@ -617,13 +617,16 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 }
             }
             Ceil(value) => {
-                let NodeKind::Tuple(values) = value.kind() else {
+                let NodeKind::Real {
+                    numerator,
+                    denominator,
+                } = value.kind()
+                else {
                     panic!()
                 };
 
-                if values
-                    .iter()
-                    .all(|v| matches!(v.kind(), NodeKind::Constant { .. }))
+                if matches!(numerator.kind(), NodeKind::Constant { .. })
+                    && matches!(denominator.kind(), NodeKind::Constant { .. })
                 {
                     todo!()
                 } else {
@@ -635,25 +638,24 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             }
 
             Floor(value) => {
-                let NodeKind::Tuple(values) = value.kind() else {
-                    panic!()
+                let NodeKind::Real {
+                    numerator,
+                    denominator,
+                } = value.kind()
+                else {
+                    panic!("{value:?}")
                 };
 
-                if values
-                    .iter()
-                    .all(|v| matches!(v.kind(), NodeKind::Constant { .. }))
+                if matches!(numerator.kind(), NodeKind::Constant { .. })
+                    && matches!(denominator.kind(), NodeKind::Constant { .. })
                 {
-                    let [num, den] = values.as_slice() else {
-                        panic!()
-                    };
-
-                    assert_eq!(num.typ(), Type::Signed(64));
-                    assert_eq!(den.typ(), Type::Signed(64));
+                    assert_eq!(numerator.typ(), Type::Signed(64));
+                    assert_eq!(denominator.typ(), Type::Signed(64));
 
                     let (
                         NodeKind::Constant { value: num, .. },
                         NodeKind::Constant { value: den, .. },
-                    ) = (num.kind(), den.kind())
+                    ) = (numerator.kind(), denominator.kind())
                     else {
                         panic!()
                     };
@@ -867,25 +869,26 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         width: *width,
                     },
                 }),
-                (NodeKind::Tuple(left), NodeKind::Tuple(right)) => {
-                    match (left.as_slice(), right.as_slice()) {
-                        ([left_num, left_den], [right_num, right_den]) => {
-                            let num = self.binary_operation(BinaryOperationKind::Multiply(
-                                left_num.clone(),
-                                right_den.clone(),
-                            ));
-                            let den = self.binary_operation(BinaryOperationKind::Multiply(
-                                left_den.clone(),
-                                right_num.clone(),
-                            ));
-                            let mut tuple = Vec::new_in(self.ctx().allocator());
-                            tuple.push(num);
-                            tuple.push(den);
+                (
+                    NodeKind::Real {
+                        numerator: left_num,
+                        denominator: left_den,
+                    },
+                    NodeKind::Real {
+                        numerator: right_num,
+                        denominator: right_den,
+                    },
+                ) => {
+                    let num = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_num.clone(),
+                        right_den.clone(),
+                    ));
+                    let den = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_den.clone(),
+                        right_num.clone(),
+                    ));
 
-                            self.create_tuple(tuple)
-                        }
-                        _ => panic!(),
-                    }
+                    self.create_real(num, den)
                 }
                 _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
@@ -2222,6 +2225,20 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         })
     }
 
+    fn create_real(
+        &mut self,
+        numerator: Self::NodeRef,
+        denominator: Self::NodeRef,
+    ) -> Self::NodeRef {
+        self.node(X86Node {
+            typ: Type::Real,
+            kind: NodeKind::Real {
+                numerator,
+                denominator,
+            },
+        })
+    }
+
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef {
         let NodeKind::Tuple(values) = tuple.kind() else {
             panic!("accessing non tuple: {:?}", *tuple.0)
@@ -2255,6 +2272,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             }
             Type::Int => self.constant(64, Type::Unsigned(16)),
             Type::Tuple => todo!(),
+            Type::Real => todo!(),
         }
     }
 
@@ -2516,6 +2534,10 @@ pub enum NodeKind {
     GetFlags {
         operation: X86NodeRef,
     },
+    Real {
+        numerator: X86NodeRef,
+        denominator: X86NodeRef,
+    },
     Tuple(Vec<X86NodeRef, BumpAllocatorRef>),
     Select {
         condition: X86NodeRef,
@@ -2696,57 +2718,52 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
             })
         }
         // attempt const eval of reals
-        (NodeKind::Tuple(left_real), NodeKind::Tuple(right_real)) => {
-            if left_real
+        (
+            NodeKind::Real {
+                numerator: left_num,
+                denominator: left_den,
+            },
+            NodeKind::Real {
+                numerator: right_num,
+                denominator: right_den,
+            },
+        ) => {
+            if [left_num, left_den, right_num, right_den]
                 .iter()
                 .all(|v| matches!(v.kind(), NodeKind::Constant { .. }))
-                && right_real
-                    .iter()
-                    .all(|v| matches!(v.kind(), NodeKind::Constant { .. }))
             {
-                match (left_real.clone().as_slice(), right_real.as_slice()) {
-                    ([left_num, left_den], [right_num, right_den]) => {
-                        let left = emitter.binary_operation(BinaryOperationKind::Multiply(
-                            left_num.clone(),
-                            right_den.clone(),
-                        ));
+                let left = emitter.binary_operation(BinaryOperationKind::Multiply(
+                    left_num.clone(),
+                    right_den.clone(),
+                ));
 
-                        let right = emitter.binary_operation(BinaryOperationKind::Multiply(
-                            left_den.clone(),
-                            right_num.clone(),
-                        ));
+                let right = emitter.binary_operation(BinaryOperationKind::Multiply(
+                    left_den.clone(),
+                    right_num.clone(),
+                ));
 
-                        assert!(matches!(left.kind(), NodeKind::Constant { .. }));
-                        assert!(matches!(right.kind(), NodeKind::Constant { .. }));
+                assert!(matches!(left.kind(), NodeKind::Constant { .. }));
+                assert!(matches!(right.kind(), NodeKind::Constant { .. }));
 
-                        let op = match op {
-                            CompareLessThan(_, _) => CompareLessThan(left, right),
-                            CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
-                            CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
-                            CompareGreaterThanOrEqual(_, _) => {
-                                CompareGreaterThanOrEqual(left, right)
-                            }
-                            _ => panic!(),
-                        };
-
-                        emit_compare(op, emitter)
-                    }
-                    _ => panic!(),
-                }
-            } else {
-                let (left, right) = match (left_real.clone().as_slice(), right_real.as_slice()) {
-                    ([left_num, left_den], [right_num, right_den]) => (
-                        emitter.binary_operation(BinaryOperationKind::Multiply(
-                            left_num.clone(),
-                            right_den.clone(),
-                        )),
-                        emitter.binary_operation(BinaryOperationKind::Multiply(
-                            left_den.clone(),
-                            right_num.clone(),
-                        )),
-                    ),
+                let op = match op {
+                    CompareLessThan(_, _) => CompareLessThan(left, right),
+                    CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
+                    CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
+                    CompareGreaterThanOrEqual(_, _) => CompareGreaterThanOrEqual(left, right),
                     _ => panic!(),
                 };
+
+                emit_compare(op, emitter)
+            } else {
+                let left = emitter.binary_operation(BinaryOperationKind::Multiply(
+                    left_num.clone(),
+                    right_den.clone(),
+                ));
+
+                let right = emitter.binary_operation(BinaryOperationKind::Multiply(
+                    left_den.clone(),
+                    right_num.clone(),
+                ));
 
                 let bin_op = match &op {
                     CompareLessThan(_, _) => CompareLessThan(left, right),
@@ -2876,6 +2893,10 @@ fn contains_addwithcarry(value: &X86NodeRef) -> Option<X86NodeRef> {
             value: a,
             amount: b,
             ..
+        }
+        | NodeKind::Real {
+            numerator: a,
+            denominator: b,
         } => contains_addwithcarry(a).or_else(|| contains_addwithcarry(b)),
         NodeKind::BitExtract {
             value: a,

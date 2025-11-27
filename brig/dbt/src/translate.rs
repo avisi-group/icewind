@@ -1430,6 +1430,14 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     .collect_into(&mut tuple);
                 StatementResult::Data(Some(self.emitter.create_tuple(tuple)))
             }
+            Statement::CreateReal {
+                numerator,
+                denominator,
+            } => {
+                let numerator = value_store.get(*numerator);
+                let denominator = value_store.get(*denominator);
+                StatementResult::Data(Some(self.emitter.create_real(numerator, denominator)))
+            }
             Statement::TupleAccess { index, source } => {
                 let source = value_store.get(*source);
                 StatementResult::Data(Some(self.emitter.access_tuple(source, *index)))

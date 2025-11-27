@@ -583,7 +583,8 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             NodeKind::GetFlags { .. } => {
                 panic!("handled by addwithcarry specialization");
             }
-            NodeKind::Tuple(vec) => panic!("cannot convert to operand: {vec:#?}"),
+            NodeKind::Real { .. } => panic!("cannot convert real to operand: {node:#?}"),
+            NodeKind::Tuple(vec) => panic!("cannot convert tuple to operand: {vec:#?}"),
             NodeKind::Select {
                 condition,
                 true_value,
@@ -640,11 +641,11 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 value
             }
             UnaryOperationKind::Ceil(value) => {
-                let NodeKind::Tuple(real) = value.kind() else {
-                    panic!();
-                };
-
-                let [num, den] = real.as_slice() else {
+                let NodeKind::Real {
+                    numerator: num,
+                    denominator: den,
+                } = value.kind()
+                else {
                     panic!();
                 };
 
@@ -687,11 +688,11 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 quotient
             }
             UnaryOperationKind::Floor(value) => {
-                let NodeKind::Tuple(real) = value.kind() else {
-                    panic!();
-                };
-
-                let [num, den] = real.as_slice() else {
+                let NodeKind::Real {
+                    numerator: num,
+                    denominator: den,
+                } = value.kind()
+                else {
                     panic!();
                 };
 

@@ -660,6 +660,11 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     operand,
                     operation_kind,
                 } => todo!(),
+
+                Statement::CreateReal {
+                    numerator,
+                    denominator,
+                } => todo!(),
             };
 
             log::trace!(

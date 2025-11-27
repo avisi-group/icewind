@@ -34,12 +34,12 @@ impl Pass for LowerReals {
             .unwrap()
             .entry_block = {
             let block = ControlFlowBlock::new();
-            block.set_terminator(Terminator::Return(Some(Value::Tuple(vec![
-                Shared::new(Value::Identifier("p0".into())),
-                Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
+            block.set_terminator(Terminator::Return(Some(Value::Real {
+                numerator: Shared::new(Value::Identifier("p0".into())),
+                denominator: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
                     1.into(),
                 )))),
-            ]))));
+            })));
             block
         };
 
@@ -83,16 +83,7 @@ impl Pass for LowerReals {
 fn try_replace_type(typ: &Shared<Type>) {
     let mut typ = typ.get_mut();
     match &*typ {
-        Type::Real => {
-            *typ = Type::Tuple(vec![
-                Shared::new(Type::Integer {
-                    size: Size::Unknown,
-                }),
-                Shared::new(Type::Integer {
-                    size: Size::Unknown,
-                }),
-            ])
-        }
+        Type::Real => *typ = Type::Real,
 
         Type::Struct { fields, .. } => fields
             .iter()

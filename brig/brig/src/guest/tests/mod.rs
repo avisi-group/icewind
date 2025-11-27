@@ -1872,11 +1872,7 @@ fn floor() {
             let n = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
             let d = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(64));
 
-            let mut vec = Vec::new_in(emitter.ctx().allocator());
-            vec.push(n);
-            vec.push(d);
-
-            let real = emitter.create_tuple(vec);
+            let real = emitter.create_real(n, d);
             let floor = emitter.unary_operation(UnaryOperationKind::Floor(real));
             emitter.write_register(model.reg_offset("R0"), floor);
         }
@@ -1911,11 +1907,7 @@ fn _ceil() {
             let n = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
             let d = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(64));
 
-            let mut vec = Vec::new_in(emitter.ctx().allocator());
-            vec.push(n);
-            vec.push(d);
-
-            let real = emitter.create_tuple(vec);
+            let real = emitter.create_real(n, d);
             let floor = emitter.unary_operation(UnaryOperationKind::Ceil(real));
             emitter.write_register(model.reg_offset("R0"), floor);
         }

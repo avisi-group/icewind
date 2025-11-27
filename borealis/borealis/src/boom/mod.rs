@@ -436,6 +436,10 @@ pub enum Value {
         value: Shared<Self>,
         identifier: InternedString,
     },
+    Real {
+        numerator: Shared<Self>,
+        denominator: Shared<Self>,
+    },
     Tuple(Vec<Shared<Self>>),
     VectorAccess {
         value: Shared<Self>,
@@ -519,6 +523,13 @@ impl Walkable for Value {
             Value::VectorAccess { value, index } => {
                 visitor.visit_value(value.clone());
                 visitor.visit_value(index.clone());
+            }
+            Value::Real {
+                numerator,
+                denominator,
+            } => {
+                visitor.visit_value(numerator.clone());
+                visitor.visit_value(denominator.clone());
             }
             Value::VectorMutate {
                 vector,
