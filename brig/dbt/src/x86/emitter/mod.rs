@@ -1068,6 +1068,39 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             | CompareLessThan(_, _)
             | CompareLessThanOrEqual(_, _) => emit_compare(op, self),
 
+            PowI(base, exponent) => match (base.kind(), exponent.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: base_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: exponent_value,
+                        ..
+                    },
+                ) => self.constant(
+                    base_value.pow(u32::try_from(*exponent_value).unwrap()),
+                    base.typ(),
+                ),
+                (
+                    NodeKind::Real {
+                        numerator,
+                        denominator,
+                    },
+                    _,
+                ) => {
+                    let new_numerator = self.binary_operation(BinaryOperationKind::PowI(
+                        numerator.clone(),
+                        exponent.clone(),
+                    ));
+
+                    self.create_real(new_numerator, denominator.clone())
+                }
+                _ => self.node(X86Node {
+                    typ: Type::Unsigned(1),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+
             op => {
                 todo!("{op:?}")
             }
