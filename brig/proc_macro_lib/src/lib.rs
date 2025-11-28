@@ -96,7 +96,7 @@ pub fn irq_handler(args: TokenStream, input: TokenStream) -> TokenStream {
         let args = args.into_iter().collect::<Vec<_>>();
 
         if args[0].to_string() != "with_code" || args[1].to_string() != "=" {
-            panic!("argument must be `with_code = true` or `with_code = false`");
+            panic!("argument must be `with_code = true` or `with_code = false`, got {args:?}");
         }
 
         match args[2].to_string().as_str() {

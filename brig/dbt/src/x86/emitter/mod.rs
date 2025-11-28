@@ -21,7 +21,7 @@ use {
         ktest,
     },
     core::{
-        cmp::Ordering,
+        cmp::{Ordering, max},
         fmt::Debug,
         hash::{Hash, Hasher},
         mem::offset_of,
@@ -1022,48 +1022,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
-            CompareEqual(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: lhs_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: rhs_value, ..
-                    },
-                ) => self.node(X86Node {
-                    typ: lhs.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if lhs_value == rhs_value { 1 } else { 0 },
-                        width: 1,
-                    },
-                }),
-                _ => self.node(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
-            CompareNotEqual(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: lhs_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: rhs_value, ..
-                    },
-                ) => self.node(X86Node {
-                    typ: lhs.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if lhs_value != rhs_value { 1 } else { 0 },
-                        width: 1,
-                    },
-                }),
-                _ => self.node(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
 
-            CompareGreaterThan(_, _)
+            CompareEqual(_, _)
+            | CompareNotEqual(_, _)
+            | CompareGreaterThan(_, _)
             | CompareGreaterThanOrEqual(_, _)
             | CompareLessThan(_, _)
             | CompareLessThanOrEqual(_, _) => emit_compare(op, self),
@@ -2687,9 +2649,11 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
     let (CompareLessThan(left, right)
     | CompareLessThanOrEqual(left, right)
     | CompareGreaterThan(left, right)
-    | CompareGreaterThanOrEqual(left, right)) = &op
+    | CompareGreaterThanOrEqual(left, right)
+    | CompareEqual(left, right)
+    | CompareNotEqual(left, right)) = &op
     else {
-        panic!("only greater/less than comparisons should be handled here");
+        panic!("only comparisons should be handled here");
     };
 
     match (left.kind(), right.kind()) {
@@ -2703,12 +2667,12 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
         ) => {
             let (is_signed, width) = match (left.typ(), right.typ()) {
                 (Type::Signed(lw), Type::Signed(rw)) => {
-                    assert_eq!(lw, rw);
-                    (true, lw)
+                    //assert_eq!(lw, rw);
+                    (true, max(lw, rw))
                 }
                 (Type::Unsigned(lw), Type::Unsigned(rw)) => {
-                    assert_eq!(lw, rw);
-                    (true, lw)
+                    //assert_eq!(lw, rw);
+                    (false, max(lw, rw))
                 }
                 (Type::Int, Type::Signed(64)) => (true, 64),
                 (Type::Unsigned(64), Type::Signed(64)) => (true, 64),
@@ -2717,20 +2681,19 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
             };
 
             let result = if is_signed {
-                match width {
-                    64 => {
-                        let left = *left_value as i64;
-                        let right = *right_value as i64;
+                // todo: watch out if width changes
 
-                        match &op {
-                            CompareLessThan(_, _) => left < right,
-                            CompareLessThanOrEqual(_, _) => left <= right,
-                            CompareGreaterThan(_, _) => left > right,
-                            CompareGreaterThanOrEqual(_, _) => left >= right,
-                            _ => panic!(),
-                        }
-                    }
-                    w => todo!("{w:?}"),
+                let left = *left_value as i64;
+                let right = *right_value as i64;
+
+                match &op {
+                    CompareLessThan(_, _) => left < right,
+                    CompareLessThanOrEqual(_, _) => left <= right,
+                    CompareGreaterThan(_, _) => left > right,
+                    CompareGreaterThanOrEqual(_, _) => left >= right,
+                    CompareEqual(_, _) => left == right,
+                    CompareNotEqual(_, _) => left != right,
+                    _ => panic!(),
                 }
             } else {
                 match &op {
@@ -2738,6 +2701,8 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
                     CompareLessThanOrEqual(_, _) => left_value <= right_value,
                     CompareGreaterThan(_, _) => left_value > right_value,
                     CompareGreaterThanOrEqual(_, _) => left_value >= right_value,
+                    CompareEqual(_, _) => left_value == right_value,
+                    CompareNotEqual(_, _) => left_value != right_value,
                     _ => panic!(),
                 }
             };
@@ -2761,53 +2726,27 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
                 denominator: right_den,
             },
         ) => {
-            if [left_num, left_den, right_num, right_den]
-                .iter()
-                .all(|v| matches!(v.kind(), NodeKind::Constant { .. }))
-            {
-                let left = emitter.binary_operation(BinaryOperationKind::Multiply(
-                    left_num.clone(),
-                    right_den.clone(),
-                ));
+            let left = emitter.binary_operation(BinaryOperationKind::Multiply(
+                left_num.clone(),
+                right_den.clone(),
+            ));
 
-                let right = emitter.binary_operation(BinaryOperationKind::Multiply(
-                    left_den.clone(),
-                    right_num.clone(),
-                ));
+            let right = emitter.binary_operation(BinaryOperationKind::Multiply(
+                left_den.clone(),
+                right_num.clone(),
+            ));
 
-                assert!(matches!(left.kind(), NodeKind::Constant { .. }));
-                assert!(matches!(right.kind(), NodeKind::Constant { .. }));
+            let bin_op = match &op {
+                CompareLessThan(_, _) => CompareLessThan(left, right),
+                CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
+                CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
+                CompareGreaterThanOrEqual(_, _) => CompareGreaterThanOrEqual(left, right),
+                CompareEqual(_, _) => CompareEqual(left, right),
+                CompareNotEqual(_, _) => CompareNotEqual(left, right),
+                _ => panic!(),
+            };
 
-                let op = match op {
-                    CompareLessThan(_, _) => CompareLessThan(left, right),
-                    CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
-                    CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
-                    CompareGreaterThanOrEqual(_, _) => CompareGreaterThanOrEqual(left, right),
-                    _ => panic!(),
-                };
-
-                emit_compare(op, emitter)
-            } else {
-                let left = emitter.binary_operation(BinaryOperationKind::Multiply(
-                    left_num.clone(),
-                    right_den.clone(),
-                ));
-
-                let right = emitter.binary_operation(BinaryOperationKind::Multiply(
-                    left_den.clone(),
-                    right_num.clone(),
-                ));
-
-                let bin_op = match &op {
-                    CompareLessThan(_, _) => CompareLessThan(left, right),
-                    CompareLessThanOrEqual(_, _) => CompareLessThanOrEqual(left, right),
-                    CompareGreaterThan(_, _) => CompareGreaterThan(left, right),
-                    CompareGreaterThanOrEqual(_, _) => CompareGreaterThanOrEqual(left, right),
-                    _ => panic!(),
-                };
-
-                emitter.binary_operation(bin_op)
-            }
+            emitter.binary_operation(bin_op)
         }
         _ => {
             // else emit an X86 node
