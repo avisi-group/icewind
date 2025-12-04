@@ -27,9 +27,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
             if src.is_xmm() {
-                assembler
-                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
-                    .unwrap();
+                panic!();
             } else {
                 assembler
                     .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
@@ -125,12 +123,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             if dst.is_xmm() {
-                assembler
-                    .movq::<AsmRegisterXmm, AsmMemoryOperand>(
-                        dst.try_into().unwrap(),
-                        qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
-                    )
-                    .unwrap();
+                panic!()
             } else {
                 assembler
                     .mov::<AsmRegister64, AsmMemoryOperand>(
@@ -726,42 +719,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 )
                 .unwrap();
         }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_128,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_8,
-            },
-        ) => {
-            assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
-                .unwrap();
-            assembler
-                .movzx::<AsmRegister64, AsmRegister8>(dst.into(), dst.into())
-                .unwrap();
-        }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_128,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_16,
-            },
-        ) => {
-            assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
-                .unwrap();
-            assembler
-                .movzx::<AsmRegister64, AsmRegister16>(dst.into(), dst.into())
-                .unwrap();
-        }
+
         // MOV R -> R
         (
             Operand {
@@ -775,22 +733,6 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
-                .unwrap();
-        }
-
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_128,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
                 .unwrap();
         }
 

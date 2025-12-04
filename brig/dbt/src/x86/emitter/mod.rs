@@ -794,27 +794,62 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
-            Sub(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: lhs_value,
-                        width,
-                    },
-                    NodeKind::Constant {
-                        value: rhs_value, ..
-                    },
-                ) => self.node(X86Node {
-                    typ: lhs.typ().clone(),
-                    kind: NodeKind::Constant {
+            Sub(lhs, rhs) => {
+                match (lhs.kind(), rhs.kind()) {
+                    (
+                        NodeKind::Constant {
+                            value: lhs_value,
+                            width,
+                        },
+                        NodeKind::Constant {
+                            value: rhs_value, ..
+                        },
+                    ) => self.node(X86Node {
+                        typ: lhs.typ().clone(),
+                        kind: NodeKind::Constant {
                         value: lhs_value.wrapping_sub(*rhs_value),// todo: THIS WILL WRAP AT 64 NOT *width*!
                         width: *width,
                     },
-                }),
-                _ => self.node(X86Node {
-                    typ: lhs.typ().clone(),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
+                    }),
+                    (
+                        NodeKind::Real {
+                            numerator: left_num,
+                            denominator: left_den,
+                        },
+                        NodeKind::Real {
+                            numerator: right_num,
+                            denominator: right_den,
+                        },
+                    ) => {
+                        // normalize denominators
+
+                        // a/b - c/d
+                        // = ad/bd - cb/db
+                        // = (ad-cb)/bd
+
+                        let normalized_left_num = self.binary_operation(
+                            BinaryOperationKind::Multiply(left_num.clone(), right_den.clone()),
+                        );
+                        let normalized_left_den = self.binary_operation(
+                            BinaryOperationKind::Multiply(left_den.clone(), right_den.clone()),
+                        );
+                        let normalized_right_num = self.binary_operation(
+                            BinaryOperationKind::Multiply(right_num.clone(), left_den.clone()),
+                        );
+
+                        let sub = self.binary_operation(BinaryOperationKind::Sub(
+                            normalized_left_num,
+                            normalized_right_num,
+                        ));
+
+                        self.create_real(sub, normalized_left_den)
+                    }
+                    _ => self.node(X86Node {
+                        typ: lhs.typ().clone(),
+                        kind: NodeKind::BinaryOperation(op),
+                    }),
+                }
+            }
             Multiply(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
                 (
                     NodeKind::Constant {
@@ -847,6 +882,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     },
                 }),
                 (_, NodeKind::Constant { value: 1, .. }) => lhs.clone(),
+                (
+                    NodeKind::Real {
+                        numerator: left_num,
+                        denominator: left_den,
+                    },
+                    NodeKind::Real {
+                        numerator: right_num,
+                        denominator: right_den,
+                    },
+                ) => {
+                    let num = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_num.clone(),
+                        right_num.clone(),
+                    ));
+                    let den = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_den.clone(),
+                        right_den.clone(),
+                    ));
+
+                    self.create_real(num, den)
+                }
                 _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
@@ -1043,6 +1099,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     base_value.pow(u32::try_from(*exponent_value).unwrap()),
                     base.typ(),
                 ),
+
+                // 1^x = 1
+                (NodeKind::Constant { value: 1, .. }, ..) => base.clone(),
+
                 (
                     NodeKind::Real {
                         numerator,
@@ -1055,17 +1115,18 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         exponent.clone(),
                     ));
 
-                    self.create_real(new_numerator, denominator.clone())
+                    let new_denominator = self.binary_operation(BinaryOperationKind::PowI(
+                        denominator.clone(),
+                        exponent.clone(),
+                    ));
+
+                    self.create_real(new_numerator, new_denominator)
                 }
                 _ => self.node(X86Node {
-                    typ: Type::Unsigned(1),
+                    typ: base.typ(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
-
-            op => {
-                todo!("{op:?}")
-            }
         }
     }
 
@@ -2140,10 +2201,19 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef {
         let width = typ.width();
 
-        self.node(X86Node {
-            typ,
-            kind: NodeKind::ReadStackVariable { id, width },
-        })
+        if typ == Type::Real {
+            let numerator = self.node(X86Node {
+                typ: Type::Int,
+                kind: NodeKind::ReadStackVariable { id, width },
+            });
+            let denominator = self.constant(1, Type::Int);
+            self.create_real(numerator, denominator)
+        } else {
+            self.node(X86Node {
+                typ,
+                kind: NodeKind::ReadStackVariable { id, width },
+            })
+        }
     }
 
     fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef) {
@@ -2560,6 +2630,62 @@ pub enum BinaryOperationKind {
     CompareLessThanOrEqual(X86NodeRef, X86NodeRef),
     CompareGreaterThan(X86NodeRef, X86NodeRef),
     CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
+}
+
+impl BinaryOperationKind {
+    pub fn children(&self) -> (&X86NodeRef, &X86NodeRef) {
+        match self {
+            BinaryOperationKind::Add(left, right)
+            | BinaryOperationKind::Sub(left, right)
+            | BinaryOperationKind::Multiply(left, right)
+            | BinaryOperationKind::Divide(left, right)
+            | BinaryOperationKind::Modulo(left, right)
+            | BinaryOperationKind::And(left, right)
+            | BinaryOperationKind::Or(left, right)
+            | BinaryOperationKind::Xor(left, right)
+            | BinaryOperationKind::PowI(left, right)
+            | BinaryOperationKind::CompareEqual(left, right)
+            | BinaryOperationKind::CompareNotEqual(left, right)
+            | BinaryOperationKind::CompareLessThan(left, right)
+            | BinaryOperationKind::CompareLessThanOrEqual(left, right)
+            | BinaryOperationKind::CompareGreaterThan(left, right)
+            | BinaryOperationKind::CompareGreaterThanOrEqual(left, right) => (left, right),
+        }
+    }
+
+    /// Creates a new BinaryOperationKind, with the same variant as `self`, but
+    /// with two new values
+    pub fn new_with_kind(kind: &Self, left: X86NodeRef, right: X86NodeRef) -> Self {
+        match kind {
+            BinaryOperationKind::Add(_, _) => BinaryOperationKind::Add(left, right),
+            BinaryOperationKind::Sub(_, _) => BinaryOperationKind::Sub(left, right),
+            BinaryOperationKind::Multiply(_, _) => BinaryOperationKind::Multiply(left, right),
+            BinaryOperationKind::Divide(_, _) => BinaryOperationKind::Divide(left, right),
+            BinaryOperationKind::Modulo(_, _) => BinaryOperationKind::Modulo(left, right),
+            BinaryOperationKind::And(_, _) => BinaryOperationKind::And(left, right),
+            BinaryOperationKind::Or(_, _) => BinaryOperationKind::Or(left, right),
+            BinaryOperationKind::Xor(_, _) => BinaryOperationKind::Xor(left, right),
+            BinaryOperationKind::PowI(_, _) => BinaryOperationKind::PowI(left, right),
+            BinaryOperationKind::CompareEqual(_, _) => {
+                BinaryOperationKind::CompareEqual(left, right)
+            }
+            BinaryOperationKind::CompareNotEqual(_, _) => {
+                BinaryOperationKind::CompareNotEqual(left, right)
+            }
+            BinaryOperationKind::CompareLessThan(_, _) => {
+                BinaryOperationKind::CompareLessThan(left, right)
+            }
+            BinaryOperationKind::CompareLessThanOrEqual(_, _) => {
+                BinaryOperationKind::CompareLessThanOrEqual(left, right)
+            }
+            BinaryOperationKind::CompareGreaterThan(_, _) => {
+                BinaryOperationKind::CompareGreaterThan(left, right)
+            }
+            BinaryOperationKind::CompareGreaterThanOrEqual(_, _) => {
+                BinaryOperationKind::CompareGreaterThanOrEqual(left, right)
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

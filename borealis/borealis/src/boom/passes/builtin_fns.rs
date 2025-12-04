@@ -183,6 +183,18 @@ impl Pass for HandleBuiltinFunctions {
                                             Literal::Int(0.into()),
                                         ))),
                                     })
+                                } else if name.as_ref() == "undefined_real" {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::Real {
+                                            numerator: Shared::new(Value::Literal(Shared::new(
+                                                Literal::Int(0.into()),
+                                            ))),
+                                            denominator: Shared::new(Value::Literal(Shared::new(
+                                                Literal::Int(1.into()),
+                                            ))),
+                                        }),
+                                    })
                                 } else {
                                     s.clone()
                                 }

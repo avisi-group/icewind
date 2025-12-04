@@ -133,7 +133,7 @@ impl Type {
             Type::Bits => 64, // todo: should this be the runtime length?
             Type::Int => 64,
             Type::Tuple => todo!(),
-            Type::Real => todo!(),
+            Type::Real => 64, // because we only store the numerator on the stack
         }
     }
 }

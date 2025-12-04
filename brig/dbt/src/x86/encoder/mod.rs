@@ -5,10 +5,10 @@ use {
             ARG_REGS, X86Block,
             encoder::{
                 instructions::{
-                    adc, add, and, cmp, jne, lea, mov, movsx, movzx, not, or, setne, shl, shr, sub,
-                    test, xor,
+                    adc, add, and, cmp, jne, lea, mov, movq, movsx, movzx, not, or, setne, shl,
+                    shr, sub, test, xor,
                 },
-                registers::{PhysicalRegister, Register, SegmentRegister},
+                registers::{PhysicalRegister, Register, RegisterClass, SegmentRegister},
                 width::Width,
             },
         },
@@ -35,6 +35,8 @@ pub enum Opcode {
     MOVZX(Operand, Operand),
     /// movsx {0}, {1}
     MOVSX(Operand, Operand),
+    /// movq {0}, {1}
+    MOVQ(Operand, Operand),
     /// cmove {0}, {1}
     CMOVE(Operand, Operand),
     /// cmovne {0}, {1}
@@ -42,6 +44,9 @@ pub enum Opcode {
 
     /// cmpxchg {0}, {1}
     CMPXCHG(Operand, Operand),
+
+    /// cvtsi2sd {0}, {1}
+    CVTSI2SD(Operand, Operand),
 
     /// lea {0}, {1}
     LEA(Operand, Operand),
@@ -282,6 +287,10 @@ impl Operand {
         self.width_in_bits = width;
     }
 
+    pub fn register_class(&self) -> Option<RegisterClass> {
+        self.as_register().map(|r| r.class()).flatten()
+    }
+
     pub fn imm(width_in_bits: Width, value: u64) -> Operand {
         Operand {
             kind: OperandKind::Immediate(value),
@@ -300,10 +309,43 @@ impl Operand {
         }
     }
 
-    pub fn vreg(width_in_bits: Width, reg: usize) -> Operand {
+    pub fn vreg_with_class_todo_replace_vreg(
+        class: RegisterClass,
+        width_in_bits: Width,
+        reg: usize,
+    ) -> Operand {
         Operand {
-            kind: OperandKind::Register(Register::Virtual(reg)),
+            kind: OperandKind::Register(Register::Virtual { index: reg, class }),
             width_in_bits,
+        }
+    }
+
+    pub fn vreg_general(width_in_bits: Width, reg: usize) -> Operand {
+        Operand::vreg_with_class_todo_replace_vreg(RegisterClass::General, width_in_bits, reg)
+    }
+
+    pub fn vreg_xmm(width_in_bits: Width, reg: usize) -> Operand {
+        Operand::vreg_with_class_todo_replace_vreg(RegisterClass::Xmm, width_in_bits, reg)
+    }
+
+    pub fn vreg(width_in_bits: Width, reg: usize) -> Operand {
+        // todo: pass in class to vreg, skipped for now to avoid lots of api rework
+        if width_in_bits > Width::_64 {
+            Operand {
+                kind: OperandKind::Register(Register::Virtual {
+                    index: reg,
+                    class: registers::RegisterClass::Xmm,
+                }),
+                width_in_bits,
+            }
+        } else {
+            Operand {
+                kind: OperandKind::Register(Register::Virtual {
+                    index: reg,
+                    class: registers::RegisterClass::General,
+                }),
+                width_in_bits,
+            }
         }
     }
 
@@ -571,7 +613,13 @@ impl Instruction {
         if let OperandKind::Immediate(_) = src.kind()
             && src.width() == Width::_128
         {
-            return Err(Error::MovImmediateSSE { src, dst });
+            return Err(Error::MovImmediateXmm { src, dst });
+        }
+
+        if let (Some(src_class), Some(dst_class)) = (src.register_class(), dst.register_class())
+            && src_class != dst_class
+        {
+            return Err(Error::MovDifferentClass(src_class, dst_class));
         }
 
         Ok(Self(Opcode::MOV(src, dst)))
@@ -585,10 +633,34 @@ impl Instruction {
         if let OperandKind::Immediate(_) = src.kind()
             && dst.width() == Width::_128
         {
-            return Err(Error::MovImmediateSSE { src, dst });
+            return Err(Error::MovImmediateXmm { src, dst });
+        }
+
+        if let Some(src_reg) = src.as_register()
+            && matches!(src_reg.class(), Some(RegisterClass::Xmm))
+        {
+            return Err(Error::MovZxXmm);
+        }
+
+        if let Some(dst_reg) = dst.as_register()
+            && matches!(dst_reg.class(), Some(RegisterClass::Xmm))
+        {
+            return Err(Error::MovZxXmm);
         }
 
         Ok(Self(Opcode::MOVZX(src, dst)))
+    }
+
+    pub fn movq(src: Operand, dst: Operand) -> Result<Self, Error> {
+        if src.register_class() == dst.register_class() {
+            return Err(Error::MovqSameClass(src.register_class()));
+        }
+
+        if src.width() != dst.width() {
+            return Err(Error::MovqDifferentWidths(src.width(), dst.width()));
+        }
+
+        Ok(Self(Opcode::MOVQ(src, dst)))
     }
 
     pub fn movsx(src: Operand, dst: Operand) -> Self {
@@ -781,6 +853,10 @@ impl Instruction {
         Self(Opcode::CMOVE(src, dest))
     }
 
+    pub fn cvtsi2sd(src: Operand, dest: Operand) -> Self {
+        Self(Opcode::CVTSI2SD(src, dest))
+    }
+
     pub fn cmovne(src: Operand, dest: Operand) -> Self {
         Self(Opcode::CMOVNE(src, dest))
     }
@@ -816,6 +892,7 @@ impl Instruction {
             MOV(src, dst) => mov::encode(assembler, src, dst),
             MOVZX(src, dst) => movzx::encode(assembler, src, dst),
             MOVSX(src, dst) => movsx::encode(assembler, src, dst),
+            MOVQ(src, dst) => movq::encode(assembler, src, dst),
             SHL(amount, value) => shl::encode(assembler, amount, value),
 
             SHR(amount, value) => shr::encode(assembler, amount, value),
@@ -1489,6 +1566,19 @@ impl Instruction {
                     )))
                     .unwrap();
             }
+            CVTSI2SD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .cvtsi2sd::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                .unwrap(),
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1500,9 +1590,11 @@ impl Instruction {
             Opcode::MOV(src, dst)
             | Opcode::MOVZX(src, dst)
             | Opcode::MOVSX(src, dst)
+            | Opcode::MOVQ(src, dst)
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
-            | Opcode::CMOVNE(src, dst) => [
+            | Opcode::CMOVNE(src, dst)
+            | Opcode::CVTSI2SD(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
                 None,
@@ -1626,9 +1718,11 @@ impl Instruction {
             Opcode::MOV(src, dst)
             | Opcode::MOVZX(src, dst)
             | Opcode::MOVSX(src, dst)
+            | Opcode::MOVQ(src, dst)
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
-            | Opcode::CMOVNE(src, dst) => {
+            | Opcode::CMOVNE(src, dst)
+            | Opcode::CVTSI2SD(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::Out, dst)]
                     .into_iter()
                     .collect()
@@ -1865,11 +1959,19 @@ pub enum Error {
     /// Mov operands have different widths, src: {src}, dst: {dst}
     MovWidthMismatch { src: Operand, dst: Operand },
     /// Cannot move an immediate ({src}) into an SSE register ({dst})
-    MovImmediateSSE { src: Operand, dst: Operand },
+    MovImmediateXmm { src: Operand, dst: Operand },
     /// Found general register greater than 64-bits wide: {0}
     OversizeGeneralRegister(Operand),
     /// Cannot zero extend {src} into equal-or-smaller destination {dst}
     MovZeroExtendDestinationNotGreater { src: Operand, dst: Operand },
     /// Cannot test two immedaites
     TestImmediates,
+    /// Cannot movzx XMM registers
+    MovZxXmm,
+    /// Cannot movq between the same register class ({0:?})
+    MovqSameClass(Option<RegisterClass>),
+    /// Cannot movq between the same register class, src: {0}, dst: {0}
+    MovqDifferentWidths(Width, Width),
+    /// Cannot mov between different register classes, src: {0}, dst: {0}
+    MovDifferentClass(RegisterClass, RegisterClass),
 }

@@ -1448,12 +1448,44 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
+            // "FixedToFP" => {
+            //     let int_value = args[0].clone();
+            //     let fbits = args[1].clone(); // 0?
+            //     let is_unsigned = args[2].clone();
+            //     let fpcr = args[3].clone();
+            //     let rounding = args[4].clone();
+            //     let float_size = args[5].clone();
+
+            //     let zero =  build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Constant(Constant::UnsignedInteger { value: 0, width: 64 }));
+
+            //     Some(build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::CreateBits { value:zero , width: float_size }))
+            // },
+
+            // "FPToFixed" => {
+            //      let float_value = args[0].clone();
+            //     let fbits = args[1].clone(); // 0?
+            //     let is_unsigned = args[2].clone();
+            //     let fpcr = args[3].clone();
+            //     let rounding = args[4].clone();
+            //     let int_size = args[5].clone();
+
+            //      Some(build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Cast { kind: CastOperationKind::Convert, typ: Type::Primitive(()), value: () }))
+            // },
+
             // todo: bad hack this really shouldn't be specialized, fix it
             "V_set"  => {
                 let n = args[0].clone();
                 let width = args[1].clone();
                 let value = args[2].clone();
-
 
                 let zero_extended = build(
                     self.block,

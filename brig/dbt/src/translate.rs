@@ -160,24 +160,78 @@ pub fn translate(
     emitter: &mut X86Emitter,
     register_file: &RegisterFile,
 ) -> Result<Option<X86NodeRef>, Error> {
-    translate_with_variable_ids(model, function, arguments, emitter, register_file)
-}
-
-fn translate_with_variable_ids(
-    model: &Model,
-    function: &str,
-    arguments: &[X86NodeRef],
-    emitter: &mut X86Emitter,
-    register_file: &RegisterFile,
-) -> Result<Option<X86NodeRef>, Error> {
     if function == "__DecodeA64_Reserved" {
-        return translate_with_variable_ids(
-            model,
-            "AArch64_UndefinedFault",
-            &[],
-            emitter,
-            register_file,
-        );
+        return translate(model, "AArch64_UndefinedFault", &[], emitter, register_file);
+    }
+
+    if function == "FPToFixed" {
+        let NodeKind::Constant { value: size, .. } = arguments[5].kind() else {
+            panic!()
+        };
+        let float = arguments[0].clone();
+
+        panic!("{:?}", float.kind());
+
+        return Ok(Some(emitter.cast(
+            float,
+            Type::Signed(u32::try_from(*size).unwrap()),
+            CastOperationKind::Convert,
+        )));
+    }
+
+    if function == "FixedToFP" {
+        //     let int_value = args[0].clone();
+        //     let fbits = args[1].clone(); // 0?
+        //     let is_unsigned = args[2].clone();
+        //     let fpcr = args[3].clone();
+        //     let rounding = args[4].clone();
+        //     let float_size = args[5].clone();
+
+        let NodeKind::Constant {
+            value: is_unsigned, ..
+        } = arguments[2].kind()
+        else {
+            panic!()
+        };
+        let NodeKind::Constant {
+            value: rounding, ..
+        } = arguments[4].kind()
+        else {
+            panic!()
+        };
+        let NodeKind::Constant {
+            value: float_size, ..
+        } = arguments[5].kind()
+        else {
+            panic!()
+        };
+
+        // enum FPRounding {
+        //   FPRounding_TIEEVEN,
+        //   FPRounding_POSINF,
+        //   FPRounding_NEGINF,
+        //   FPRounding_ZERO,
+        //   FPRounding_TIEAWAY,
+        //   FPRounding_ODD,
+        // }
+
+        let int = arguments[0].clone();
+
+        // is_signed
+
+        let int = if *is_unsigned == 1 {
+            assert!(matches!(int.typ(), Type::Unsigned(_)));
+            int
+        } else {
+            let width = int.typ().width();
+            emitter.cast(int, Type::Signed(width), CastOperationKind::Reinterpret)
+        };
+
+        return Ok(Some(emitter.cast(
+            int,
+            Type::Floating(u32::try_from(*float_size).unwrap()),
+            CastOperationKind::Convert,
+        )));
     }
 
     let (is_sysreg, is_read) = match function {
@@ -1183,7 +1237,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 //     self.emitter.call(function, args);
                 // }
 
-                let res = StatementResult::Data(translate_with_variable_ids(
+                let res = StatementResult::Data(translate(
                     self.model,
                     target.as_ref(),
                     &args,
@@ -1202,7 +1256,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 // }
 
                 log::debug!(
-                    "finished translating {:?}, now in {:?}",
+                    "finished translating {:?} (got {res:?}), now in {:?}",
                     target.as_ref(),
                     self.function.name(),
                 );
@@ -1522,6 +1576,7 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
         rudder::types::Type::Bits => emitter::Type::Bits,
         rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
         rudder::types::Type::Int => emitter::Type::Int,
+        rudder::types::Type::Real => emitter::Type::Real,
         t => panic!("todo codegen type instance: {t:?}"),
     }
 }

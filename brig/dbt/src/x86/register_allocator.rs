@@ -5,7 +5,7 @@ use {
             Instruction, Opcode, Operand,
             OperandKind::{self},
             UseDef, UseDefMut,
-            registers::{PhysicalRegister, Register},
+            registers::{PhysicalRegister, Register, RegisterClass},
             width::Width,
         },
     },
@@ -74,7 +74,7 @@ fn calculate_vreg_live_ranges(
                     None
                 }
             })
-            .filter(|(_, reg)| matches!(reg, Register::Virtual(_)))
+            .filter(|(_, reg)| matches!(reg, Register::Virtual { .. }))
             .for_each(|(ud, reg)| {
                 let tracked_register = register_tracking.get_mut(&reg);
 
@@ -100,7 +100,7 @@ fn calculate_vreg_live_ranges(
                     None
                 }
             })
-            .filter(|reg| matches!(reg, Register::Virtual(_)))
+            .filter(|reg| matches!(reg, Register::Virtual { .. }))
             .for_each(|reg| {
                 register_tracking.get_mut(&reg).last_use = Some(current);
             });
@@ -159,7 +159,7 @@ fn do_allocate(
                 log::trace!("ud def: {usedef_reg:?}");
 
                 match usedef_reg {
-                    Register::Virtual(usedef_virt_reg) => {
+                    Register::Virtual{index: usedef_virt_reg, class} => {
                         // Definition of a virtual register
                         let tracked_virt_reg = register_tracking.get_mut(&usedef_reg);
 
@@ -177,7 +177,7 @@ fn do_allocate(
                                     assert!(tracked_virt_reg.physical_register.is_none());
 
                                     tracked_virt_reg.physical_register = Some(allocate_phys_reg(
-                                        usedef.1,
+                                        class,
                                         &avail_phys_regs_xmm,
                                         &avail_phys_regs_gpr,
                                         &tracked_virt_reg.interference,
@@ -210,7 +210,7 @@ fn do_allocate(
                         if live_phys_regs.contains(usedef_phys_reg) {
                             live_phys_regs.remove(usedef_phys_reg);
 
-                            if let Some(Register::Virtual(conflicting_vreg_index)) = tracked_phys_reg.tracking {
+                            if let Some(Register::Virtual{index:conflicting_vreg_index,class}) = tracked_phys_reg.tracking {
                                 log::trace!(
                                     "def of preg {}, but it's tracking vreg {}!",
                                     usedef_phys_reg,
@@ -219,24 +219,24 @@ fn do_allocate(
 
                                 // Allocate a physical register
                                 let allocated_phys_reg = allocate_phys_reg(
-                                    usedef.1,
+                                    class,
                                     &avail_phys_regs_xmm,
                                     &avail_phys_regs_gpr,
                                     &register_tracking
-                                        .get(&Register::Virtual(conflicting_vreg_index))
+                                        .get(&Register::Virtual{index: conflicting_vreg_index, class})
                                         .interference,
                                 );
 
                                 register_tracking
-                                    .get_mut(&Register::Virtual(conflicting_vreg_index))
+                                    .get_mut(&Register::Virtual{index: conflicting_vreg_index, class})
                                     .physical_register = Some(allocated_phys_reg);
                                 register_tracking
                                     .get_mut(&Register::Physical(allocated_phys_reg))
-                                    .tracking = Some(Register::Virtual(conflicting_vreg_index));
+                                    .tracking = Some(Register::Virtual{index: conflicting_vreg_index, class});
 
                                 live_phys_regs.insert(allocated_phys_reg);
                                 register_tracking
-                                    .get_mut(&Register::Virtual(conflicting_vreg_index))
+                                    .get_mut(&Register::Virtual{index: conflicting_vreg_index, class})
                                     .interference = live_phys_regs;
 
                                 for avail_phys_reg in avail_phys_regs_gpr.iter().chain(avail_phys_regs_xmm.iter()) {
@@ -271,7 +271,7 @@ fn do_allocate(
                 log::trace!("ud use: {usedef_reg:?}");
 
                 match usedef_reg {
-                    Register::Virtual(usedef_virt_reg) => {
+                    Register::Virtual{ index: usedef_virt_reg, class} => {
                         // Use of a virtual register
                         let tracked_virt_reg = register_tracking.get_mut(&usedef_reg);
 
@@ -280,7 +280,7 @@ fn do_allocate(
                         {
                             //  ALLOCATE
                             let allocated_phys_reg = allocate_phys_reg(
-                                usedef.1,
+                                class,
                                 &avail_phys_regs_xmm,
                                 &avail_phys_regs_gpr,
                                 &live_phys_regs,
@@ -334,8 +334,14 @@ fn do_allocate(
                                 tracking_reg
                             );
 
+                            let class = if usedef_phys_reg.is_gpr() {
+                                RegisterClass::General
+                            } else {
+                                RegisterClass::Xmm
+                            };
+
                             let new_phys_reg = allocate_phys_reg(
-                                usedef.1,
+                                class,
                                 &avail_phys_regs_xmm,
                                 &avail_phys_regs_gpr,
                                 &conflicting_vreg.interference,
@@ -426,10 +432,10 @@ fn commit(
 
         instructions[i].get_use_defs_mut().for_each(|ud| {
             let (UseDefMut::Def(reg) | UseDefMut::Use(reg) | UseDefMut::UseDef(reg)) = ud;
-            if let Register::Virtual(vreg) = &*reg {
+            if let Register::Virtual {index: vreg,.. } = &*reg {
                 *reg = Register::Physical(
                     register_tracking
-                        .get(&Register::Virtual(*vreg))
+                        .get(&*reg)
                         .physical_register
                         .unwrap_or_else(|| {
                             panic!("No physical register tracked by vreg {vreg} when committing instruction {i}")
@@ -493,15 +499,14 @@ fn commit(
 }
 
 fn allocate_phys_reg(
-    width: Width,
+    class: RegisterClass,
     xmm_avail: &PhysicalRegisterSet,
     gpr_avail: &PhysicalRegisterSet,
     in_use: &PhysicalRegisterSet,
 ) -> PhysicalRegister {
-    (if width == Width::_128 {
-        xmm_avail
-    } else {
-        gpr_avail
+    (match class {
+        RegisterClass::General => gpr_avail,
+        RegisterClass::Xmm => xmm_avail,
     })
     .first_difference(in_use)
     .unwrap()
@@ -523,7 +528,7 @@ impl RegisterTracker {
     pub fn get(&self, register: &Register) -> &RegisterTrack {
         match register {
             Register::Physical(physical_register) => &self.phys[physical_register.index()],
-            Register::Virtual(vreg) => &self.virt[*vreg],
+            Register::Virtual { index: vreg, .. } => &self.virt[*vreg],
             Register::Global(_) => panic!(),
         }
     }
@@ -531,7 +536,7 @@ impl RegisterTracker {
     pub fn get_mut(&mut self, register: &Register) -> &mut RegisterTrack {
         match register {
             Register::Physical(physical_register) => &mut self.phys[physical_register.index()],
-            Register::Virtual(vreg) => &mut self.virt[*vreg],
+            Register::Virtual { index: vreg, .. } => &mut self.virt[*vreg],
             Register::Global(_) => panic!(),
         }
     }

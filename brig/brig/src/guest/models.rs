@@ -558,6 +558,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
     } else if name.as_ref().starts_with("SPE")
         || [
             "PSTATE_EL",
+            "PSTATE_SM",
             "_MPAM1_EL1_bits",
             "_MPAM3_EL3_bits",
             "_MPAM3_EL3_bits",
@@ -570,11 +571,13 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
             "MDCCSR_EL0_bits",
             "SMCR_EL1_bits",
             "SMCR_EL2_bits",
+            "SMCR_EL3_LEN_VALUE",
             "SMCR_EL3_bits",
             "SCTLR_EL1_bits",
             "SCTLR_EL2_bits",
             "SCTLR_EL3_bits",
             "CPACR_EL1_bits",
+            "FPCR_bits",
         ]
         .contains(&name.as_ref())
     {

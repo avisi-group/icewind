@@ -355,7 +355,11 @@ impl VirtQueueEvent {
         isr: &AtomicU32,
     ) {
         log::trace!("read event: {sector:x}");
+        // 1st write buffer is data destination
+        // 2nd write buffer is status
         assert_eq!(self.write_buffers.len(), 2);
+        // 1st read buffer is event descriptor
+        assert_eq!(self.read_buffers.len(), 1);
 
         // Fill the buffer with zeroes, to make sure the underlying storage has been
         // allocated.
@@ -399,8 +403,11 @@ impl VirtQueueEvent {
     ) {
         log::debug!("write event: {sector:x}");
 
-        //         assert(evt->read_buffers.size() == 2);
+        // 1st read buffer is descriptor
+        // 2nd is the data being written
         assert_eq!(self.read_buffers.len(), 2);
+        // 1st write buffer is the status
+        assert_eq!(self.write_buffers.len(), 1);
 
         // 	DEBUG << CONTEXT(VirtIOBlockDevice) << "Handling Write Event";
 
@@ -437,7 +444,8 @@ impl VirtQueueEvent {
         // #endif
 
         // callback logic just inlined here
-        unsafe { self.write_buffers[1].data.write(0x00) }; // success
+
+        unsafe { self.write_buffers[0].data.write(0x00) }; // success
 
         self.response_size = 1;
         self.submit(queue, irq, isr);

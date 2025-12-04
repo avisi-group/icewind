@@ -263,7 +263,6 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
         } => {
             if let Statement::Constant(value) = value.get(arena) {
                 let value = cast_integer(value.clone(), typ.clone());
-
                 stmt.get_mut(arena).replace(Statement::Constant(value));
                 true
             } else {

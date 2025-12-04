@@ -5,12 +5,12 @@ use {
             EMIT_TRACING,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
-                TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
+                TernaryOperationKind, UnaryOperationKind, X86Emitter, X86Node, X86NodeRef,
                 X86NodeRefPtrHash,
             },
             encoder::{
                 Instruction, Operand, OperandKind,
-                registers::{PhysicalRegister, Register},
+                registers::{PhysicalRegister, Register, RegisterClass},
                 width::Width,
             },
         },
@@ -18,6 +18,7 @@ use {
     alloc::vec::Vec,
     common::ktest,
     core::cmp::{Ordering, min},
+    iced_x86::code_asm::es,
 };
 
 impl<'a, 'ctx> X86Emitter<'ctx> {
@@ -52,11 +53,14 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 let truncated_op = Operand::imm(limited_width, *value);
                 let tmp = Operand::vreg(limited_width, self.next_vreg());
 
-                let tmp_full = Operand::vreg(op.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(truncated_op, tmp).unwrap());
-                self.push_instruction(Instruction::movzx(tmp, tmp_full).unwrap());
+                let destination_vreg = self.next_vreg();
+                let destination = Operand::vreg_xmm(op.width(), destination_vreg);
 
-                tmp_full
+                let destination_64 = Operand::vreg_xmm(Width::_64, destination_vreg);
+                self.push_instruction(Instruction::mov(truncated_op, tmp).unwrap());
+                self.push_instruction(Instruction::movq(tmp, destination_64).unwrap());
+
+                destination
             } else if *value > u64::try_from(i32::MAX).unwrap() && op.width() > Width::_32 {
                 // will fit in a general register, but the immediate is too
                 // large
@@ -343,65 +347,118 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             }
             NodeKind::Cast { value, kind } => {
                 let target_width = Width::from_uncanonicalized(node.typ().width()).unwrap();
+
+                // todo: determine class based on typ + width, not just width
                 let dst = Operand::vreg(target_width, self.next_vreg());
 
                 let src = self.to_operand(value);
 
-                if src.width() == dst.width() {
-                    self.push_instruction(Instruction::mov(src, dst).unwrap());
-                } else {
-                    use {CastOperationKind::*, Ordering::*};
+                use {CastOperationKind::*, Ordering::*};
 
-                    match (kind, src.width().cmp(&dst.width())) {
-                        (ZeroExtend, Equal) => {
-                            self.push_instruction(Instruction::mov(src, dst).unwrap())
-                        }
-                        (ZeroExtend, Less) => {
+                match (kind, src.width().cmp(&dst.width())) {
+                    (ZeroExtend, Equal) => {
+                        self.push_instruction(Instruction::mov(src, dst).unwrap())
+                    }
+                    (ZeroExtend, Less) => match dst.register_class().unwrap() {
+                        RegisterClass::General => {
                             self.push_instruction(Instruction::movzx(src, dst).unwrap())
                         }
-                        (ZeroExtend, Greater) => {
-                            panic!(
-                                "cannot zero extend when src ({src}) is larger than dst ({dst})\ntarget type: {:?}\nvalue: {value:#?}",
-                                node.typ()
-                            )
-                        }
-
-                        (SignExtend, Equal) => {
-                            self.push_instruction(Instruction::mov(src, dst).unwrap())
-                        }
-                        (SignExtend, Less) => self.push_instruction(Instruction::movsx(src, dst)),
-                        (SignExtend, Greater) => {
-                            panic!("cannot zero extend when src ({src}) is larger than dst ({dst})")
-                        }
-
-                        (Convert, _) => {
-                            panic!("{:?}\n{:#?}", node.typ(), value);
-                        }
-                        (Truncate, Greater) => {
-                            // workaround for XMM truncation, if we change the width to match dst it
-                            // will be emitted as a regular register, has to stay 128-bit for it to
-                            // be an XMM, but it's fine because there's already a XMM -> GPR mov
-                            // that is equivalent to a truncation
-                            if src.width() > Width::_64 && dst.width() < Width::_128 {
-                                self.push_instruction(Instruction::mov(src, dst).unwrap());
+                        RegisterClass::Xmm => {
+                            let intermediate = if src.width() < Width::_64 {
+                                let intermediate =
+                                    Operand::vreg_general(Width::_64, self.next_vreg());
+                                self.push_instruction(
+                                    Instruction::movzx(src, intermediate).unwrap(),
+                                );
+                                intermediate
                             } else {
-                                // normal case, just access src as a smaller register
-                                let mut src = src;
-                                src.set_width(dst.width());
-                                self.push_instruction(Instruction::mov(src, dst).unwrap());
+                                src
+                            };
+
+                            match (
+                                intermediate.width() == dst.width(),
+                                intermediate.register_class() == dst.register_class(),
+                            ) {
+                                (true, true) => self
+                                    .push_instruction(Instruction::mov(intermediate, dst).unwrap()),
+                                (true, false) => self.push_instruction(
+                                    Instruction::movq(intermediate, dst).unwrap(),
+                                ),
+                                (false, true) => {
+                                    let mut dst = dst;
+                                    dst.set_width(Width::_64);
+                                    self.push_instruction(
+                                        Instruction::mov(intermediate, dst).unwrap(),
+                                    );
+                                }
+                                (false, false) => {
+                                    let mut dst = dst;
+                                    dst.set_width(Width::_64);
+                                    self.push_instruction(
+                                        Instruction::movq(intermediate, dst).unwrap(),
+                                    );
+                                }
                             }
                         }
-                        (Truncate, Equal | Less) => {
-                            panic!(
-                                "invalid truncate: source value: {:?}, cast node target type: {:?}, src_width: {}, dst_width: {}",
-                                value.typ(),
-                                node.typ(),
-                                src.width(),
-                                dst.width()
-                            )
+                    },
+                    (ZeroExtend, Greater) => {
+                        panic!(
+                            "cannot zero extend when src ({src}) is larger than dst ({dst})\ntarget type: {:?}\nvalue: {value:#?}",
+                            node.typ()
+                        )
+                    }
+
+                    (SignExtend, Equal) => {
+                        self.push_instruction(Instruction::mov(src, dst).unwrap())
+                    }
+                    (SignExtend, Less) => self.push_instruction(Instruction::movsx(src, dst)),
+                    (SignExtend, Greater) => {
+                        panic!("cannot zero extend when src ({src}) is larger than dst ({dst})")
+                    }
+
+                    (Convert, _) => match (node.typ(), value.typ()) {
+                        (Type::Floating(64), Type::Signed(64)) => {
+                            let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
+                            // self.push_instruction(Instruction::xor(dst, dst));
+                            self.push_instruction(Instruction::cvtsi2sd(src, dst));
+                            return dst;
+                        }
+                        _ => todo!(),
+                    },
+                    (Truncate, Greater) => {
+                        // normal case, just access src as a smaller register
+                        let mut src = src;
+                        src.set_width(dst.width());
+
+                        if src.register_class() == dst.register_class() {
+                            self.push_instruction(Instruction::mov(src, dst).unwrap());
+                        } else {
+                            self.push_instruction(Instruction::movq(src, dst).unwrap());
+                        }
+                    }
+                    (Truncate, Less) => {
+                        panic!(
+                            "invalid truncate: source value: {:?}, cast node target type: {:?}, src_width: {}, dst_width: {}",
+                            value.typ(),
+                            node.typ(),
+                            src.width(),
+                            dst.width()
+                        )
+                    }
+
+                    // copy
+                    (Truncate, Equal) => {
+                        self.push_instruction(Instruction::mov(src, dst).unwrap());
+                    }
+
+                    (Reinterpret, _) => {
+                        if src.register_class() == Some(RegisterClass::Xmm)
+                            || dst.register_class() == Some(RegisterClass::Xmm)
+                        {
+                            panic!("{src} {dst}")
                         }
 
-                        (Reinterpret, _) => match src.width().cmp(&dst.width()) {
+                        match src.width().cmp(&dst.width()) {
                             Ordering::Equal => {
                                 self.push_instruction(Instruction::mov(src, dst).unwrap())
                             }
@@ -420,9 +477,9 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                                     self.push_instruction(Instruction::mov(src, dst).unwrap());
                                 }
                             }
-                        },
-                        (Broadcast, _) => todo!(),
+                        }
                     }
+                    (Broadcast, _) => todo!(),
                 }
 
                 dst
@@ -508,17 +565,44 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     && target.typ().width() > 64
                 // pinsr can only be used on xmm registers
                 {
-                    let target = self.to_operand(target);
+                    if let NodeKind::Constant {
+                        value: 0,
+                        width: 128,
+                    } = target.kind()
+                        && *start_c == 0
+                        && *length_c == u64::from(source.typ().width())
+                        && *length_c == 64
+                    {
+                        let target_vreg = self.next_vreg();
+                        let target_64 = Operand::vreg_xmm(Width::_64, target_vreg);
+                        let target = Operand::vreg_xmm(Width::_128, target_vreg);
 
-                    let index = Operand::imm(Width::_8, start_c / length_c);
+                        let source = self.to_operand(source);
 
-                    // length encoded in source operand width
-                    let mut source = self.to_operand_reg_promote(source);
-                    source.set_width(Width::from_uncanonicalized(*length_c).unwrap());
+                        if source.register_class() == target.register_class() {
+                            self.push_instruction(Instruction::mov(source, target_64).unwrap());
+                        } else {
+                            self.push_instruction(Instruction::movq(source, target_64).unwrap());
+                        }
 
-                    self.push_instruction(Instruction::pinsr(index, source, target));
+                        target
+                    } else {
+                        let target_op = self.to_operand(target);
 
-                    target
+                        let index = Operand::imm(Width::_8, start_c / length_c);
+
+                        // length encoded in source operand width
+                        let mut source = self.to_operand_reg_promote(source);
+                        source.set_width(Width::from_uncanonicalized(*length_c).unwrap());
+
+                        if target_op.width() == Width::_64 {
+                            panic!("{index} {source} {target_op} {target:#?}");
+                        }
+
+                        self.push_instruction(Instruction::pinsr(index, source, target_op));
+
+                        target_op
+                    }
                 } else {
                     let out = if target.typ().width() > 64 {
                         self.bit_insert_128(
@@ -583,7 +667,16 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             NodeKind::GetFlags { .. } => {
                 panic!("handled by addwithcarry specialization");
             }
-            NodeKind::Real { .. } => panic!("cannot convert real to operand: {node:#?}"),
+            NodeKind::Real {
+                numerator,
+                denominator,
+            } => {
+                let div = self.binary_operation(BinaryOperationKind::Divide(
+                    numerator.clone(),
+                    denominator.clone(),
+                ));
+                self.to_operand(&div)
+            }
             NodeKind::Tuple(vec) => panic!("cannot convert tuple to operand: {vec:#?}"),
             NodeKind::Select {
                 condition,
@@ -738,23 +831,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
     }
 
     fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind) -> Operand {
-        use BinaryOperationKind::*;
-
-        let (Add(left, right)
-        | Sub(left, right)
-        | Or(left, right)
-        | Modulo(left, right)
-        | Divide(left, right)
-        | Multiply(left, right)
-        | And(left, right)
-        | Xor(left, right)
-        | PowI(left, right)
-        | CompareEqual(left, right)
-        | CompareNotEqual(left, right)
-        | CompareLessThan(left, right)
-        | CompareLessThanOrEqual(left, right)
-        | CompareGreaterThan(left, right)
-        | CompareGreaterThanOrEqual(left, right)) = kind;
+        let (left, right) = kind.children();
 
         // do this first to avoid tuple issues
         if let BinaryOperationKind::CompareEqual(left, right)
@@ -847,7 +924,16 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 }
                 Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
                 Ordering::Greater => {
-                    todo!("sign extend {r} to {l}")
+                    let left = self.to_operand(left);
+                    let right = self.to_operand(right);
+                    let tmp = Operand::vreg(left.width(), self.next_vreg());
+
+                    if left.width() == right.width() {
+                        panic!("true widths different but normalized widths equal")
+                    }
+
+                    self.push_instruction(Instruction::movsx(right, tmp));
+                    (left, tmp)
                 }
             },
 
@@ -862,7 +948,31 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 Type::Signed(64) | Type::Unsigned(64) | Type::Int,
             ) => (self.to_operand(left), self.to_operand(right)),
 
-            (left, right) => todo!("{left:?} {right:?}"),
+            (Type::Real, Type::Real) => match (left.kind(), right.kind()) {
+                (
+                    NodeKind::ReadStackVariable { id, .. },
+                    NodeKind::Real {
+                        numerator,
+                        denominator,
+                    },
+                ) => {
+                    if matches!(denominator.kind(), NodeKind::Constant { value: 1, .. }) {
+                        let stack_read = self.read_stack_variable(*id, Type::Int);
+                        return self.binary_operation_to_operand(
+                            &BinaryOperationKind::new_with_kind(
+                                kind,
+                                stack_read,
+                                numerator.clone(),
+                            ),
+                        );
+                    } else {
+                        todo!()
+                    }
+                }
+                (l, r) => todo!("binary operation to operand: \n{l:#?}\n\n\n{r:#?}"),
+            },
+
+            (_, _) => todo!("{kind:#?}"),
         };
 
         let width = left.width();
@@ -961,6 +1071,16 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 let dst = Operand::vreg(width, self.next_vreg());
                 self.push_instruction(Instruction::mov(hi, dst).unwrap());
                 dst
+            }
+
+            BinaryOperationKind::PowI(base, exponent) => {
+                let zero = self.constant(0, Type::Int);
+                let exp_gt_zero = self.binary_operation(
+                    BinaryOperationKind::CompareGreaterThanOrEqual(exponent.clone(), zero),
+                );
+                self.assert(exp_gt_zero, 0);
+
+                todo!("{base:?} ^ {exponent:?}");
             }
 
             op => todo!("{op:#?}"),

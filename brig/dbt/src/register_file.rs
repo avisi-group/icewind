@@ -265,7 +265,7 @@ impl RegisterValue for bool {
 }
 
 impl<const N: usize> RegisterValue for [u8; N] {
-    const SIZE: usize = N * 8;
+    const SIZE: usize = N;
 
     type Inner = Self;
 
@@ -277,6 +277,19 @@ impl<const N: usize> RegisterValue for [u8; N] {
         let mut celf = [0u8; N];
         celf.copy_from_slice(&src[..N]);
         celf
+    }
+}
+
+impl RegisterValue for f64 {
+    const SIZE: usize = 8;
+    type Inner = Self;
+
+    fn write(&self, dest: &mut [u8]) {
+        byteorder::LittleEndian::write_f64(dest, *self);
+    }
+
+    fn read(src: &[u8]) -> Self {
+        byteorder::LittleEndian::read_f64(src)
     }
 }
 

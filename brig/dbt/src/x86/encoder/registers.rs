@@ -1,4 +1,5 @@
 use {
+    alloc::alloc::Global,
     common::ktest,
     core::fmt::{Display, Formatter},
     displaydoc::Display,
@@ -104,6 +105,14 @@ impl PhysicalRegister {
         }
     }
 
+    pub fn class(&self) -> RegisterClass {
+        if self.is_gpr() {
+            RegisterClass::General
+        } else {
+            RegisterClass::Xmm
+        }
+    }
+
     pub fn is_gpr(&self) -> bool {
         !self.is_xmm()
     }
@@ -146,7 +155,7 @@ impl From<&PhysicalRegister> for AsmRegister64 {
             PhysicalRegister::R13 => r13,
             PhysicalRegister::R14 => r14,
             PhysicalRegister::R15 => r15,
-            _ => panic!(),
+            r => panic!("can't convert {r} to AsmRegister64"),
         }
     }
 }
@@ -282,15 +291,47 @@ impl TryFrom<&PhysicalRegister> for AsmRegisterXmm {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
     Physical(PhysicalRegister),
-    Virtual(usize),
+    Virtual { index: usize, class: RegisterClass },
     Global(usize),
+}
+
+impl Register {
+    pub fn class(&self) -> Option<RegisterClass> {
+        match self {
+            Register::Global(_) => None,
+            Register::Virtual { class, .. } => Some(*class),
+            Register::Physical(phys) => Some(phys.class()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RegisterClass {
+    General,
+    Xmm,
+}
+
+impl Display for RegisterClass {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            RegisterClass::General => write!(f, "gpr"),
+            RegisterClass::Xmm => write!(f, "xmm"),
+        }
+    }
 }
 
 impl Display for Register {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Register::Physical(pr) => write!(f, "%{pr}"),
-            Register::Virtual(vr) => write!(f, "v{vr}"),
+            Register::Virtual {
+                index,
+                class: RegisterClass::General,
+            } => write!(f, "vg{index}"),
+            Register::Virtual {
+                index,
+                class: RegisterClass::Xmm,
+            } => write!(f, "vx{index}"),
             Register::Global(gr) => write!(f, "g{gr}"),
         }
     }
