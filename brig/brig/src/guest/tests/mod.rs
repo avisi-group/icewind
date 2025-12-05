@@ -7521,6 +7521,9 @@ fn fmul() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // 1e7e0bff        fmul    d31, d31, d30
+    // decode_fmul_float_aarch64_instrs_float_arithmetic_mul_product
+    // execute_aarch64_instrs_float_arithmetic_mul_product
+    // FPMul
     translate_instruction(
         &*model,
         "__DecodeA64",
@@ -7535,5 +7538,16 @@ fn fmul() {
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    todo!()
+    let d30_offset = usize::try_from(model.reg_offset("_Z") + 30 * 256).unwrap();
+    let d31_offset = usize::try_from(model.reg_offset("_Z") + 31 * 256).unwrap();
+
+    register_file.write_raw::<f64>(d30_offset, 1323.12314f64);
+    register_file.write_raw::<f64>(d31_offset, -0.97656789f64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<f64>(d31_offset),
+        1323.12314f64 * -0.97656789f64
+    );
 }

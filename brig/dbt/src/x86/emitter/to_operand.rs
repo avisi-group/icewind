@@ -452,31 +452,51 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     }
 
                     (Reinterpret, _) => {
-                        if src.register_class() == Some(RegisterClass::Xmm)
-                            || dst.register_class() == Some(RegisterClass::Xmm)
-                        {
-                            panic!("{src} {dst}")
-                        }
+                        match (value.typ(), node.typ()) {
+                            (Type::Unsigned(_), Type::Floating(_)) => {
+                                let dst = Operand::vreg_xmm(target_width, self.next_vreg());
+                                self.push_instruction(Instruction::movq(src, dst).unwrap());
+                                return dst;
+                            }
+                            (Type::Floating(_), Type::Unsigned(_)) => {
+                                let dst = Operand::vreg_general(target_width, self.next_vreg());
+                                self.push_instruction(Instruction::movq(src, dst).unwrap());
+                                return dst;
+                            }
+                            _ => {
+                                if src.register_class() == Some(RegisterClass::Xmm)
+                                    || dst.register_class() == Some(RegisterClass::Xmm)
+                                {
+                                    todo!("{src} {dst}")
+                                }
 
-                        match src.width().cmp(&dst.width()) {
-                            Ordering::Equal => {
-                                self.push_instruction(Instruction::mov(src, dst).unwrap())
-                            }
-                            Ordering::Less => {
-                                self.push_instruction(Instruction::movzx(src, dst).unwrap())
-                            }
-                            Ordering::Greater => {
-                                // same as truncate, todo: actually figure out how/why re-interpret
-                                // is different
-                                if src.width() > Width::_64 && dst.width() < Width::_128 {
-                                    self.push_instruction(Instruction::mov(src, dst).unwrap());
-                                } else {
-                                    // normal case, just access src as a smaller register
-                                    let mut src = src;
-                                    src.set_width(dst.width());
-                                    self.push_instruction(Instruction::mov(src, dst).unwrap());
+                                match src.width().cmp(&dst.width()) {
+                                    Ordering::Equal => {
+                                        self.push_instruction(Instruction::mov(src, dst).unwrap())
+                                    }
+                                    Ordering::Less => {
+                                        self.push_instruction(Instruction::movzx(src, dst).unwrap())
+                                    }
+                                    Ordering::Greater => {
+                                        // same as truncate, todo: actually figure out how/why
+                                        // re-interpret
+                                        // is different
+                                        if src.width() > Width::_64 && dst.width() < Width::_128 {
+                                            self.push_instruction(
+                                                Instruction::mov(src, dst).unwrap(),
+                                            );
+                                        } else {
+                                            // normal case, just access src as a smaller register
+                                            let mut src = src;
+                                            src.set_width(dst.width());
+                                            self.push_instruction(
+                                                Instruction::mov(src, dst).unwrap(),
+                                            );
+                                        }
+                                    }
                                 }
                             }
+                            _ => panic!(),
                         }
                     }
                     (Broadcast, _) => todo!(),
@@ -937,7 +957,24 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 }
             },
 
-            (Type::Floating(_), Type::Floating(_)) => todo!(),
+            (Type::Floating(left_width), Type::Floating(right_width)) => {
+                if left_width == right_width {
+                    let left = self.to_operand(left);
+                    let right = self.to_operand(right);
+                    let dst = Operand::vreg_xmm(left.width_in_bits, self.next_vreg());
+
+                    match kind {
+                        BinaryOperationKind::Multiply(_, _) => {
+                            self.push_instruction(Instruction::mov(right, dst).unwrap());
+                            self.push_instruction(Instruction::mulpd(left, dst));
+                            return dst;
+                        }
+                        _ => todo!(),
+                    }
+                } else {
+                    todo!()
+                }
+            }
 
             (Type::Tuple, Type::Tuple) => {
                 todo!()

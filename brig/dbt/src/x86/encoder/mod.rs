@@ -84,6 +84,8 @@ pub enum Opcode {
     IDIV(Operand),
     /// div RDX:RAX {0}
     DIV(Operand),
+    /// mulpd {0}, {1},
+    MULPD(Operand, Operand),
     /// cqo
     CQO,
     /// not {0}
@@ -686,6 +688,9 @@ impl Instruction {
     pub fn imul(src: Operand, dst: Operand) -> Self {
         Self(Opcode::IMUL(src, dst))
     }
+    pub fn mulpd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::MULPD(src, dst))
+    }
 
     pub fn imul1(src: Operand, dst_lo: Operand, dst_hi: Operand) -> Self {
         Self(Opcode::IMUL1(src, dst_lo, dst_hi))
@@ -1241,6 +1246,21 @@ impl Instruction {
                     .cmovne::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                     .unwrap();
             }
+            MULPD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .mulpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
             IMUL(
                 Operand {
                     kind: I(left),
@@ -1609,6 +1629,7 @@ impl Instruction {
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
+            | Opcode::MULPD(src, dst)
             | Opcode::PUNPCKL(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
@@ -1736,6 +1757,7 @@ impl Instruction {
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
+            | Opcode::MULPD(src, dst)
             | Opcode::PUNPCKL(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
                     .into_iter()

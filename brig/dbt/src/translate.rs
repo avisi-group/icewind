@@ -171,12 +171,6 @@ pub fn translate(
         let float = arguments[0].clone();
 
         panic!("{:?}", float.kind());
-
-        return Ok(Some(emitter.cast(
-            float,
-            Type::Signed(u32::try_from(*size).unwrap()),
-            CastOperationKind::Convert,
-        )));
     }
 
     if function == "FixedToFP" {
@@ -231,6 +225,25 @@ pub fn translate(
             int,
             Type::Floating(u32::try_from(*float_size).unwrap()),
             CastOperationKind::Convert,
+        )));
+    }
+
+    if function == "FPMul" {
+        let op1 = arguments[0].clone();
+        let op2 = arguments[1].clone();
+
+        assert_eq!(op1.typ().width(), 64);
+        assert_eq!(op2.typ().width(), 64);
+
+        let op1 = emitter.cast(op1, Type::Floating(64), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(64), CastOperationKind::Reinterpret);
+
+        let res = emitter.binary_operation(BinaryOperationKind::Multiply(op1, op2));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(64),
+            CastOperationKind::Reinterpret,
         )));
     }
 
