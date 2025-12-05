@@ -7426,94 +7426,6 @@ fn scvtf_d30_x3() {
     // 9e62007e        scvtf   d30, x3
     // decode_scvtf_float_int_aarch64_instrs_float_convert_int
     // execute_aarch64_instrs_float_convert_int:
-    //  X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             64,
-    //         ),
-    //         kind: Constant {
-    //             value: 30,
-    //             width: 64,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             64,
-    //         ),
-    //         kind: Constant {
-    //             value: 64,
-    //             width: 64,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             64,
-    //         ),
-    //         kind: Constant {
-    //             value: 64,
-    //             width: 64,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             64,
-    //         ),
-    //         kind: Constant {
-    //             value: 3,
-    //             width: 64,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             32,
-    //         ),
-    //         kind: Constant {
-    //             value: 1,
-    //             width: 32,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             64,
-    //         ),
-    //         kind: Constant {
-    //             value: 0,
-    //             width: 64,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Signed(
-    //             32,
-    //         ),
-    //         kind: ReadStackVariable {
-    //             id: 1,
-    //             width: 32,
-    //         },
-    //     },
-    // ),
-    // X86NodeRef(
-    //     X86Node {
-    //         typ: Unsigned(
-    //             1,
-    //         ),
-    //         kind: Constant {
-    //             value: 0,
-    //             width: 1,
-    //         },
-    //     },
-    // ),
 
     translate_instruction(
         &*model,
@@ -7529,7 +7441,18 @@ fn scvtf_d30_x3() {
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    todo!()
+    let d30_offset = usize::try_from(model.reg_offset("_Z") + 30 * 256).unwrap();
+
+    register_file.write::<i64>("R3", 8765678);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read_raw::<f64>(d30_offset), 8765678.0f64);
+
+    register_file.write::<i64>("R3", -876543456789);
+    translation.execute(&register_file);
+    assert_eq!(
+        register_file.read_raw::<f64>(d30_offset),
+        -876543456789.0f64
+    );
 }
 
 // #[ktest]
