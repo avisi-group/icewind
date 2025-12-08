@@ -961,16 +961,35 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                 if left_width == right_width {
                     let left = self.to_operand(left);
                     let right = self.to_operand(right);
-                    let dst = Operand::vreg_xmm(left.width_in_bits, self.next_vreg());
 
-                    match kind {
-                        BinaryOperationKind::Multiply(_, _) => {
-                            self.push_instruction(Instruction::mov(right, dst).unwrap());
-                            self.push_instruction(Instruction::mulpd(left, dst));
-                            return dst;
+                    let dst = Operand::vreg_xmm(left.width_in_bits, self.next_vreg());
+                    self.push_instruction(Instruction::mov(left, dst).unwrap());
+
+                    if left_width == 64 {
+                        match kind {
+                            BinaryOperationKind::Multiply(_, _) => {
+                                self.push_instruction(Instruction::mulpd(right, dst));
+                            }
+                            BinaryOperationKind::Add(_, _) => {
+                                self.push_instruction(Instruction::addpd(right, dst));
+                            }
+                            BinaryOperationKind::Sub(_, _) => {
+                                self.push_instruction(Instruction::subpd(right, dst));
+                            }
+                            _ => todo!(),
                         }
-                        _ => todo!(),
+                    } else if left_width == 32 {
+                        match kind {
+                            BinaryOperationKind::Sub(_, _) => {
+                                self.push_instruction(Instruction::subps(right, dst));
+                            }
+                            _ => todo!(),
+                        }
+                    } else {
+                        panic!()
                     }
+
+                    return dst;
                 } else {
                     todo!()
                 }

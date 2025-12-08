@@ -247,6 +247,45 @@ pub fn translate(
         )));
     }
 
+    if function == "FPAdd" {
+        let op1 = arguments[0].clone();
+        let op2 = arguments[1].clone();
+
+        assert_eq!(op1.typ().width(), 64);
+        assert_eq!(op2.typ().width(), 64);
+
+        let op1 = emitter.cast(op1, Type::Floating(64), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(64), CastOperationKind::Reinterpret);
+
+        let res = emitter.binary_operation(BinaryOperationKind::Add(op1, op2));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(64),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
+    if function == "FPSub" {
+        let op1 = arguments[0].clone();
+        let op2 = arguments[1].clone();
+
+        let width = op1.typ().width();
+        assert_eq!(width, op2.typ().width());
+        assert!(matches!(width, 64 | 32));
+
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let res = emitter.binary_operation(BinaryOperationKind::Sub(op1, op2));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(width),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
     let (is_sysreg, is_read) = match function {
         "AArch64_SysRegRead" => (true, true),
         "AArch64_SysRegWrite" => (true, false),

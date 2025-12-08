@@ -98,6 +98,30 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .unwrap();
         }
 
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            if src.is_gpr() && dst.is_xmm() {
+                assembler
+                    .movq::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                    .unwrap();
+            } else if src.is_xmm() && dst.is_gpr() {
+                assembler
+                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                    .unwrap();
+            } else {
+                panic!()
+            }
+        }
+
         _ => todo!("movq {src} {dst}"),
     }
 }

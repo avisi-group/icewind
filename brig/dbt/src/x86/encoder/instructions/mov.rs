@@ -8,7 +8,8 @@ use {
     },
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64,
-        AsmRegisterXmm, CodeAssembler, byte_ptr, dword_ptr, qword_ptr, word_ptr, xmmword_ptr,
+        AsmRegisterXmm, CodeAssembler, asm_traits::CodeAsmMovq, byte_ptr, dword_ptr, qword_ptr,
+        word_ptr, xmmword_ptr,
     },
 };
 
@@ -83,10 +84,19 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 width_in_bits: Width::_32,
             },
         ) => {
-            //assert_eq!(src_width_in_bits, dst_width_in_bits);
-            assembler
-                .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
-                .unwrap();
+            if src.is_xmm() {
+                assembler
+                    .movq::<AsmRegisterXmm, AsmRegisterXmm>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
+                    .unwrap();
+            } else {
+                //assert_eq!(src_width_in_bits, dst_width_in_bits);
+                assembler
+                    .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .unwrap();
+            }
         }
 
         // MOV R -> R

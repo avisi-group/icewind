@@ -86,6 +86,12 @@ pub enum Opcode {
     DIV(Operand),
     /// mulpd {0}, {1},
     MULPD(Operand, Operand),
+    /// addpd {0}, {1},
+    ADDPD(Operand, Operand),
+    /// subpd {0}, {1},
+    SUBPD(Operand, Operand),
+    /// subps {0}, {1},
+    SUBPS(Operand, Operand),
     /// cqo
     CQO,
     /// not {0}
@@ -692,6 +698,18 @@ impl Instruction {
         Self(Opcode::MULPD(src, dst))
     }
 
+    pub fn addpd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::ADDPD(src, dst))
+    }
+
+    pub fn subpd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::SUBPD(src, dst))
+    }
+
+    pub fn subps(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::SUBPS(src, dst))
+    }
+
     pub fn imul1(src: Operand, dst_lo: Operand, dst_hi: Operand) -> Self {
         Self(Opcode::IMUL1(src, dst_lo, dst_hi))
     }
@@ -1261,6 +1279,53 @@ impl Instruction {
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
+            ADDPD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .addpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+            SUBPD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .subpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
+            SUBPS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: _,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: _,
+                },
+            ) => assembler
+                .subps::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
             IMUL(
                 Operand {
                     kind: I(left),
@@ -1629,6 +1694,9 @@ impl Instruction {
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
+            | Opcode::ADDPD(src, dst)
+            | Opcode::SUBPD(src, dst)
+            | Opcode::SUBPS(src, dst)
             | Opcode::MULPD(src, dst)
             | Opcode::PUNPCKL(src, dst) => [
                 Some((OperandDirection::In, src)),
@@ -1758,6 +1826,9 @@ impl Instruction {
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
             | Opcode::MULPD(src, dst)
+            | Opcode::ADDPD(src, dst)
+            | Opcode::SUBPD(src, dst)
+            | Opcode::SUBPS(src, dst)
             | Opcode::PUNPCKL(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
                     .into_iter()

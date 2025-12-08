@@ -293,6 +293,19 @@ impl RegisterValue for f64 {
     }
 }
 
+impl RegisterValue for f32 {
+    const SIZE: usize = 4;
+    type Inner = Self;
+
+    fn write(&self, dest: &mut [u8]) {
+        byteorder::LittleEndian::write_f32(dest, *self);
+    }
+
+    fn read(src: &[u8]) -> Self {
+        byteorder::LittleEndian::read_f32(src)
+    }
+}
+
 fn configure_features(register_file: &RegisterFile) {
     let disabled = [
         "FEAT_LSE2_IMPLEMENTED",

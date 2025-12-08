@@ -251,7 +251,7 @@ impl From<&PhysicalRegister> for AsmRegister32 {
             PhysicalRegister::R13 => r13d,
             PhysicalRegister::R14 => r14d,
             PhysicalRegister::R15 => r15d,
-            _ => panic!(),
+            _ => panic!("{phys}"),
         }
     }
 }

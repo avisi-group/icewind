@@ -7551,3 +7551,73 @@ fn fmul() {
         1323.12314f64 * -0.97656789f64
     );
 }
+
+#[ktest]
+fn fadd() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e602be0        fadd    d0, d31, d0
+
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e602be0,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let d0_offset = usize::try_from(model.reg_offset("_Z") + 0 * 256).unwrap();
+    let d31_offset = usize::try_from(model.reg_offset("_Z") + 31 * 256).unwrap();
+
+    register_file.write_raw::<f64>(d0_offset, 1323.12314f64);
+    register_file.write_raw::<f64>(d31_offset, -0.97656789f64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<f64>(d0_offset),
+        1323.12314f64 + -0.97656789f64
+    );
+}
+
+#[ktest]
+fn fsub() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1e3e3be0        fsub    s0, s31, s30
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e3e3be0,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let d0_offset = usize::try_from(model.reg_offset("_Z") + 0 * 256).unwrap();
+    let d30_offset = usize::try_from(model.reg_offset("_Z") + 30 * 256).unwrap();
+    let d31_offset = usize::try_from(model.reg_offset("_Z") + 31 * 256).unwrap();
+
+    register_file.write_raw::<f32>(d30_offset, 1323.12314f32);
+    register_file.write_raw::<f32>(d31_offset, 0.97656789f32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<f32>(d0_offset),
+        0.97656789f32 - 1323.12314f32
+    );
+}
