@@ -289,16 +289,17 @@ pub fn linux_platform() -> Guest {
         0x3c00_0000,
     );
 
-    // block
-    let backing_dev = kernel::devices::virtio::block::get(&DeviceFunction {
-        bus: 0,
-        device: 4,
-        function: 0,
-    });
-    let block = Arc::new(new_virtio_block(64, gic.clone(), backing_dev));
-    guest.devices.insert("block".into(), block.clone());
+    // // block
+    // let backing_dev = kernel::devices::virtio::block::get(&DeviceFunction {
+    //     bus: 0,
+    //     device: 4,
+    //     function: 0,
+    // });
+    // let block = Arc::new(new_virtio_block(64, gic.clone(), backing_dev));
+    // guest.devices.insert("block".into(), block.clone());
 
-    attach_mmap_device(&mut guest, "block".into(), block, "as0".into(), 0x3d00_0000);
+    // attach_mmap_device(&mut guest, "block".into(), block, "as0".into(),
+    // 0x3d00_0000);
 
     // timer
     let timer = Arc::new(GenericTimer::new(gic.clone(), 27, Nanoseconds::new(1_000)));

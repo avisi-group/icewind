@@ -61,11 +61,12 @@
 		      <0x0 0x2c002000 0 0x2000>;
 	};
 
-	virtio_block@3d000000 {
-		compatible = "virtio,mmio";
-		reg = <0x00 0x3d000000 0x00 0x1000>;
-		interrupts = <0x00 0x20 0x04>;
-	};
+/*	virtio_block@3d000000 {
+*		compatible = "virtio,mmio";
+*		reg = <0x00 0x3d000000 0x00 0x1000>;
+*		interrupts = <0x00 0x20 0x04>;
+*	};
+*/
 
 	apb-pclk {
 		compatible = "fixed-clock";

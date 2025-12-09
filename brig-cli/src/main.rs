@@ -390,16 +390,16 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         ),
     ]);
 
-    cmd.args([
-        "-device",
-        "virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4",
-    ]);
-    // rootfs.ext2
-    // hello.ext2
-    cmd.args([
-        "-drive",
-        &format!("file=guest_data/rootfs.ext2,if=none,format=raw,id=drive1",),
-    ]);
+    // cmd.args([
+    //     "-device",
+    //     "virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4",
+    // ]);
+    // // rootfs.ext2
+    // // hello.ext2
+    // cmd.args([
+    //     "-drive",
+    //     &format!("file=guest_data/rootfs.ext2,if=none,format=raw,id=drive1",),
+    // ]);
 
     cmd.args(["-debugcon", "file:/tmp/debugcon"]);
 
