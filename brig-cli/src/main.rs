@@ -146,9 +146,12 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
             cmd.arg("-F no_logging");
         }
 
-        cmd.arg("--message-format=json")
-            .current_dir(path)
-            .stdout(Stdio::piped());
+        cmd.arg("--message-format=json");
+
+        cmd.current_dir(path);
+
+        cmd.stdout(Stdio::piped());
+
         cmd
     };
 
