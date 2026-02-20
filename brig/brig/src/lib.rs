@@ -126,9 +126,10 @@ fn panic(info: &PanicInfo) -> ! {
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
     if let Some(device) = try_get_current_guest() {
+        let guest_pc = device.core.register_file.read::<u64>("_PC");
         log::error!(
-            "Guest PC = {:#018x}, EL = {}",
-            device.core.register_file.read::<u64>("_PC"),
+            "Guest PC = {guest_pc:#018x} ({:#010x}), EL = {}",
+            unsafe { *(guest_pc as *const u32) },
             device.core.register_file.read::<u8>("PSTATE_EL")
         );
 
