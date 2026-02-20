@@ -6,7 +6,7 @@ authors = ["AVISI Research Group"]
 
 [dependencies]
 rkyv = { version = "0.8.11", default-features = false, features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
-hashbrown = { version = "0.15.5",  default-features = false,  features = ["serde", "nightly"] }
+hashbrown = { version = "0.16.1",  default-features = false,  features = ["serde", "nightly"] }
 twox-hash = { version = "2.1.1", default-features = false, features = ["alloc", "xxhash64"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive"] }
 log = "0.4.27"
