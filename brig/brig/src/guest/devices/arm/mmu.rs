@@ -6,7 +6,7 @@ use {
             models::{ModelDevice, write_to_el},
         },
     },
-    aarch64_paging::paging::{Attributes, Descriptor},
+    aarch64_paging::descriptor::{Attributes, Descriptor},
     common::sysreg_helpers::encode_sysreg_id,
     core::sync::atomic::{AtomicU64, Ordering},
 };

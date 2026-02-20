@@ -14,10 +14,10 @@ common = { path = "../common" }
 pl011 = { path = "../devices/primecell/pl011" }
 virtio = { path = "../devices/virtio" }
 
-bootloader_api = "0.11.12"
-log = { version = "0.4.28", default-features = false }
+bootloader_api = "0.11.15"
+log = { version = "0.4.29", default-features = false }
 postcard = { version = "1.1.3", features = ["alloc"], default-features = false }
-x86_64 = "0.15.2"
+x86_64 = "0.15.4"
 iced-x86 = { version = "1.21.0", default-features = false, features = [
     "decoder",
     "encoder",
@@ -32,5 +32,5 @@ embedded-time = "0.12.1"
 disarm64 = "0.1.25"
 x86 = "0.52.0"
 linkme = "0.3.35"
-bitfields = "1.0.0"
-aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
+bitfields = "1.0.2"
+aarch64-paging = "0.11.0"

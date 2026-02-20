@@ -7,9 +7,9 @@ edition = "2024"
 common.workspace = true
 kernel.workspace = true
 
-log = { version = "0.4.28", default-features = false }
+log = { version = "0.4.29", default-features = false }
 spin = "0.10.0"
 x86 = "0.52.0"
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers.git", rev = "3967727", features = ["alloc"] }
 virtio-bindings = { git = "https://github.com/fmckeogh/vm-virtio", version = "0.2.5" }
-bitfields = "1.0.0"
+bitfields = "1.0.2"
