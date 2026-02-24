@@ -17,7 +17,10 @@ use {
     },
     alloc::vec::Vec,
     common::ktest,
-    core::cmp::{Ordering, min},
+    core::{
+        cmp::{Ordering, min},
+        panic,
+    },
     iced_x86::code_asm::es,
 };
 
@@ -1200,6 +1203,43 @@ fn encode_compare(
 
     let left_op = emitter.to_operand(&left);
     let right_op = emitter.to_operand(&right);
+
+    if let (Type::Floating(left_width), Type::Floating(right_width)) = (left.typ(), right.typ()) {
+        assert_eq!(left_width, right_width);
+
+        let width = left_op.width();
+
+        let dst = Operand::vreg_xmm(width, emitter.next_vreg());
+        emitter.push_instruction(Instruction::mov(left_op, dst).unwrap());
+
+        let predicate = match kind {
+            BinaryOperationKind::CompareEqual(_, _) => Operand::imm(Width::_8, 0),
+            BinaryOperationKind::CompareLessThan(_, _) => Operand::imm(Width::_8, 1),
+            k => todo!("{k:?}"),
+        };
+
+        emitter.push_instruction(Instruction::cmppd(right_op, dst, predicate));
+
+        // get lowest 8 bits of xmm register into gpr
+        let result = {
+            let mut lower_dst = dst;
+            lower_dst.set_width(Width::_64);
+
+            let mut tmp = Operand::vreg_general(Width::_64, emitter.next_vreg());
+
+            emitter.push_instruction(Instruction::movq(lower_dst, tmp).unwrap());
+
+            tmp.set_width(Width::_8);
+
+            tmp
+        };
+
+        // mask just to be safe
+        let mask = Operand::imm(Width::_8, 0x1);
+        emitter.push_instruction(Instruction::and(mask, result));
+
+        return result;
+    }
 
     // only valid compare instructions are (source-destination):
     // reg reg

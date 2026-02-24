@@ -387,12 +387,13 @@ impl<'a> X86TranslationContext {
             }
         }
 
-        log::trace!("encoding instructions");
+        log::debug!("encoding instructions");
         for (idx, instr) in instructions.iter().enumerate() {
             if let Some(instruction_label) = instruction_labels.get_mut(&idx) {
                 assembler.set_label(instruction_label).unwrap();
             }
 
+            log::debug!("{instr}");
             instr.encode(&mut assembler, &block_labels);
         }
 

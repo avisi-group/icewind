@@ -571,18 +571,31 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 width_in_bits: Width::_64,
             },
         ) => {
-            if *src == 0 {
-                assembler
-                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
-                    .unwrap();
-            } else if *src < i32::MAX as u64 {
-                assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
-                    .unwrap();
+            if dst.is_gpr() {
+                if *src == 0 {
+                    assembler
+                        .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                        .unwrap();
+                } else if *src < i32::MAX as u64 {
+                    assembler
+                        .mov::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                        .unwrap();
+                } else {
+                    assembler
+                        .mov::<AsmRegister64, u64>(dst.into(), *src)
+                        .unwrap();
+                }
             } else {
-                assembler
-                    .mov::<AsmRegister64, u64>(dst.into(), *src)
-                    .unwrap();
+                if *src == 0 {
+                    assembler
+                        .pxor::<AsmRegisterXmm, AsmRegisterXmm>(
+                            dst.try_into().unwrap(),
+                            dst.try_into().unwrap(),
+                        )
+                        .unwrap();
+                } else {
+                    panic!()
+                }
             }
         }
         // MOV I -> R

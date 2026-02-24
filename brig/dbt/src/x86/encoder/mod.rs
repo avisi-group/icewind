@@ -5,8 +5,8 @@ use {
             ARG_REGS, X86Block,
             encoder::{
                 instructions::{
-                    adc, add, and, cmp, jne, lea, mov, movq, movsx, movzx, not, or, setne, shl,
-                    shr, sub, test, xor,
+                    adc, add, and, cmovne, cmp, jne, lea, mov, movq, movsx, movzx, not, or, setne,
+                    shl, shr, sub, test, xor,
                 },
                 registers::{PhysicalRegister, Register, RegisterClass, SegmentRegister},
                 width::Width,
@@ -92,6 +92,8 @@ pub enum Opcode {
     SUBPD(Operand, Operand),
     /// subps {0}, {1},
     SUBPS(Operand, Operand),
+    /// cmppd {0}, {1}, {2}
+    CMPPD(Operand, Operand, Operand),
     /// cqo
     CQO,
     /// not {0}
@@ -710,6 +712,10 @@ impl Instruction {
         Self(Opcode::SUBPS(src, dst))
     }
 
+    pub fn cmppd(src: Operand, dst: Operand, predicate: Operand) -> Self {
+        Self(Opcode::CMPPD(src, dst, predicate))
+    }
+
     pub fn imul1(src: Operand, dst_lo: Operand, dst_hi: Operand) -> Self {
         Self(Opcode::IMUL1(src, dst_lo, dst_hi))
     }
@@ -917,7 +923,6 @@ impl Instruction {
             MOVSX(src, dst) => movsx::encode(assembler, src, dst),
             MOVQ(src, dst) => movq::encode(assembler, src, dst),
             SHL(amount, value) => shl::encode(assembler, amount, value),
-
             SHR(amount, value) => shr::encode(assembler, amount, value),
             AND(src, dst) => and::encode(assembler, src, dst),
             SETNE(dst) => setne::encode(assembler, dst),
@@ -930,6 +935,7 @@ impl Instruction {
             CMP(left, right) => cmp::encode(assembler, left, right),
             XOR(src, dst) => xor::encode(assembler, src, dst),
             NOT(dst) => not::encode(assembler, dst),
+            CMOVNE(src, dst) => cmovne::encode(assembler, src, dst),
 
             // control flow
             JNE(tgt) => jne::encode(assembler, label_map, tgt),
@@ -1236,34 +1242,7 @@ impl Instruction {
                     .cmove::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
-            CMOVNE(
-                Operand {
-                    kind: R(PHYS(src)),
-                    width_in_bits: Width::_64,
-                },
-                Operand {
-                    kind: R(PHYS(dst)),
-                    width_in_bits: Width::_64,
-                },
-            ) => {
-                assembler
-                    .cmovne::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
-                    .unwrap();
-            }
-            CMOVNE(
-                Operand {
-                    kind: R(PHYS(src)),
-                    width_in_bits: Width::_32,
-                },
-                Operand {
-                    kind: R(PHYS(dst)),
-                    width_in_bits: Width::_32,
-                },
-            ) => {
-                assembler
-                    .cmovne::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
-                    .unwrap();
-            }
+
             MULPD(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1664,6 +1643,27 @@ impl Instruction {
                 .cvtsi2sd::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
                 .unwrap(),
 
+            CMPPD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: I(predicate),
+                    width_in_bits: Width::_8,
+                },
+            ) => assembler
+                .cmppd::<AsmRegisterXmm, AsmRegisterXmm, i32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                    i32::try_from(*predicate).unwrap(),
+                )
+                .unwrap(),
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1702,6 +1702,12 @@ impl Instruction {
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
+            ]
+            .into_iter(),
+            Opcode::CMPPD(src, dst, predicate) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst)),
+                Some((OperandDirection::In, predicate)),
             ]
             .into_iter(),
             Opcode::MUL(src, dst_lo, dst_hi) => [
@@ -1834,6 +1840,13 @@ impl Instruction {
                     .into_iter()
                     .collect()
             }
+            Opcode::CMPPD(src, dst, predicate) => [
+                ((OperandDirection::In, src)),
+                ((OperandDirection::InOut, dst)),
+                ((OperandDirection::In, predicate)),
+            ]
+            .into_iter()
+            .collect(),
             Opcode::MUL(src, dst_lo, dst_hi) => [
                 (OperandDirection::In, src),
                 (OperandDirection::InOut, dst_lo),

@@ -1,6 +1,7 @@
 pub mod adc;
 pub mod add;
 pub mod and;
+pub mod cmovne;
 pub mod cmp;
 pub mod jne;
 pub mod lea;

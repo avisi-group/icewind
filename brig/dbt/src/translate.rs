@@ -286,6 +286,43 @@ pub fn translate(
         )));
     }
 
+    if function == "FPCompare" {
+        // bv op1, bv op2, bool signal_nans, FPCRType fpcr
+
+        let op1 = arguments[0].clone();
+        let op2 = arguments[1].clone();
+        // let _signal_nans = arguments[2].clone();
+        // let _fpcr = arguments[3].clone();
+
+        let width = op1.typ().width();
+        assert_eq!(width, op2.typ().width());
+        assert!(matches!(width, 64 | 32));
+
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let _0110 = emitter.constant(0b0110, Type::Unsigned(4));
+        let _1000 = emitter.constant(0b1000, Type::Unsigned(4));
+        let _0010 = emitter.constant(0b0010, Type::Unsigned(4));
+
+        //   if value1_name == value2_name then {
+        //             result = 0b0110
+        //         } else if value1_name < value2_name then {
+        //             result = 0b1000
+        //         } else {
+        //             result = 0b0010
+        //         };
+
+        let cmp_eq =
+            emitter.binary_operation(BinaryOperationKind::CompareEqual(op1.clone(), op2.clone()));
+        let cmp_lt = emitter.binary_operation(BinaryOperationKind::CompareLessThan(op1, op2));
+
+        let select_lt = emitter.select(cmp_lt, _1000, _0010);
+        let select_eq = emitter.select(cmp_eq, _0110, select_lt);
+
+        return Ok(Some(select_eq));
+    }
+
     let (is_sysreg, is_read) = match function {
         "AArch64_SysRegRead" => (true, true),
         "AArch64_SysRegWrite" => (true, false),
