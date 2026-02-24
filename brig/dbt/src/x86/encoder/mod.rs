@@ -90,6 +90,8 @@ pub enum Opcode {
     ADDPD(Operand, Operand),
     /// subpd {0}, {1},
     SUBPD(Operand, Operand),
+    /// divpd {0}, {1},
+    DIVPD(Operand, Operand),
     /// subps {0}, {1},
     SUBPS(Operand, Operand),
     /// cmppd {0}, {1}, {2}
@@ -708,6 +710,10 @@ impl Instruction {
         Self(Opcode::SUBPD(src, dst))
     }
 
+    pub fn divpd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::DIVPD(src, dst))
+    }
+
     pub fn subps(src: Operand, dst: Operand) -> Self {
         Self(Opcode::SUBPS(src, dst))
     }
@@ -1289,6 +1295,22 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            DIVPD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .divpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
             SUBPS(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1696,6 +1718,7 @@ impl Instruction {
             | Opcode::IMUL(src, dst)
             | Opcode::ADDPD(src, dst)
             | Opcode::SUBPD(src, dst)
+            | Opcode::DIVPD(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::MULPD(src, dst)
             | Opcode::PUNPCKL(src, dst) => [
@@ -1834,6 +1857,7 @@ impl Instruction {
             | Opcode::MULPD(src, dst)
             | Opcode::ADDPD(src, dst)
             | Opcode::SUBPD(src, dst)
+            | Opcode::DIVPD(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::PUNPCKL(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]

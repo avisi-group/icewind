@@ -7622,34 +7622,6 @@ fn fsub() {
     );
 }
 
-// #[ktest]
-// fn tbl() {
-//     let (model, register_file, mut ctx) = setup();
-//     let mut emitter = X86Emitter::new(&mut ctx);
-
-//     // 4e1a03ff        tbl     v31.16b, {v31.16b}, v26.16b
-//     translate_instruction(
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x4e1a03ff,
-//         0x0,
-//     )
-//     .unwrap();
-
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
-//     let translation = Translation::new(ctx.compile(num_regs));
-
-//     let v26_offset = usize::try_from(model.reg_offset("_Z") + 26 *
-// 256).unwrap();     let v30_offset = usize::try_from(model.reg_offset("_Z") +
-// 30 * 256).unwrap();     let v31_offset =
-// usize::try_from(model.reg_offset("_Z") + 31 * 256).unwrap();
-
-//     translation.execute(&register_file);
-// }
-
 #[ktest]
 fn fmov() {
     let (model, register_file, mut ctx) = setup();
@@ -7678,80 +7650,6 @@ fn fmov() {
 
     assert_eq!(register_file.read::<f32>("R0"), 0.97656789f32);
 }
-
-// #[ktest]
-// fn addv() {
-//     let (model, register_file, mut ctx) = setup();
-//     let mut emitter = X86Emitter::new(&mut ctx);
-
-//     // 0e31bbff        addv    b31, v31.8b
-//     // __DecodeA64_DataProcFPSIMD
-//     // decode_addv_advsimd_aarch64_instrs_vector_reduce_add_simd
-//     // execute_aarch64_instrs_vector_reduce_add_simd
-//     // Reduce__1
-//     translate_instruction(
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x0e31bbff,
-//         0x0,
-//     )
-//     .unwrap();
-
-//     emitter.leave();
-//     let num_regs = emitter.next_vreg();
-//     let translation = Translation::new(ctx.compile(num_regs));
-
-//     let z31_offset = usize::try_from(model.reg_offset("_Z") + 31 *
-// 256).unwrap();
-
-//     translation.execute(&register_file);
-// }
-
-// #[ktest]
-// fn ldr_not_mod8() {
-//     // (1251658ms) ERROR [brig] panicked at
-//     // dbt/src/x86/emitter/mod.rs:1559:21: assertion failed: (start_value %
-//     // 8) == 0
-
-//     // f94002e2        ldr     x2, [x23]
-
-//     todo!()
-// }
-
-// #[ktest]
-// fn ucvtf() {
-//     // 9e230061        ucvtf   s1, x3
-// }
-
-// #[ktest]
-// fn fcvt() {
-//     // 1e22c000        fcvt    d0, s0
-// }
-// #[ktest]
-// fn fcvtzs_w0_s19() {
-//     // 1e380260        fcvtzs  w0, s19
-// }
-
-// #[ktest]
-// fn fcvtzs_w1_d8() {
-//     let (model, register_file, mut ctx) = setup();
-//     let mut emitter = X86Emitter::new(&mut ctx);
-
-//     // 1e780101        fcvtzs  w1, d8
-//     // decode_fcvtzs_float_int_aarch64_instrs_float_convert_int
-//     // execute_aarch64_instrs_float_convert_int
-//     translate_instruction(
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x1e780101,
-//         0x0,
-//     )
-//     .unwrap();
-// }
 
 #[ktest]
 fn fcmpe_pos() {
@@ -7860,3 +7758,137 @@ fn fcmpe_neg() {
     assert_eq!(register_file.read::<u8>("PSTATE_C"), 1);
     assert_eq!(register_file.read::<u8>("PSTATE_V"), 0);
 }
+
+#[ktest]
+fn fdiv() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1e601920        fdiv    d0, d9, d0
+
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e601920,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z0_offset = usize::try_from(model.reg_offset("_Z") + 0 * 256).unwrap();
+    let z9_offset = usize::try_from(model.reg_offset("_Z") + 9 * 256).unwrap();
+
+    register_file.write_raw(z0_offset, -3.14f64);
+    register_file.write_raw(z9_offset, 1.11f64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(1.11 / -3.14f64, register_file.read_raw::<f64>(z0_offset));
+}
+
+// #[ktest]
+// fn tbl() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     // 4e1a03ff        tbl     v31.16b, {v31.16b}, v26.16b
+//     translate_instruction(
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x4e1a03ff,
+//         0x0,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
+
+//     let v26_offset = usize::try_from(model.reg_offset("_Z") + 26 *
+// 256).unwrap();     let v30_offset = usize::try_from(model.reg_offset("_Z") +
+// 30 * 256).unwrap();     let v31_offset =
+// usize::try_from(model.reg_offset("_Z") + 31 * 256).unwrap();
+
+//     translation.execute(&register_file);
+// }
+
+// #[ktest]
+// fn addv() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     // 0e31bbff        addv    b31, v31.8b
+//     // __DecodeA64_DataProcFPSIMD
+//     // decode_addv_advsimd_aarch64_instrs_vector_reduce_add_simd
+//     // execute_aarch64_instrs_vector_reduce_add_simd
+//     // Reduce__1
+//     translate_instruction(
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x0e31bbff,
+//         0x0,
+//     )
+//     .unwrap();
+
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
+
+//     let z31_offset = usize::try_from(model.reg_offset("_Z") + 31 *
+// 256).unwrap();
+
+//     translation.execute(&register_file);
+// }
+
+// #[ktest]
+// fn ldr_not_mod8() {
+//     // (1251658ms) ERROR [brig] panicked at
+//     // dbt/src/x86/emitter/mod.rs:1559:21: assertion failed: (start_value %
+//     // 8) == 0
+
+//     // f94002e2        ldr     x2, [x23]
+
+//     todo!()
+// }
+
+// #[ktest]
+// fn ucvtf() {
+//     // 9e230061        ucvtf   s1, x3
+// }
+
+// #[ktest]
+// fn fcvt() {
+//     // 1e22c000        fcvt    d0, s0
+// }
+// #[ktest]
+// fn fcvtzs_w0_s19() {
+//     // 1e380260        fcvtzs  w0, s19
+// }
+
+// #[ktest]
+// fn fcvtzs_w1_d8() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     // 1e780101        fcvtzs  w1, d8
+//     // decode_fcvtzs_float_int_aarch64_instrs_float_convert_int
+//     // execute_aarch64_instrs_float_convert_int
+//     translate_instruction(
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x1e780101,
+//         0x0,
+//     )
+//     .unwrap();
+// }

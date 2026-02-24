@@ -979,6 +979,9 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             BinaryOperationKind::Sub(_, _) => {
                                 self.push_instruction(Instruction::subpd(right, dst));
                             }
+                            BinaryOperationKind::Divide(_, _) => {
+                                self.push_instruction(Instruction::divpd(right, dst));
+                            }
                             _ => todo!(),
                         }
                     } else if left_width == 32 {
