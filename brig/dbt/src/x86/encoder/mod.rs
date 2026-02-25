@@ -48,6 +48,9 @@ pub enum Opcode {
     /// cvtsi2sd {0}, {1}
     CVTSI2SD(Operand, Operand),
 
+    /// cvtsi2ss {0}, {1}
+    CVTSI2SS(Operand, Operand),
+
     /// lea {0}, {1}
     LEA(Operand, Operand),
     /// shl {0}, {1}
@@ -891,6 +894,9 @@ impl Instruction {
     pub fn cvtsi2sd(src: Operand, dest: Operand) -> Self {
         Self(Opcode::CVTSI2SD(src, dest))
     }
+    pub fn cvtsi2ss(src: Operand, dest: Operand) -> Self {
+        Self(Opcode::CVTSI2SS(src, dest))
+    }
 
     pub fn cmovne(src: Operand, dest: Operand) -> Self {
         Self(Opcode::CMOVNE(src, dest))
@@ -1665,6 +1671,19 @@ impl Instruction {
                 .cvtsi2sd::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
                 .unwrap(),
 
+            CVTSI2SS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .cvtsi2ss::<AsmRegisterXmm, AsmRegister32>(dst.try_into().unwrap(), src.into())
+                .unwrap(),
+
             CMPPD(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1701,7 +1720,8 @@ impl Instruction {
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
             | Opcode::CMOVNE(src, dst)
-            | Opcode::CVTSI2SD(src, dst) => [
+            | Opcode::CVTSI2SD(src, dst)
+            | Opcode::CVTSI2SS(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
                 None,
@@ -1840,7 +1860,8 @@ impl Instruction {
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
             | Opcode::CMOVNE(src, dst)
-            | Opcode::CVTSI2SD(src, dst) => {
+            | Opcode::CVTSI2SD(src, dst)
+            | Opcode::CVTSI2SS(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::Out, dst)]
                     .into_iter()
                     .collect()

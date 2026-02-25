@@ -367,16 +367,25 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::movzx(src, dst).unwrap())
                         }
                         RegisterClass::Xmm => {
-                            let intermediate = if src.width() < Width::_64 {
-                                let intermediate =
-                                    Operand::vreg_general(Width::_64, self.next_vreg());
-                                self.push_instruction(
-                                    Instruction::movzx(src, intermediate).unwrap(),
-                                );
-                                intermediate
-                            } else {
-                                src
-                            };
+                            let intermediate =
+                                if let Some(RegisterClass::Xmm) = src.register_class() {
+                                    let mut intermediate = src.clone();
+                                    intermediate.set_width(dst.width());
+                                    intermediate
+                                } else {
+                                    if src.width() < Width::_64 {
+                                        let intermediate =
+                                            Operand::vreg_general(Width::_64, self.next_vreg());
+                                        self.push_instruction(
+                                            Instruction::movzx(src, intermediate).unwrap_or_else(
+                                                |e| panic!("{e:?} {src:?} {:?}", node.typ()),
+                                            ),
+                                        );
+                                        intermediate
+                                    } else {
+                                        src
+                                    }
+                                };
 
                             match (
                                 intermediate.width() == dst.width(),
@@ -426,7 +435,13 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::cvtsi2sd(src, dst));
                             return dst;
                         }
-                        _ => todo!(),
+                        (Type::Floating(32), Type::Unsigned(32)) => {
+                            let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
+                            // self.push_instruction(Instruction::xor(dst, dst));
+                            self.push_instruction(Instruction::cvtsi2ss(src, dst));
+                            return dst;
+                        }
+                        (dst_type, src_type) => todo!("{src_type:?} -> {dst_type:?}"),
                     },
                     (Truncate, Greater) => {
                         // normal case, just access src as a smaller register
