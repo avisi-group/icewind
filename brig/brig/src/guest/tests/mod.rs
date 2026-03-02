@@ -7791,6 +7791,105 @@ fn fdiv() {
     assert_eq!(1.11 / -3.14f64, register_file.read_raw::<f64>(z0_offset));
 }
 
+#[ktest]
+fn gcc_segfault_str() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // b9008801        str     w1, [x0, #136]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xb9008801,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+    log::error!("{translation:?}");
+
+    let mut mem = Box::new(0u32);
+
+    register_file.write("R0", ((&mut *mem as *mut u32) as u64) - 136);
+    register_file.write("R1", 0xbee5_abcdu32);
+
+    translation.execute(&register_file);
+
+    assert_eq!(*mem, 0xbee5_abcdu32);
+}
+
+#[ktest]
+fn gcc_segfault_sequence() {
+    //  c45f2c:       b9408802        ldr     w2, [x0, #136]
+    //  c45f30:       b9400003        ldr     w3, [x0]
+    //  c45f34:       51000441        sub     w1, w2, #0x1
+    //  c45f38:       2a020021        orr     w1, w1, w2
+    //  c45f3c:       b9008801        str     w1, [x0, #136]
+
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xb9408802,
+        0x0,
+    )
+    .unwrap();
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xb9400003,
+        0x0,
+    )
+    .unwrap();
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x51000441,
+        0x0,
+    )
+    .unwrap();
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x2a020021,
+        0x0,
+    )
+    .unwrap();
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xb9008801,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut data = alloc::vec![0u8; 140];
+
+    register_file.write("R0", data.as_mut_ptr() as u64);
+
+    translation.execute(&register_file);
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();
