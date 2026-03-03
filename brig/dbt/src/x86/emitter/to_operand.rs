@@ -428,27 +428,40 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                         panic!("cannot zero extend when src ({src}) is larger than dst ({dst})")
                     }
 
-                    (Convert, _) => match (node.typ(), value.typ()) {
-                        (Type::Floating(64), Type::Signed(64)) => {
+                    (Convert, _) => match (value.typ(), node.typ()) {
+                        (Type::Signed(64), Type::Floating(64)) => {
                             let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
-                            // self.push_instruction(Instruction::xor(dst, dst));
                             self.push_instruction(Instruction::cvtsi2sd(src, dst));
                             return dst;
                         }
-                        (Type::Floating(32), Type::Unsigned(32)) => {
+                        (Type::Signed(32), Type::Floating(64)) => {
+                            let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsi2sd(src, dst));
+                            return dst;
+                        }
+                        (Type::Unsigned(32), Type::Floating(32)) => {
                             let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
-                            // self.push_instruction(Instruction::xor(dst, dst));
                             self.push_instruction(Instruction::cvtsi2ss(src, dst));
                             return dst;
                         }
-                        (Type::Signed(32), Type::Floating(64)) => {
+                        (Type::Floating(64), Type::Signed(32)) => {
                             let dst = Operand::vreg_general(Width::_32, self.next_vreg());
-                            // self.push_instruction(Instruction::xor(dst, dst));
                             self.push_instruction(Instruction::cvtsds2i(src, dst));
                             return dst;
                         }
+                        (Type::Floating(32), Type::Floating(64)) => {
+                            let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::cvtss2sd(src, dst));
+                            return dst;
+                        }
 
-                        (dst_type, src_type) => todo!("{src_type:?} -> {dst_type:?}"),
+                        (Type::Floating(64), Type::Floating(32)) => {
+                            let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsd2ss(src, dst));
+                            return dst;
+                        }
+
+                        (src_type, dst_type) => todo!("{src_type:?} -> {dst_type:?}"),
                     },
                     (Truncate, Greater) => {
                         // normal case, just access src as a smaller register

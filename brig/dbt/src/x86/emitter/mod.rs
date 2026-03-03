@@ -1556,7 +1556,9 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         _ => todo!("{typ:?}"),
                     };
 
-                    assert!((start_value % 8) == 0);
+                    if (start_value % 8) != 0 {
+                        panic!("{offset:x} {length:x} {start_value}")
+                    }
 
                     self.read_register(*offset + (start_value / 8), new_typ)
                 } else {

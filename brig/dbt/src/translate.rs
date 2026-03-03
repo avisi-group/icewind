@@ -363,6 +363,29 @@ pub fn translate(
         return Ok(Some(select_eq));
     }
 
+    if function == "FPConvert" {
+        // op: bv, fpcr_bits: u64, rounding: i32, M: i64
+        let op = arguments[0].clone();
+        let source_width = op.typ().width();
+
+        let NodeKind::Constant {
+            value: target_width,
+            ..
+        } = arguments[3].kind()
+        else {
+            panic!()
+        };
+        let target_width = u32::try_from(*target_width).unwrap();
+
+        let op_float = emitter.cast(op, Type::Floating(source_width), CastOperationKind::Convert);
+
+        return Ok(Some(emitter.cast(
+            op_float,
+            Type::Floating(target_width),
+            CastOperationKind::Convert,
+        )));
+    }
+
     if function == "FPDiv" {
         let op1 = arguments[0].clone();
         let op2 = arguments[1].clone();
