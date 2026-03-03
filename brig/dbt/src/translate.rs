@@ -165,12 +165,52 @@ pub fn translate(
     }
 
     if function == "FPToFixed" {
-        let NodeKind::Constant { value: size, .. } = arguments[5].kind() else {
+        // op: bv,
+        // fbits: int
+        // is_unsigned: u1
+        // fpcr_bits: u64
+        // rounding: i32
+        // M: i64
+        let NodeKind::Constant {
+            value: is_unsigned, ..
+        } = arguments[2].kind()
+        else {
             panic!()
         };
-        let float = arguments[0].clone();
+        let is_unsigned = *is_unsigned != 0;
 
-        panic!("{:?}", float.kind());
+        let target_type = {
+            let NodeKind::Constant {
+                value: target_size, ..
+            } = arguments[5].kind()
+            else {
+                panic!()
+            };
+
+            let target_size = u32::try_from(*target_size).unwrap();
+
+            if is_unsigned {
+                Type::Unsigned(target_size)
+            } else {
+                Type::Signed(target_size)
+            }
+        };
+
+        let float_bv = arguments[0].clone();
+
+        let float_size = float_bv.typ().width();
+
+        let float = emitter.cast(
+            float_bv,
+            Type::Floating(float_size),
+            CastOperationKind::Reinterpret,
+        );
+
+        return Ok(Some(emitter.cast(
+            float,
+            target_type,
+            CastOperationKind::Convert,
+        )));
     }
 
     if function == "FixedToFP" {

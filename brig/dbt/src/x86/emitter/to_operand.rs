@@ -441,6 +441,13 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::cvtsi2ss(src, dst));
                             return dst;
                         }
+                        (Type::Signed(32), Type::Floating(64)) => {
+                            let dst = Operand::vreg_general(Width::_32, self.next_vreg());
+                            // self.push_instruction(Instruction::xor(dst, dst));
+                            self.push_instruction(Instruction::cvtsds2i(src, dst));
+                            return dst;
+                        }
+
                         (dst_type, src_type) => todo!("{src_type:?} -> {dst_type:?}"),
                     },
                     (Truncate, Greater) => {

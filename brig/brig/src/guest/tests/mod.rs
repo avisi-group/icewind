@@ -7890,6 +7890,37 @@ fn gcc_segfault_sequence() {
     translation.execute(&register_file);
 }
 
+#[ktest]
+fn fcvtzs_w1_d0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // fcvtzs  w1, d0
+    // decode_fcvtzs_float_int_aarch64_instrs_float_convert_int
+    // execute_aarch64_instrs_float_convert_int
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e780001,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("_Z", 3.14159f64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<i32>("R1"), 3);
+
+    register_file.write("_Z", -3141.59f64);
+    translation.execute(&register_file);
+    assert_eq!(register_file.read::<i32>("R1"), -3142);
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();
