@@ -686,28 +686,52 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     Width::from_uncanonicalized(pattern_width * u32::try_from(count).unwrap())
                         .unwrap();
 
-                // zero extend pattern if necessary
-                let pattern = if pattern.width() != destination_width {
-                    let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
-                    self.push_instruction(Instruction::movzx(pattern, pattern_zx).unwrap());
-                    pattern_zx
+                if destination_width > Width::_64 {
+                    match (destination_width, pattern.width(), count) {
+                        (Width::_128, Width::_16, 8) => {
+                            // https://stackoverflow.com/questions/56991672/broadcast-a-word-to-an-xmm-register
+
+                            let mut pattern_xmm = Operand::vreg_xmm(Width::_16, self.next_vreg());
+                            self.push_instruction(Instruction::movd(pattern, pattern_xmm).unwrap());
+                            pattern_xmm.set_width(Width::_128);
+
+                            //pshuflw   xmm0, xmm0, 0
+                            self.push_instruction(Instruction::pshuflw(
+                                pattern_xmm,
+                                pattern_xmm,
+                                Operand::imm(Width::_8, 0),
+                            ));
+
+                            // punpcklwd xmm0, xmm0
+                            self.push_instruction(Instruction::punpcklwd(pattern_xmm, pattern_xmm));
+
+                            pattern_xmm
+                        }
+                        (d, p, c) => todo!("{d:?} {p:?} {c}"),
+                    }
                 } else {
-                    pattern
-                };
+                    // zero extend pattern if necessary
+                    let pattern = if pattern.width() != destination_width {
+                        let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
+                        self.push_instruction(Instruction::movzx(pattern, pattern_zx).unwrap());
+                        pattern_zx
+                    } else {
+                        pattern
+                    };
 
-                let dest = Operand::vreg(destination_width, self.next_vreg());
+                    let dest = Operand::vreg(destination_width, self.next_vreg());
 
-                self.push_instruction(Instruction::mov(pattern, dest).unwrap());
+                    self.push_instruction(Instruction::mov(pattern, dest).unwrap());
 
-                for _ in 1..count {
-                    self.push_instruction(Instruction::shl(
-                        Operand::imm(Width::_8, u64::from(pattern_width)),
-                        dest,
-                    ));
-                    self.push_instruction(Instruction::or(pattern, dest));
+                    for _ in 1..count {
+                        self.push_instruction(Instruction::shl(
+                            Operand::imm(Width::_8, u64::from(pattern_width)),
+                            dest,
+                        ));
+                        self.push_instruction(Instruction::or(pattern, dest));
+                    }
+                    dest
                 }
-
-                dest
             }
             NodeKind::GetFlags { .. } => {
                 panic!("handled by addwithcarry specialization");

@@ -7921,6 +7921,38 @@ fn fcvtzs_w1_d0() {
     assert_eq!(register_file.read::<i32>("R1"), -3142);
 }
 
+#[ktest]
+fn ld1r() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 4d40c700        ld1r    {v0.8h}, [x24]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4d40c700,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mut mem = Box::new(0xbee5u16);
+
+    register_file.write("R24", &mut *mem as *mut u16 as u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        unsafe { core::mem::transmute::<_, [u16; 8]>(register_file.read::<[u8; 16]>("_Z")) },
+        [0xbee5u16; 8]
+    )
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();
@@ -8010,15 +8042,5 @@ fn fcvtzs_w1_d0() {
 //     let mut emitter = X86Emitter::new(&mut ctx);
 
 //     // 1e780101        fcvtzs  w1, d8
-//     // decode_fcvtzs_float_int_aarch64_instrs_float_convert_int
-//     // execute_aarch64_instrs_float_convert_int
-//     translate_instruction(
-//         &*model,
-//         "__DecodeA64",
-//         &mut emitter,
-//         &register_file,
-//         0x1e780101,
-//         0x0,
-//     )
-//     .unwrap();
+
 // }

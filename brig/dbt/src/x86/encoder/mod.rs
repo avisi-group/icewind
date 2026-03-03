@@ -5,8 +5,8 @@ use {
             ARG_REGS, X86Block,
             encoder::{
                 instructions::{
-                    adc, add, and, cmovne, cmp, jne, lea, mov, movq, movsx, movzx, not, or, setne,
-                    shl, shr, sub, test, xor,
+                    adc, add, and, cmovne, cmp, jne, lea, mov, movd, movq, movsx, movzx, not, or,
+                    setne, shl, shr, sub, test, xor,
                 },
                 registers::{PhysicalRegister, Register, RegisterClass, SegmentRegister},
                 width::Width,
@@ -37,17 +37,16 @@ pub enum Opcode {
     MOVSX(Operand, Operand),
     /// movq {0}, {1}
     MOVQ(Operand, Operand),
+    /// movd {0}, {1}
+    MOVD(Operand, Operand),
     /// cmove {0}, {1}
     CMOVE(Operand, Operand),
     /// cmovne {0}, {1}
     CMOVNE(Operand, Operand),
-
     /// cmpxchg {0}, {1}
     CMPXCHG(Operand, Operand),
-
     /// cvtsi2sd {0}, {1}
     CVTSI2SD(Operand, Operand),
-
     /// cvtsi2ss {0}, {1}
     CVTSI2SS(Operand, Operand),
     /// cvtsd2si {0}, {1}
@@ -114,6 +113,10 @@ pub enum Opcode {
     PINSR(Operand, Operand, Operand),
     /// punpckl {0}, {1}
     PUNPCKL(Operand, Operand),
+    /// punpcklwd {0}, {1}
+    PUNPCKLWD(Operand, Operand),
+    /// pshuflw {0}, {1}, {2}
+    PSHUFLW(Operand, Operand, Operand),
     /// jmp {0}
     JMP(Operand),
     /// push {0}
@@ -667,6 +670,18 @@ impl Instruction {
         Ok(Self(Opcode::MOVZX(src, dst)))
     }
 
+    pub fn movd(src: Operand, dst: Operand) -> Result<Self, Error> {
+        if src.register_class() == dst.register_class() {
+            return Err(Error::MovdSameClass(src.register_class()));
+        }
+
+        if src.width() != dst.width() {
+            return Err(Error::MovdDifferentWidths(src.width(), dst.width()));
+        }
+
+        Ok(Self(Opcode::MOVD(src, dst)))
+    }
+
     pub fn movq(src: Operand, dst: Operand) -> Result<Self, Error> {
         if src.register_class() == dst.register_class() {
             return Err(Error::MovqSameClass(src.register_class()));
@@ -776,6 +791,14 @@ impl Instruction {
 
     pub fn punpckl(src: Operand, dst: Operand) -> Self {
         Self(Opcode::PUNPCKL(src, dst))
+    }
+
+    pub fn pshuflw(src: Operand, dst: Operand, select: Operand) -> Self {
+        Self(Opcode::PSHUFLW(src, dst, select))
+    }
+
+    pub fn punpcklwd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::PUNPCKLWD(src, dst))
     }
 
     pub fn pinsr(index: Operand, src: Operand, dst: Operand) -> Self {
@@ -937,6 +960,7 @@ impl Instruction {
             MOV(src, dst) => mov::encode(assembler, src, dst),
             MOVZX(src, dst) => movzx::encode(assembler, src, dst),
             MOVSX(src, dst) => movsx::encode(assembler, src, dst),
+            MOVD(src, dst) => movd::encode(assembler, src, dst),
             MOVQ(src, dst) => movq::encode(assembler, src, dst),
             SHL(amount, value) => shl::encode(assembler, amount, value),
             SHR(amount, value) => shr::encode(assembler, amount, value),
@@ -1574,6 +1598,43 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            PUNPCKLWD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => assembler
+                .punpcklwd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
+            PSHUFLW(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: I(0),
+                    width_in_bits: Width::_8,
+                },
+            ) => assembler
+                .pshuflw::<AsmRegisterXmm, AsmRegisterXmm, i32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                    0,
+                )
+                .unwrap(),
+
             CMPXCHG(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1734,6 +1795,7 @@ impl Instruction {
             | Opcode::MOVZX(src, dst)
             | Opcode::MOVSX(src, dst)
             | Opcode::MOVQ(src, dst)
+            | Opcode::MOVD(src, dst)
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
             | Opcode::CMOVNE(src, dst)
@@ -1759,13 +1821,14 @@ impl Instruction {
             | Opcode::DIVPD(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::MULPD(src, dst)
-            | Opcode::PUNPCKL(src, dst) => [
+            | Opcode::PUNPCKL(src, dst)
+            | Opcode::PUNPCKLWD(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
             ]
             .into_iter(),
-            Opcode::CMPPD(src, dst, predicate) => [
+            Opcode::CMPPD(src, dst, predicate) | Opcode::PSHUFLW(src, dst, predicate) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 Some((OperandDirection::In, predicate)),
@@ -1875,6 +1938,7 @@ impl Instruction {
             | Opcode::MOVZX(src, dst)
             | Opcode::MOVSX(src, dst)
             | Opcode::MOVQ(src, dst)
+            | Opcode::MOVD(src, dst)
             | Opcode::LEA(src, dst)
             | Opcode::CMOVE(src, dst)
             | Opcode::CMOVNE(src, dst)
@@ -1899,12 +1963,13 @@ impl Instruction {
             | Opcode::SUBPD(src, dst)
             | Opcode::DIVPD(src, dst)
             | Opcode::SUBPS(src, dst)
-            | Opcode::PUNPCKL(src, dst) => {
+            | Opcode::PUNPCKL(src, dst)
+            | Opcode::PUNPCKLWD(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
                     .into_iter()
                     .collect()
             }
-            Opcode::CMPPD(src, dst, predicate) => [
+            Opcode::CMPPD(src, dst, predicate) | Opcode::PSHUFLW(src, dst, predicate) => [
                 ((OperandDirection::In, src)),
                 ((OperandDirection::InOut, dst)),
                 ((OperandDirection::In, predicate)),
@@ -2142,6 +2207,10 @@ pub enum Error {
     MovqSameClass(Option<RegisterClass>),
     /// Cannot movq between the same register class, src: {0}, dst: {0}
     MovqDifferentWidths(Width, Width),
+    /// Cannot movd between the same register class ({0:?})
+    MovdSameClass(Option<RegisterClass>),
+    /// Cannot movd between the same register class, src: {0}, dst: {0}
+    MovdDifferentWidths(Width, Width),
     /// Cannot mov between different register classes, src: {0}, dst: {0}
     MovDifferentClass(RegisterClass, RegisterClass),
 }
