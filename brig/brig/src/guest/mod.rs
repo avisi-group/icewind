@@ -27,13 +27,9 @@ use {
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
     iced_x86::{Formatter, Instruction},
-    kernel::{
-        arch::x86::memory::VirtualMemoryArea, devices::virtio::block::DeviceFunction,
-        fs::Filesystem,
-    },
+    kernel::{arch::x86::memory::VirtualMemoryArea, fs::Filesystem},
     pl011::Pl011,
     spin::Mutex,
-    virtio::devices::block::{VirtioBlock, new_virtio_block},
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
@@ -232,13 +228,7 @@ pub fn linux_platform() -> Guest {
     addrspace.add_region(AddressSpaceRegion::new(
         "ram0".into(),
         0x8000_0000,
-        1024 * 1024 * 1024,
-        AddressSpaceRegionKind::Ram,
-    ));
-    addrspace.add_region(AddressSpaceRegion::new(
-        "ram1".into(),
-        0xdead_b000,
-        4096,
+        0x8000_0000, // todo pull from DTS
         AddressSpaceRegionKind::Ram,
     ));
     addrspace.add_region(AddressSpaceRegion::new(

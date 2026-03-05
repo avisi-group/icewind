@@ -21,8 +21,10 @@ impl AddressSpace {
         }
     }
 
+    // TODO MAKE SURE THEY DONT OVERLAP!!!!!
     pub fn add_region(&mut self, region: AddressSpaceRegion) {
         log::trace!("addr-space: adding region {}", region);
+
         self.regions.insert(region.base, region);
     }
 

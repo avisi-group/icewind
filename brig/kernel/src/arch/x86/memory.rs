@@ -25,7 +25,8 @@ use {
     },
 };
 
-pub const GUEST_PHYSICAL_SIZE: u64 = 8 * 1024 * 1024 * 1024;
+/// 32 GiB
+pub const GUEST_PHYSICAL_SIZE: u64 = 0x8_0000_0000;
 
 pub const _LOW_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0x0000_0000_0000_0000);
 pub const LOW_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x0000_7fff_ffff_ffff);
@@ -36,8 +37,8 @@ pub const GUEST_PHYSICAL_START: VirtAddr = VirtAddr::new_truncate(0xffff_9000_00
 pub const GUEST_PHYSICAL_END: VirtAddr =
     VirtAddr::new_truncate(0xffff_9000_0000_0000 + GUEST_PHYSICAL_SIZE);
 
-pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START: PhysAddr = PhysAddr::new(0x40_0000_0000); // 256 GB
-pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END: PhysAddr = PhysAddr::new(0x50_0000_0000);
+pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START: PhysAddr = PhysAddr::new(0x40_0000_0000); // 0x0 + 256 GiB
+pub const VIRT_GUEST_EMULATED_GUEST_PHYSICAL_END: PhysAddr = PhysAddr::new(0x50_0000_0000); // start + 64 GiB
 
 pub fn guest_physical_to_host_virt(guest_physical: u64) -> VirtAddr {
     GUEST_PHYSICAL_START + guest_physical
