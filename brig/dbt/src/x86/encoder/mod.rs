@@ -54,6 +54,8 @@ pub enum Opcode {
     CVTSI2SS(Operand, Operand),
     /// cvtsd2si {0}, {1}
     CVTSD2SI(Operand, Operand),
+    /// cvtss2si {0}, {1}
+    CVTSS2SI(Operand, Operand),
     /// cvtss2sd {0}, {1}
     CVTSS2SD(Operand, Operand),
     /// cvtsd2ss {0}, {1}
@@ -100,6 +102,8 @@ pub enum Opcode {
     MULPS(Operand, Operand),
     /// addpd {0}, {1},
     ADDPD(Operand, Operand),
+    /// addps {0}, {1},
+    ADDPS(Operand, Operand),
     /// subpd {0}, {1},
     SUBPD(Operand, Operand),
     /// divpd {0}, {1},
@@ -756,6 +760,10 @@ impl Instruction {
         Self(Opcode::SUBPS(src, dst))
     }
 
+    pub fn addps(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::ADDPS(src, dst))
+    }
+
     pub fn cmppd(src: Operand, dst: Operand, predicate: Operand) -> Self {
         Self(Opcode::CMPPD(src, dst, predicate))
     }
@@ -944,12 +952,15 @@ impl Instruction {
     pub fn cvtsi2ss(src: Operand, dest: Operand) -> Self {
         Self(Opcode::CVTSI2SS(src, dest))
     }
-    pub fn cvtsds2i(src: Operand, dest: Operand) -> Self {
+    pub fn cvtsd2si(src: Operand, dest: Operand) -> Self {
         Self(Opcode::CVTSD2SI(src, dest))
     }
 
     pub fn cvtss2sd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::CVTSS2SD(src, dst))
+    }
+    pub fn cvtss2si(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::CVTSS2SI(src, dst))
     }
 
     pub fn cvtsd2ss(src: Operand, dst: Operand) -> Self {
@@ -1400,6 +1411,21 @@ impl Instruction {
                 },
             ) => assembler
                 .addpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+            ADDPS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .addps::<AsmRegisterXmm, AsmRegisterXmm>(
                     dst.try_into().unwrap(),
                     src.try_into().unwrap(),
                 )
@@ -1940,6 +1966,22 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            CVTSS2SI(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .cvtss2si::<AsmRegister32, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
             CVTSD2SS(
                 Operand {
                     kind: R(PHYS(src)),
@@ -2018,6 +2060,7 @@ impl Instruction {
             | Opcode::CVTSI2SS(src, dst)
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
+            | Opcode::CVTSS2SI(src, dst)
             | Opcode::CVTSD2SS(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
@@ -2034,6 +2077,7 @@ impl Instruction {
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
             | Opcode::ADDPD(src, dst)
+            | Opcode::ADDPS(src, dst)
             | Opcode::SUBPD(src, dst)
             | Opcode::DIVPD(src, dst)
             | Opcode::DIVPS(src, dst)
@@ -2167,6 +2211,7 @@ impl Instruction {
             | Opcode::CVTSI2SS(src, dst)
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
+            | Opcode::CVTSS2SI(src, dst)
             | Opcode::CVTSD2SS(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::Out, dst)]
                     .into_iter()
@@ -2184,6 +2229,7 @@ impl Instruction {
             | Opcode::MULPD(src, dst)
             | Opcode::MULPS(src, dst)
             | Opcode::ADDPD(src, dst)
+            | Opcode::ADDPS(src, dst)
             | Opcode::SUBPD(src, dst)
             | Opcode::DIVPD(src, dst)
             | Opcode::DIVPS(src, dst)

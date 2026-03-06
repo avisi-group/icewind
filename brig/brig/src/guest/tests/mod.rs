@@ -8072,6 +8072,48 @@ fn fcmpe_single() {
     let translation = Translation::new(ctx.compile(num_regs));
 }
 
+#[ktest]
+fn fadd_single() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1e212800        fadd    s0, s0, s1
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e212800,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
+#[ktest]
+fn fdiv_single() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1e201900        fdiv    s0, s8, s0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e201900,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();

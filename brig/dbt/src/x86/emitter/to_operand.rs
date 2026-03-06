@@ -364,6 +364,18 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     }
                     (ZeroExtend, Less) => match dst.register_class().unwrap() {
                         RegisterClass::General => {
+                            let src = if src.register_class() == Some(RegisterClass::Xmm) {
+                                let src_gen = Operand::vreg_general(src.width(), self.next_vreg());
+
+                                if src.width() == Width::_32 {
+                                    self.push_instruction(Instruction::movd(src, src_gen).unwrap());
+                                    src_gen
+                                } else {
+                                    todo!()
+                                }
+                            } else {
+                                src
+                            };
                             self.push_instruction(Instruction::movzx(src, dst).unwrap())
                         }
                         RegisterClass::Xmm => {
@@ -439,6 +451,11 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::cvtsi2sd(src, dst));
                             return dst;
                         }
+                        (Type::Signed(32), Type::Floating(32)) => {
+                            let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsi2ss(src, dst));
+                            return dst;
+                        }
                         (Type::Unsigned(32), Type::Floating(32)) => {
                             let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
                             self.push_instruction(Instruction::cvtsi2ss(src, dst));
@@ -451,12 +468,17 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                         }
                         (Type::Floating(64), Type::Signed(32)) => {
                             let dst = Operand::vreg_general(Width::_32, self.next_vreg());
-                            self.push_instruction(Instruction::cvtsds2i(src, dst));
+                            self.push_instruction(Instruction::cvtsd2si(src, dst));
                             return dst;
                         }
                         (Type::Floating(32), Type::Floating(64)) => {
                             let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
                             self.push_instruction(Instruction::cvtss2sd(src, dst));
+                            return dst;
+                        }
+                        (Type::Floating(32), Type::Signed(32)) => {
+                            let dst = Operand::vreg_general(Width::_32, self.next_vreg());
+                            self.push_instruction(Instruction::cvtss2si(src, dst));
                             return dst;
                         }
 
@@ -661,6 +683,15 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                         if target_op.width() == Width::_64 {
                             panic!("{index} {source} {target_op} {target:#?}");
                         }
+
+                        let source = if source.register_class().unwrap() == RegisterClass::Xmm {
+                            let source_gpr =
+                                Operand::vreg_general(source.width(), self.next_vreg());
+                            self.push_instruction(Instruction::movd(source, source_gpr).unwrap());
+                            source_gpr
+                        } else {
+                            source
+                        };
 
                         self.push_instruction(Instruction::pinsr(index, source, target_op));
 
@@ -1058,6 +1089,9 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             }
                             BinaryOperationKind::Multiply(_, _) => {
                                 self.push_instruction(Instruction::mulps(right, dst));
+                            }
+                            BinaryOperationKind::Add(_, _) => {
+                                self.push_instruction(Instruction::addps(right, dst));
                             }
                             op => todo!("{op:?}"),
                         }
