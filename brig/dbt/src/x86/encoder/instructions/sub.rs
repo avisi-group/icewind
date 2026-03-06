@@ -61,6 +61,24 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .sub::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap();
+        }
+        // SUB R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
                 width_in_bits: Width::_64,
             },
             Operand {
