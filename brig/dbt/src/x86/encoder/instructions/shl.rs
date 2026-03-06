@@ -23,11 +23,17 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             if *amount >= 8 {
                 assembler
-                    .xor::<AsmRegister8, AsmRegister8>(value.into(), value.into())
+                    .xor::<AsmRegister8, AsmRegister8>(
+                        value.try_into().unwrap(),
+                        value.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .shl::<AsmRegister8, u32>(
+                        value.try_into().unwrap(),
+                        u32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -42,11 +48,17 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             if *amount >= 16 {
                 assembler
-                    .xor::<AsmRegister16, AsmRegister16>(value.into(), value.into())
+                    .xor::<AsmRegister16, AsmRegister16>(
+                        value.try_into().unwrap(),
+                        value.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .shl::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .shl::<AsmRegister16, u32>(
+                        value.try_into().unwrap(),
+                        u32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -61,11 +73,17 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             if *amount >= 32 {
                 assembler
-                    .xor::<AsmRegister32, AsmRegister32>(value.into(), value.into())
+                    .xor::<AsmRegister32, AsmRegister32>(
+                        value.try_into().unwrap(),
+                        value.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .shl::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .shl::<AsmRegister32, u32>(
+                        value.try_into().unwrap(),
+                        u32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -80,11 +98,17 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             if *amount >= 64 {
                 assembler
-                    .xor::<AsmRegister64, AsmRegister64>(value.into(), value.into())
+                    .xor::<AsmRegister64, AsmRegister64>(
+                        value.try_into().unwrap(),
+                        value.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .shl::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .shl::<AsmRegister64, u32>(
+                        value.try_into().unwrap(),
+                        u32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -116,7 +140,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shl::<AsmRegister64, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
+                .shl::<AsmRegister64, AsmRegister8>(
+                    value.try_into().unwrap(),
+                    PhysicalRegister::RCX.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -130,7 +157,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shl::<AsmRegister32, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
+                .shl::<AsmRegister32, AsmRegister8>(
+                    value.try_into().unwrap(),
+                    PhysicalRegister::RCX.try_into().unwrap(),
+                )
                 .unwrap();
         }
 

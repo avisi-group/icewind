@@ -28,11 +28,17 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
             if src.is_xmm() {
                 assembler
-                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                    .movq::<AsmRegister64, AsmRegisterXmm>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .movq::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                    .movq::<AsmRegisterXmm, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -58,7 +64,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 assembler
                     .movq::<AsmRegisterXmm, AsmMemoryOperand>(
                         dst.try_into().unwrap(),
-                        qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                        qword_ptr(
+                            memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                        ),
                     )
                     .unwrap();
             } else {
@@ -78,7 +86,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                .movq::<AsmRegister64, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -94,7 +105,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .movq::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                .movq::<AsmRegisterXmm, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -111,11 +125,17 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             if src.is_gpr() && dst.is_xmm() {
                 assembler
-                    .movq::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                    .movq::<AsmRegisterXmm, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             } else if src.is_xmm() && dst.is_gpr() {
                 assembler
-                    .movq::<AsmRegister64, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                    .movq::<AsmRegister64, AsmRegisterXmm>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 panic!()

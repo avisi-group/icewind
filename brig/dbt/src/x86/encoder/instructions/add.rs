@@ -25,7 +25,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .add::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         // ADD R -> R
@@ -40,7 +43,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .add::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         // ADD R -> R
@@ -55,7 +61,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
+                .add::<AsmRegister16, AsmRegister16>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         // ADD R -> R
@@ -70,7 +79,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
+                .add::<AsmRegister8, AsmRegister8>(dst.try_into().unwrap(), src.try_into().unwrap())
                 .unwrap();
         }
         // ADD IMM -> R
@@ -85,7 +94,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
+                .add::<AsmRegister64, i32>(
+                    dst.try_into().unwrap(),
+                    i32::try_from(*src as i64).unwrap(),
+                )
                 .unwrap();
         }
         // ADD IMM -> R
@@ -100,7 +112,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .add::<AsmRegister32, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
+                .add::<AsmRegister32, i32>(
+                    dst.try_into().unwrap(),
+                    i32::try_from(*src as i64).unwrap(),
+                )
                 .unwrap();
         }
         // ADD IMM -> M
@@ -125,7 +140,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
 
             assembler
                 .add::<AsmMemoryOperand, i32>(
-                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    qword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     i32::try_from(*src as i64).unwrap(),
                 )
                 .unwrap();

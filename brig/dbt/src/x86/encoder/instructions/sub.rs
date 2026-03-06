@@ -24,7 +24,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .sub::<AsmRegister64, i32>(dst.try_into().unwrap(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         // SUB IMM -> R
@@ -39,7 +39,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .sub::<AsmRegister32, i32>(dst.try_into().unwrap(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         // SUB IMM -> R: todo remove me
@@ -54,7 +54,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister8, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .sub::<AsmRegister8, i32>(dst.try_into().unwrap(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         // SUB R -> R
@@ -69,7 +69,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .sub::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         // SUB IMM -> R
@@ -84,7 +87,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister8, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .sub::<AsmRegister8, i32>(dst.try_into().unwrap(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         // SUB IMM -> R
@@ -99,7 +102,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .sub::<AsmRegister16, i32>(dst.into(), i32::try_from(*src).unwrap())
+                .sub::<AsmRegister16, i32>(dst.try_into().unwrap(), i32::try_from(*src).unwrap())
                 .unwrap();
         }
         _ => todo!("sub {src} {dst}"),

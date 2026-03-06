@@ -32,19 +32,27 @@ pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
         Operand {
             kind: R(PHYS(value)),
             width_in_bits: Width::_64,
-        } => assembler.not::<AsmRegister64>(value.into()).unwrap(),
+        } => assembler
+            .not::<AsmRegister64>(value.try_into().unwrap())
+            .unwrap(),
         Operand {
             kind: R(PHYS(value)),
             width_in_bits: Width::_32,
-        } => assembler.not::<AsmRegister32>(value.into()).unwrap(),
+        } => assembler
+            .not::<AsmRegister32>(value.try_into().unwrap())
+            .unwrap(),
         Operand {
             kind: R(PHYS(value)),
             width_in_bits: Width::_16,
-        } => assembler.not::<AsmRegister16>(value.into()).unwrap(),
+        } => assembler
+            .not::<AsmRegister16>(value.try_into().unwrap())
+            .unwrap(),
         Operand {
             kind: R(PHYS(value)),
             width_in_bits: Width::_8,
-        } => assembler.not::<AsmRegister8>(value.into()).unwrap(),
+        } => assembler
+            .not::<AsmRegister8>(value.try_into().unwrap())
+            .unwrap(),
         _ => todo!("not {dst}"),
     }
 }

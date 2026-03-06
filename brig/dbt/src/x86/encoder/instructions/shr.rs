@@ -23,7 +23,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shr::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister8, u32>(
+                    value.try_into().unwrap(),
+                    u32::try_from(*amount).unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -36,7 +39,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shr::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister16, u32>(
+                    value.try_into().unwrap(),
+                    u32::try_from(*amount).unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -49,7 +55,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shr::<AsmRegister32, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister32, u32>(
+                    value.try_into().unwrap(),
+                    u32::try_from(*amount).unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -62,7 +71,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
         ) => {
             assembler
-                .shr::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .shr::<AsmRegister64, u32>(
+                    value.try_into().unwrap(),
+                    u32::try_from(*amount).unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -79,7 +91,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
                 panic!("can't shr %rcx %rcx");
             }
             assembler
-                .shr::<AsmRegister64, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
+                .shr::<AsmRegister64, AsmRegister8>(
+                    value_reg.try_into().unwrap(),
+                    PhysicalRegister::RCX.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -96,7 +111,10 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
                 panic!("can't shr %rcx %rcx");
             }
             assembler
-                .shr::<AsmRegister32, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
+                .shr::<AsmRegister32, AsmRegister8>(
+                    value_reg.try_into().unwrap(),
+                    PhysicalRegister::RCX.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (

@@ -31,7 +31,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!();
             } else {
                 assembler
-                    .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .mov::<AsmRegister64, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
         }

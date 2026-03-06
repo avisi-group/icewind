@@ -6,7 +6,7 @@ use {
         registers::Register::Physical as PHYS,
     },
     iced_x86::code_asm::{
-        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegisterXmm, CodeAssembler,
     },
 };
 
@@ -23,7 +23,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .cmovne::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .cmovne::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -37,7 +40,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .cmovne::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .cmovne::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -51,7 +57,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .cmovne::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
+                .cmovne::<AsmRegister16, AsmRegister16>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         _ => todo!("xor {src} {dst}"),

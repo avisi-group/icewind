@@ -1291,7 +1291,11 @@ fn encode_compare(
             k => todo!("{k:?}"),
         };
 
-        emitter.push_instruction(Instruction::cmppd(right_op, dst, predicate));
+        match width {
+            Width::_64 => emitter.push_instruction(Instruction::cmppd(right_op, dst, predicate)),
+            Width::_32 => emitter.push_instruction(Instruction::cmpps(right_op, dst, predicate)),
+            _ => todo!(),
+        }
 
         // get lowest 8 bits of xmm register into gpr
         let result = {

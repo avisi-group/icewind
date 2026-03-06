@@ -24,7 +24,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister8, i32>(right.into(), i32::try_from(*left).unwrap())
+                .or::<AsmRegister8, i32>(right.try_into().unwrap(), i32::try_from(*left).unwrap())
                 .unwrap();
         }
         // OR I R
@@ -39,7 +39,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister32, i32>(right.into(), i32::try_from(*left).unwrap())
+                .or::<AsmRegister32, i32>(right.try_into().unwrap(), i32::try_from(*left).unwrap())
                 .unwrap();
         }
         // OR I R
@@ -55,7 +55,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             if *left <= u32::MAX as u64 {
                 assembler
-                    .or::<AsmRegister32, u32>(right.into(), *left as u32)
+                    .or::<AsmRegister32, u32>(right.try_into().unwrap(), *left as u32)
                     .unwrap();
             } else {
                 panic!("{left:?}")
@@ -74,7 +74,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             if *left < i32::MAX as u64 {
                 assembler
-                    .or::<AsmRegister64, i32>(right.into(), *left as i32)
+                    .or::<AsmRegister64, i32>(right.try_into().unwrap(), *left as i32)
                     .unwrap();
             } else {
                 panic!("{left:?}")
@@ -92,7 +92,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                .or::<AsmRegister8, AsmRegister8>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -106,7 +109,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister16, AsmRegister16>(right.into(), left.into())
+                .or::<AsmRegister16, AsmRegister16>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -120,7 +126,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister32, AsmRegister32>(right.into(), left.into())
+                .or::<AsmRegister32, AsmRegister32>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -134,7 +143,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .or::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .or::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (

@@ -8051,6 +8051,27 @@ fn fmul_s0_s0_s2() {
     let translation = Translation::new(ctx.compile(num_regs));
 }
 
+#[ktest]
+fn fcmpe_single() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  1e202018        fcmpe   s0, #0.0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e202018,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();

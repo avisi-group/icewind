@@ -23,7 +23,10 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                .cmp::<AsmRegister8, AsmRegister8>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -37,7 +40,10 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister16, AsmRegister16>(right.into(), left.into())
+                .cmp::<AsmRegister16, AsmRegister16>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -51,7 +57,10 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister32, AsmRegister32>(right.into(), left.into())
+                .cmp::<AsmRegister32, AsmRegister32>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -65,7 +74,10 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister64, AsmRegister64>(right.into(), left.into())
+                .cmp::<AsmRegister64, AsmRegister64>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -79,7 +91,7 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister64, i32>(right.into(), (*left).try_into().unwrap())
+                .cmp::<AsmRegister64, i32>(right.try_into().unwrap(), (*left).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -93,7 +105,7 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister32, i32>(right.into(), (*left).try_into().unwrap())
+                .cmp::<AsmRegister32, i32>(right.try_into().unwrap(), (*left).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -107,7 +119,7 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister8, i32>(right.into(), (*left).try_into().unwrap())
+                .cmp::<AsmRegister8, i32>(right.try_into().unwrap(), (*left).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -121,7 +133,7 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
             },
         ) => {
             assembler
-                .cmp::<AsmRegister16, i32>(right.into(), (*left).try_into().unwrap())
+                .cmp::<AsmRegister16, i32>(right.try_into().unwrap(), (*left).try_into().unwrap())
                 .unwrap();
         }
 

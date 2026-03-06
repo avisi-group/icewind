@@ -8,7 +8,10 @@ use {
                     adc, add, and, cmovne, cmp, jne, lea, mov, movd, movq, movsx, movzx, not, or,
                     setne, shl, shr, sub, test, xor,
                 },
-                registers::{PhysicalRegister, Register, RegisterClass, SegmentRegister},
+                registers::{
+                    PhysicalRegister, Register, RegisterClass, RegisterConversionError,
+                    SegmentRegister,
+                },
                 width::Width,
             },
         },
@@ -107,6 +110,8 @@ pub enum Opcode {
     SUBPS(Operand, Operand),
     /// cmppd {0}, {1}, {2}
     CMPPD(Operand, Operand, Operand),
+    /// cmpps {0}, {1}, {2}
+    CMPPS(Operand, Operand, Operand),
     /// cqo
     CQO,
     /// not {0}
@@ -564,8 +569,8 @@ fn memory_operand_to_iced(
     index: Option<Register>,
     scale: MemoryScale,
     displacement: i32,
-) -> AsmMemoryOperand {
-    let mut mem = AsmRegister64::from(base) + displacement;
+) -> Result<AsmMemoryOperand, RegisterConversionError> {
+    let mut mem = AsmRegister64::try_from(base)? + displacement;
 
     if let Some(Register::Physical(index)) = index {
         let scale: i32 = match scale {
@@ -573,13 +578,12 @@ fn memory_operand_to_iced(
             MemoryScale::S2 => 2,
             MemoryScale::S4 => 4,
             MemoryScale::S8 => 8,
-        }
-        .into();
+        };
 
-        mem = mem + AsmRegister64::from(index) * scale;
+        mem = mem + AsmRegister64::try_from(index)? * scale;
     }
 
-    mem
+    Ok(mem)
 }
 
 fn segment_memory_operand_to_iced(
@@ -587,7 +591,7 @@ fn segment_memory_operand_to_iced(
     index: Option<Register>,
     scale: MemoryScale,
     displacement: i32,
-) -> AsmMemoryOperand {
+) -> Result<AsmMemoryOperand, RegisterConversionError> {
     let mut mem = AsmMemoryOperand::from(displacement);
 
     if let Some(Register::Physical(index)) = index {
@@ -599,13 +603,13 @@ fn segment_memory_operand_to_iced(
         }
         .into();
 
-        mem = mem + AsmRegister64::from(index) * scale;
+        mem = mem + AsmRegister64::try_from(index)? * scale;
     }
 
-    match segment {
+    Ok(match segment {
         SegmentRegister::FS => mem.fs(),
         SegmentRegister::GS => mem.gs(),
-    }
+    })
 }
 
 impl Instruction {
@@ -754,6 +758,10 @@ impl Instruction {
 
     pub fn cmppd(src: Operand, dst: Operand, predicate: Operand) -> Self {
         Self(Opcode::CMPPD(src, dst, predicate))
+    }
+
+    pub fn cmpps(src: Operand, dst: Operand, predicate: Operand) -> Self {
+        Self(Opcode::CMPPS(src, dst, predicate))
     }
 
     pub fn imul1(src: Operand, dst_lo: Operand, dst_hi: Operand) -> Self {
@@ -1032,12 +1040,9 @@ impl Instruction {
                 ..
             }) => {
                 assembler
-                    .jmp(qword_ptr(memory_operand_to_iced(
-                        *base,
-                        *index,
-                        *scale,
-                        *displacement,
-                    )))
+                    .jmp(qword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ))
                     .unwrap();
             }
             RET => {
@@ -1058,8 +1063,8 @@ impl Instruction {
                 },
             ) => assembler
                 .shrd::<AsmRegister64, AsmRegister64, i32>(
-                    lo.into(),
-                    hi.into(),
+                    lo.try_into().unwrap(),
+                    hi.try_into().unwrap(),
                     i32::try_from(*amount).unwrap(),
                 )
                 .unwrap(),
@@ -1067,22 +1072,30 @@ impl Instruction {
             SETA(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.seta::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .seta::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETG(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setg::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setg::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETAE(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setae::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setae::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETE(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.sete::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .sete::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETE(Operand {
                 kind:
@@ -1096,13 +1109,15 @@ impl Instruction {
                 width_in_bits: Width::_8,
             }) => {
                 assembler
-                    .sete(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .sete(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap())
                     .unwrap();
             }
             SETO(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.seto::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .seto::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETO(Operand {
                 kind:
@@ -1116,13 +1131,15 @@ impl Instruction {
                 width_in_bits: Width::_8,
             }) => {
                 assembler
-                    .seto(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .seto(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap())
                     .unwrap();
             }
             SETC(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setc::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setc::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETC(Operand {
                 kind:
@@ -1136,13 +1153,15 @@ impl Instruction {
                 width_in_bits: Width::_8,
             }) => {
                 assembler
-                    .setc(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .setc(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap())
                     .unwrap();
             }
             SETS(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.sets::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .sets::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETS(Operand {
                 kind:
@@ -1156,19 +1175,23 @@ impl Instruction {
                 width_in_bits: Width::_8,
             }) => {
                 assembler
-                    .sets(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .sets(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap())
                     .unwrap();
             }
             SETGE(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setge::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setge::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
 
             NEG(Operand {
                 kind: R(PHYS(value)),
                 ..
-            }) => assembler.neg::<AsmRegister64>(value.into()).unwrap(),
+            }) => assembler
+                .neg::<AsmRegister64>(value.try_into().unwrap())
+                .unwrap(),
             SAR(
                 Operand {
                     kind: R(PHYS(amount)),
@@ -1180,7 +1203,10 @@ impl Instruction {
                 },
             ) => {
                 assembler
-                    .sar::<AsmRegister64, AsmRegister8>(value.into(), amount.into())
+                    .sar::<AsmRegister64, AsmRegister8>(
+                        value.try_into().unwrap(),
+                        amount.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             SAR(
@@ -1194,7 +1220,10 @@ impl Instruction {
                 },
             ) => {
                 assembler
-                    .sar::<AsmRegister32, AsmRegister8>(value.into(), amount.into())
+                    .sar::<AsmRegister32, AsmRegister8>(
+                        value.try_into().unwrap(),
+                        amount.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             SAR(
@@ -1208,7 +1237,10 @@ impl Instruction {
                 },
             ) => {
                 assembler
-                    .sar::<AsmRegister64, i32>(value.into(), i32::try_from(*amount).unwrap())
+                    .sar::<AsmRegister64, i32>(
+                        value.try_into().unwrap(),
+                        i32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
             SAR(
@@ -1222,7 +1254,10 @@ impl Instruction {
                 },
             ) => {
                 assembler
-                    .sar::<AsmRegister32, i32>(value.into(), i32::try_from(*amount).unwrap())
+                    .sar::<AsmRegister32, i32>(
+                        value.try_into().unwrap(),
+                        i32::try_from(*amount).unwrap(),
+                    )
                     .unwrap();
             }
             BEXTR(
@@ -1241,9 +1276,9 @@ impl Instruction {
             ) => {
                 assembler
                     .bextr::<AsmRegister64, AsmRegister64, AsmRegister64>(
-                        dst.into(),
-                        src.into(),
-                        ctrl.into(),
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                        ctrl.try_into().unwrap(),
                     )
                     .unwrap();
             }
@@ -1254,41 +1289,55 @@ impl Instruction {
                 kind: R(PHYS(src)),
                 width_in_bits: Width::_64,
             }) => {
-                assembler.push::<AsmRegister64>(src.into()).unwrap();
+                assembler
+                    .push::<AsmRegister64>(src.try_into().unwrap())
+                    .unwrap();
             }
             POP(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_64,
             }) => {
-                assembler.pop::<AsmRegister64>(dst.into()).unwrap();
+                assembler
+                    .pop::<AsmRegister64>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETB(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
             }) => {
-                assembler.setne::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setne::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETNZ(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
-            }) => assembler.setnz::<AsmRegister8>(dst.into()).unwrap(),
+            }) => assembler
+                .setnz::<AsmRegister8>(dst.try_into().unwrap())
+                .unwrap(),
             SETBE(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
             }) => {
-                assembler.setbe::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setbe::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETLE(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
             }) => {
-                assembler.setle::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setle::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
             SETL(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
             }) => {
-                assembler.setl::<AsmRegister8>(dst.into()).unwrap();
+                assembler
+                    .setl::<AsmRegister8>(dst.try_into().unwrap())
+                    .unwrap();
             }
 
             CMOVE(
@@ -1302,7 +1351,10 @@ impl Instruction {
                 },
             ) => {
                 assembler
-                    .cmove::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .cmove::<AsmRegister64, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
 
@@ -1426,8 +1478,8 @@ impl Instruction {
                 },
             ) => assembler
                 .imul_3::<AsmRegister64, AsmRegister64, i32>(
-                    dst.into(),
-                    dst.into(),
+                    dst.try_into().unwrap(),
+                    dst.try_into().unwrap(),
                     i32::try_from(*left).unwrap(),
                 )
                 .unwrap(),
@@ -1441,7 +1493,10 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => assembler
-                .imul_2::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .imul_2::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             MUL(
@@ -1460,7 +1515,9 @@ impl Instruction {
             ) => {
                 assert_eq!(*dst_hi, PhysicalRegister::RDX);
                 assert_eq!(*dst_lo, PhysicalRegister::RAX);
-                assembler.mul::<AsmRegister64>(src.into()).unwrap()
+                assembler
+                    .mul::<AsmRegister64>(src.try_into().unwrap())
+                    .unwrap()
             }
             IMUL1(
                 Operand {
@@ -1478,7 +1535,9 @@ impl Instruction {
             ) => {
                 assert_eq!(*dst_hi, PhysicalRegister::RDX);
                 assert_eq!(*dst_lo, PhysicalRegister::RAX);
-                assembler.imul::<AsmRegister64>(src.into()).unwrap()
+                assembler
+                    .imul::<AsmRegister64>(src.try_into().unwrap())
+                    .unwrap()
             }
             CQO => {
                 assembler.cqo().unwrap();
@@ -1487,13 +1546,17 @@ impl Instruction {
                 kind: R(PHYS(div)),
                 width_in_bits: Width::_64,
             }) => {
-                assembler.idiv::<AsmRegister64>(div.into()).unwrap();
+                assembler
+                    .idiv::<AsmRegister64>(div.try_into().unwrap())
+                    .unwrap();
             }
             DIV(Operand {
                 kind: R(PHYS(div)),
                 width_in_bits: Width::_64,
             }) => {
-                assembler.div::<AsmRegister64>(div.into()).unwrap();
+                assembler
+                    .div::<AsmRegister64>(div.try_into().unwrap())
+                    .unwrap();
             }
 
             CALL {
@@ -1504,7 +1567,9 @@ impl Instruction {
                     },
                 ..
             } => {
-                assembler.call::<AsmRegister64>(tgt.into()).unwrap();
+                assembler
+                    .call::<AsmRegister64>(tgt.try_into().unwrap())
+                    .unwrap();
             }
 
             OUT(
@@ -1517,7 +1582,7 @@ impl Instruction {
                     width_in_bits: Width::_8,
                 },
             ) => assembler
-                .out::<i32, AsmRegister8>((*port).try_into().unwrap(), value.into())
+                .out::<i32, AsmRegister8>((*port).try_into().unwrap(), value.try_into().unwrap())
                 .unwrap(),
 
             PINSR(
@@ -1538,7 +1603,7 @@ impl Instruction {
                 assembler
                     .pinsrw::<AsmRegisterXmm, AsmRegister32, i32>(
                         dst.try_into().unwrap(),
-                        src.into(),
+                        src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
                     .unwrap();
@@ -1561,7 +1626,7 @@ impl Instruction {
                 assembler
                     .pinsrd::<AsmRegisterXmm, AsmRegister32, i32>(
                         dst.try_into().unwrap(),
-                        src.into(),
+                        src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
                     .unwrap();
@@ -1584,7 +1649,7 @@ impl Instruction {
                 assembler
                     .pinsrq::<AsmRegisterXmm, AsmRegister64, i32>(
                         dst.try_into().unwrap(),
-                        src.into(),
+                        src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
                     .unwrap();
@@ -1607,7 +1672,7 @@ impl Instruction {
                 assembler
                     .pinsrb::<AsmRegisterXmm, AsmRegister32, i32>(
                         dst.try_into().unwrap(),
-                        src.into(),
+                        src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
                     .unwrap();
@@ -1629,7 +1694,7 @@ impl Instruction {
             ) => {
                 assembler
                     .pextrq::<AsmRegister64, AsmRegisterXmm, i32>(
-                        dst.into(),
+                        dst.try_into().unwrap(),
                         src.try_into().unwrap(),
                         i32::try_from(*index).unwrap(),
                     )
@@ -1707,7 +1772,9 @@ impl Instruction {
                 },
             ) => assembler
                 .cmpxchg::<AsmMemoryOperand, AsmRegister64>(
-                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    qword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
@@ -1730,7 +1797,9 @@ impl Instruction {
                 },
             ) => assembler
                 .cmpxchg::<AsmMemoryOperand, AsmRegister32>(
-                    dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    dword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
@@ -1752,7 +1821,7 @@ impl Instruction {
                 },
             ) => assembler
                 .cmpxchg::<AsmMemoryOperand, AsmRegister8>(
-                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap()),
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
@@ -1769,12 +1838,10 @@ impl Instruction {
                 width_in_bits: Width::_64,
             }) => {
                 assembler
-                    .inc(qword_ptr(segment_memory_operand_to_iced(
-                        *seg_reg,
-                        *index,
-                        *scale,
-                        *displacement,
-                    )))
+                    .inc(qword_ptr(
+                        segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement)
+                            .unwrap(),
+                    ))
                     .unwrap();
             }
             CVTSI2SD(
@@ -1787,7 +1854,10 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => assembler
-                .cvtsi2sd::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                .cvtsi2sd::<AsmRegisterXmm, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             CVTSI2SD(
@@ -1800,7 +1870,10 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => assembler
-                .cvtsi2sd::<AsmRegisterXmm, AsmRegister32>(dst.try_into().unwrap(), src.into())
+                .cvtsi2sd::<AsmRegisterXmm, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             CVTSI2SS(
@@ -1813,7 +1886,10 @@ impl Instruction {
                     width_in_bits: Width::_32,
                 },
             ) => assembler
-                .cvtsi2ss::<AsmRegisterXmm, AsmRegister32>(dst.try_into().unwrap(), src.into())
+                .cvtsi2ss::<AsmRegisterXmm, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             CVTSI2SS(
@@ -1826,7 +1902,10 @@ impl Instruction {
                     width_in_bits: Width::_32,
                 },
             ) => assembler
-                .cvtsi2ss::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                .cvtsi2ss::<AsmRegisterXmm, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             CVTSD2SI(
@@ -1839,7 +1918,10 @@ impl Instruction {
                     width_in_bits: Width::_32,
                 },
             ) => assembler
-                .cvtsd2si::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                .cvtsd2si::<AsmRegister32, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap(),
 
             CVTSS2SD(
@@ -1895,6 +1977,27 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            CMPPS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: I(predicate),
+                    width_in_bits: Width::_8,
+                },
+            ) => assembler
+                .cmpps::<AsmRegisterXmm, AsmRegisterXmm, i32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                    i32::try_from(*predicate).unwrap(),
+                )
+                .unwrap(),
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1944,7 +2047,9 @@ impl Instruction {
                 None,
             ]
             .into_iter(),
-            Opcode::CMPPD(src, dst, predicate) | Opcode::PSHUFLW(src, dst, predicate) => [
+            Opcode::CMPPD(src, dst, predicate)
+            | Opcode::CMPPS(src, dst, predicate)
+            | Opcode::PSHUFLW(src, dst, predicate) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 Some((OperandDirection::In, predicate)),
@@ -2089,7 +2194,9 @@ impl Instruction {
                     .into_iter()
                     .collect()
             }
-            Opcode::CMPPD(src, dst, predicate) | Opcode::PSHUFLW(src, dst, predicate) => [
+            Opcode::CMPPD(src, dst, predicate)
+            | Opcode::CMPPS(src, dst, predicate)
+            | Opcode::PSHUFLW(src, dst, predicate) => [
                 ((OperandDirection::In, src)),
                 ((OperandDirection::InOut, dst)),
                 ((OperandDirection::In, predicate)),

@@ -26,11 +26,14 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
         ) => {
             // sets the carry flag
             assembler
-                .add::<AsmRegister8, _>(carry.into(), 0xffff_ffffu32 as i32)
+                .add::<AsmRegister8, _>(carry.try_into().unwrap(), 0xffff_ffffu32 as i32)
                 .unwrap();
 
             assembler
-                .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .adc::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -50,11 +53,14 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
         ) => {
             // sets the carry flag
             assembler
-                .add::<AsmRegister8, _>(carry.into(), 0xffff_ffffu32 as i32)
+                .add::<AsmRegister8, _>(carry.try_into().unwrap(), 0xffff_ffffu32 as i32)
                 .unwrap();
 
             assembler
-                .adc::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .adc::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -74,13 +80,19 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
         ) => match carry_in {
             0 => {
                 assembler
-                    .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .add::<AsmRegister64, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             1 => {
                 assembler.stc().unwrap();
                 assembler
-                    .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .adc::<AsmRegister64, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             _ => panic!(),
@@ -101,13 +113,19 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
         ) => match carry_in {
             0 => {
                 assembler
-                    .add::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .add::<AsmRegister32, AsmRegister32>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             1 => {
                 assembler.stc().unwrap();
                 assembler
-                    .adc::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .adc::<AsmRegister32, AsmRegister32>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
             _ => panic!(),
@@ -129,7 +147,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
             let src = src.wrapping_add(*carry_in);
 
             assembler
-                .add::<AsmRegister64, i32>(dst.into(), src.try_into().unwrap())
+                .add::<AsmRegister64, i32>(dst.try_into().unwrap(), src.try_into().unwrap())
                 .unwrap();
         }
         (
@@ -149,7 +167,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
             let src = src.wrapping_add(*carry_in);
 
             assembler
-                .add::<AsmRegister32, i32>(dst.into(), src.try_into().unwrap())
+                .add::<AsmRegister32, i32>(dst.try_into().unwrap(), src.try_into().unwrap())
                 .unwrap();
         }
         (
@@ -167,10 +185,16 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
             },
         ) => {
             assembler
-                .movzx::<AsmRegister64, AsmRegister8>(carry.into(), carry.into())
+                .movzx::<AsmRegister64, AsmRegister8>(
+                    carry.try_into().unwrap(),
+                    carry.try_into().unwrap(),
+                )
                 .unwrap();
             assembler
-                .add::<AsmRegister64, AsmRegister64>(dst.into(), carry.into())
+                .add::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    carry.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -188,10 +212,16 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand, carry
             },
         ) => {
             assembler
-                .movzx::<AsmRegister32, AsmRegister8>(carry.into(), carry.into())
+                .movzx::<AsmRegister32, AsmRegister8>(
+                    carry.try_into().unwrap(),
+                    carry.try_into().unwrap(),
+                )
                 .unwrap();
             assembler
-                .add::<AsmRegister32, AsmRegister32>(dst.into(), carry.into())
+                .add::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    carry.try_into().unwrap(),
+                )
                 .unwrap();
         }
         _ => todo!("adc {src} {dst} {carry}"),

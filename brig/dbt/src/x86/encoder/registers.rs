@@ -1,5 +1,4 @@
 use {
-    alloc::alloc::Global,
     common::ktest,
     core::fmt::{Display, Formatter},
     displaydoc::Display,
@@ -132,139 +131,154 @@ impl PhysicalRegister {
     }
 }
 
-impl From<&PhysicalRegister> for AsmRegister64 {
-    fn from(phys: &PhysicalRegister) -> Self {
+impl TryFrom<&PhysicalRegister> for AsmRegister64 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: &PhysicalRegister) -> Result<Self, Self::Error> {
         use iced_x86::code_asm::{
             r8, r9, r10, r11, r12, r13, r14, r15, rax, rbp, rbx, rcx, rdi, rdx, rsi, rsp,
         };
 
         match phys {
-            PhysicalRegister::RAX => rax,
-            PhysicalRegister::RCX => rcx,
-            PhysicalRegister::RDX => rdx,
-            PhysicalRegister::RBX => rbx,
-            PhysicalRegister::RSI => rsi,
-            PhysicalRegister::RDI => rdi,
-            PhysicalRegister::RSP => rsp,
-            PhysicalRegister::RBP => rbp,
-            PhysicalRegister::R8 => r8,
-            PhysicalRegister::R9 => r9,
-            PhysicalRegister::R10 => r10,
-            PhysicalRegister::R11 => r11,
-            PhysicalRegister::R12 => r12,
-            PhysicalRegister::R13 => r13,
-            PhysicalRegister::R14 => r14,
-            PhysicalRegister::R15 => r15,
-            r => panic!("can't convert {r} to AsmRegister64"),
+            PhysicalRegister::RAX => Ok(rax),
+            PhysicalRegister::RCX => Ok(rcx),
+            PhysicalRegister::RDX => Ok(rdx),
+            PhysicalRegister::RBX => Ok(rbx),
+            PhysicalRegister::RSI => Ok(rsi),
+            PhysicalRegister::RDI => Ok(rdi),
+            PhysicalRegister::RSP => Ok(rsp),
+            PhysicalRegister::RBP => Ok(rbp),
+            PhysicalRegister::R8 => Ok(r8),
+            PhysicalRegister::R9 => Ok(r9),
+            PhysicalRegister::R10 => Ok(r10),
+            PhysicalRegister::R11 => Ok(r11),
+            PhysicalRegister::R12 => Ok(r12),
+            PhysicalRegister::R13 => Ok(r13),
+            PhysicalRegister::R14 => Ok(r14),
+            PhysicalRegister::R15 => Ok(r15),
+            r => Err(RegisterConversionError::InvalidXmmAs64(*r)),
         }
     }
 }
 
-impl From<PhysicalRegister> for AsmRegister64 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
+impl TryFrom<PhysicalRegister> for AsmRegister64 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: PhysicalRegister) -> Result<Self, Self::Error> {
+        Self::try_from(&phys)
     }
 }
 
-impl From<&PhysicalRegister> for AsmRegister8 {
-    fn from(phys: &PhysicalRegister) -> Self {
+impl TryFrom<&PhysicalRegister> for AsmRegister8 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: &PhysicalRegister) -> Result<Self, Self::Error> {
         use iced_x86::code_asm::{
             al, bl, bpl, cl, dil, dl, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b, sil, spl,
         };
 
         match phys {
-            PhysicalRegister::RAX => al,
-            PhysicalRegister::RCX => cl,
-            PhysicalRegister::RDX => dl,
-            PhysicalRegister::RBX => bl,
-            PhysicalRegister::RSI => sil,
-            PhysicalRegister::RDI => dil,
-            PhysicalRegister::RSP => spl,
-            PhysicalRegister::RBP => bpl,
-            PhysicalRegister::R8 => r8b,
-            PhysicalRegister::R9 => r9b,
-            PhysicalRegister::R10 => r10b,
-            PhysicalRegister::R11 => r11b,
-            PhysicalRegister::R12 => r12b,
-            PhysicalRegister::R13 => r13b,
-            PhysicalRegister::R14 => r14b,
-            PhysicalRegister::R15 => r15b,
-            _ => panic!(),
+            PhysicalRegister::RAX => Ok(al),
+            PhysicalRegister::RCX => Ok(cl),
+            PhysicalRegister::RDX => Ok(dl),
+            PhysicalRegister::RBX => Ok(bl),
+            PhysicalRegister::RSI => Ok(sil),
+            PhysicalRegister::RDI => Ok(dil),
+            PhysicalRegister::RSP => Ok(spl),
+            PhysicalRegister::RBP => Ok(bpl),
+            PhysicalRegister::R8 => Ok(r8b),
+            PhysicalRegister::R9 => Ok(r9b),
+            PhysicalRegister::R10 => Ok(r10b),
+            PhysicalRegister::R11 => Ok(r11b),
+            PhysicalRegister::R12 => Ok(r12b),
+            PhysicalRegister::R13 => Ok(r13b),
+            PhysicalRegister::R14 => Ok(r14b),
+            PhysicalRegister::R15 => Ok(r15b),
+            _ => Err(RegisterConversionError::InvalidXmmAs8(*phys)),
         }
     }
 }
 
-impl From<PhysicalRegister> for AsmRegister8 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
+impl TryFrom<PhysicalRegister> for AsmRegister8 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: PhysicalRegister) -> Result<Self, Self::Error> {
+        Self::try_from(&phys)
     }
 }
 
-impl From<&PhysicalRegister> for AsmRegister16 {
-    fn from(phys: &PhysicalRegister) -> Self {
+impl TryFrom<&PhysicalRegister> for AsmRegister16 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: &PhysicalRegister) -> Result<Self, Self::Error> {
         use iced_x86::code_asm::{
             ax, bp, bx, cx, di, dx, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w, si, sp,
         };
 
         match phys {
-            PhysicalRegister::RAX => ax,
-            PhysicalRegister::RCX => cx,
-            PhysicalRegister::RDX => dx,
-            PhysicalRegister::RBX => bx,
-            PhysicalRegister::RSI => si,
-            PhysicalRegister::RDI => di,
-            PhysicalRegister::RSP => sp,
-            PhysicalRegister::RBP => bp,
-            PhysicalRegister::R8 => r8w,
-            PhysicalRegister::R9 => r9w,
-            PhysicalRegister::R10 => r10w,
-            PhysicalRegister::R11 => r11w,
-            PhysicalRegister::R12 => r12w,
-            PhysicalRegister::R13 => r13w,
-            PhysicalRegister::R14 => r14w,
-            PhysicalRegister::R15 => r15w,
-            _ => panic!(),
+            PhysicalRegister::RAX => Ok(ax),
+            PhysicalRegister::RCX => Ok(cx),
+            PhysicalRegister::RDX => Ok(dx),
+            PhysicalRegister::RBX => Ok(bx),
+            PhysicalRegister::RSI => Ok(si),
+            PhysicalRegister::RDI => Ok(di),
+            PhysicalRegister::RSP => Ok(sp),
+            PhysicalRegister::RBP => Ok(bp),
+            PhysicalRegister::R8 => Ok(r8w),
+            PhysicalRegister::R9 => Ok(r9w),
+            PhysicalRegister::R10 => Ok(r10w),
+            PhysicalRegister::R11 => Ok(r11w),
+            PhysicalRegister::R12 => Ok(r12w),
+            PhysicalRegister::R13 => Ok(r13w),
+            PhysicalRegister::R14 => Ok(r14w),
+            PhysicalRegister::R15 => Ok(r15w),
+            _ => Err(RegisterConversionError::InvalidXmmAs16(*phys)),
         }
     }
 }
 
-impl From<&PhysicalRegister> for AsmRegister32 {
-    fn from(phys: &PhysicalRegister) -> Self {
+impl TryFrom<&PhysicalRegister> for AsmRegister32 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: &PhysicalRegister) -> Result<Self, Self::Error> {
         use iced_x86::code_asm::{
             eax, ebp, ebx, ecx, edi, edx, esi, esp, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d,
         };
 
         match phys {
-            PhysicalRegister::RAX => eax,
-            PhysicalRegister::RCX => ecx,
-            PhysicalRegister::RDX => edx,
-            PhysicalRegister::RBX => ebx,
-            PhysicalRegister::RSI => esi,
-            PhysicalRegister::RDI => edi,
-            PhysicalRegister::RSP => esp,
-            PhysicalRegister::RBP => ebp,
-            PhysicalRegister::R8 => r8d,
-            PhysicalRegister::R9 => r9d,
-            PhysicalRegister::R10 => r10d,
-            PhysicalRegister::R11 => r11d,
-            PhysicalRegister::R12 => r12d,
-            PhysicalRegister::R13 => r13d,
-            PhysicalRegister::R14 => r14d,
-            PhysicalRegister::R15 => r15d,
-            _ => panic!("{phys}"),
+            PhysicalRegister::RAX => Ok(eax),
+            PhysicalRegister::RCX => Ok(ecx),
+            PhysicalRegister::RDX => Ok(edx),
+            PhysicalRegister::RBX => Ok(ebx),
+            PhysicalRegister::RSI => Ok(esi),
+            PhysicalRegister::RDI => Ok(edi),
+            PhysicalRegister::RSP => Ok(esp),
+            PhysicalRegister::RBP => Ok(ebp),
+            PhysicalRegister::R8 => Ok(r8d),
+            PhysicalRegister::R9 => Ok(r9d),
+            PhysicalRegister::R10 => Ok(r10d),
+            PhysicalRegister::R11 => Ok(r11d),
+            PhysicalRegister::R12 => Ok(r12d),
+            PhysicalRegister::R13 => Ok(r13d),
+            PhysicalRegister::R14 => Ok(r14d),
+            PhysicalRegister::R15 => Ok(r15d),
+            _ => Err(RegisterConversionError::InvalidXmmAs32(*phys)),
         }
     }
 }
 
-impl From<PhysicalRegister> for AsmRegister16 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
+impl TryFrom<PhysicalRegister> for AsmRegister16 {
+    type Error = RegisterConversionError;
+    fn try_from(phys: PhysicalRegister) -> Result<Self, Self::Error> {
+        Self::try_from(&phys)
     }
 }
 
-impl From<PhysicalRegister> for AsmRegister32 {
-    fn from(phys: PhysicalRegister) -> Self {
-        Self::from(&phys)
+impl TryFrom<PhysicalRegister> for AsmRegister32 {
+    type Error = RegisterConversionError;
+
+    fn try_from(phys: PhysicalRegister) -> Result<Self, Self::Error> {
+        Self::try_from(&phys)
     }
 }
 
@@ -348,6 +362,12 @@ impl Into<iced_x86::Register> for PhysicalRegister {
 
 #[derive(Debug, Clone, Copy, displaydoc::Display, thiserror::Error)]
 pub enum RegisterConversionError {
+    /// XMM register {0} cannot be converted to `AsmRegister8`
+    InvalidXmmAs8(PhysicalRegister),
+    /// XMM register {0} cannot be converted to `AsmRegister16`
+    InvalidXmmAs16(PhysicalRegister),
+    /// XMM register {0} cannot be converted to `AsmRegister32`
+    InvalidXmmAs32(PhysicalRegister),
     /// XMM register {0} cannot be converted to `AsmRegister64`
     InvalidXmmAs64(PhysicalRegister),
     /// General register {0} cannot be converted to `AsmRegisterXmm`

@@ -29,8 +29,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .lea::<AsmRegister64, AsmMemoryOperand>(
-                    dst.into(),
-                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    dst.try_into().unwrap(),
+                    qword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                 )
                 .unwrap();
         }

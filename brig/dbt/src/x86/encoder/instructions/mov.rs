@@ -31,7 +31,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!();
             } else {
                 assembler
-                    .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .mov::<AsmRegister64, AsmRegister64>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -70,7 +73,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
 
             assembler
-                .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
+                .mov::<AsmRegister8, AsmRegister8>(dst.try_into().unwrap(), src.try_into().unwrap())
                 .unwrap();
         }
         // MOV R -> R
@@ -94,7 +97,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             } else {
                 //assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
-                    .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .mov::<AsmRegister32, AsmRegister32>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
         }
@@ -111,7 +117,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .mov::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
+                .mov::<AsmRegister16, AsmRegister16>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         // MOV M -> R
@@ -137,8 +146,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             } else {
                 assembler
                     .mov::<AsmRegister64, AsmMemoryOperand>(
-                        dst.into(),
-                        memory_operand_to_iced(*base, *index, *scale, *displacement),
+                        dst.try_into().unwrap(),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
                     )
                     .unwrap();
             }
@@ -163,8 +172,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmRegister8, AsmMemoryOperand>(
-                    dst.into(),
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    dst.try_into().unwrap(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
                 )
                 .unwrap();
         }
@@ -188,8 +197,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmRegister16, AsmMemoryOperand>(
-                    dst.into(),
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    dst.try_into().unwrap(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
                 )
                 .unwrap();
         }
@@ -213,8 +222,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmRegister32, AsmMemoryOperand>(
-                    dst.into(),
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    dst.try_into().unwrap(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
                 )
                 .unwrap();
         }
@@ -238,12 +247,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, i32>(
-                    dword_ptr(segment_memory_operand_to_iced(
-                        *seg_reg,
-                        *index,
-                        *scale,
-                        *displacement,
-                    )),
+                    dword_ptr(
+                        segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement)
+                            .unwrap(),
+                    ),
                     i32::try_from(*imm).unwrap(),
                 )
                 .unwrap();
@@ -268,8 +275,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmRegister64, AsmMemoryOperand>(
-                    dst.into(),
-                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement),
+                    dst.try_into().unwrap(),
+                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement)
+                        .unwrap(),
                 )
                 .unwrap();
         }
@@ -293,8 +301,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmRegister64, AsmMemoryOperand>(
-                    dst.into(),
-                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement),
+                    dst.try_into().unwrap(),
+                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement)
+                        .unwrap(),
                 )
                 .unwrap();
         }
@@ -318,8 +327,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, AsmRegister8>(
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
-                    src.into(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    src.try_into().unwrap(),
                 )
                 .unwrap();
         }
@@ -343,8 +352,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, AsmRegister16>(
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
-                    src.into(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    src.try_into().unwrap(),
                 )
                 .unwrap();
         }
@@ -368,8 +377,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, AsmRegister32>(
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
-                    src.into(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    src.try_into().unwrap(),
                 )
                 .unwrap();
         }
@@ -393,8 +402,8 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, AsmRegister64>(
-                    memory_operand_to_iced(*base, *index, *scale, *displacement),
-                    src.into(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    src.try_into().unwrap(),
                 )
                 .unwrap();
         }
@@ -420,7 +429,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
 
             assembler
                 .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    dword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     *src as u32,
                 )
                 .unwrap();
@@ -447,7 +458,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
 
             assembler
                 .mov::<AsmMemoryOperand, u32>(
-                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap()),
                     u32::try_from(*src).unwrap(),
                 )
                 .unwrap();
@@ -475,7 +486,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
 
             assembler
                 .mov::<AsmMemoryOperand, u32>(
-                    word_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    word_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap()),
                     u32::try_from(*src).unwrap(),
                 )
                 .unwrap();
@@ -501,19 +512,18 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             // lo
             assembler
                 .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    dword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     u32::try_from(*src & u64::from(u32::MAX)).unwrap(),
                 )
                 .unwrap();
             // hi
             assembler
                 .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(
-                        *base,
-                        *index,
-                        *scale,
-                        *displacement + 4,
-                    )),
+                    dword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement + 4).unwrap(),
+                    ),
                     u32::try_from((*src >> 32) & u64::from(u32::MAX)).unwrap(),
                 )
                 .unwrap();
@@ -531,11 +541,14 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             if *src == 0 {
                 assembler
-                    .xor::<AsmRegister8, AsmRegister8>(dst.into(), dst.into())
+                    .xor::<AsmRegister8, AsmRegister8>(
+                        dst.try_into().unwrap(),
+                        dst.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .mov::<AsmRegister8, i32>(dst.into(), (*src).try_into().unwrap())
+                    .mov::<AsmRegister8, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                     .unwrap();
             }
         }
@@ -552,11 +565,14 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             if *src == 0 {
                 assembler
-                    .xor::<AsmRegister16, AsmRegister16>(dst.into(), dst.into())
+                    .xor::<AsmRegister16, AsmRegister16>(
+                        dst.try_into().unwrap(),
+                        dst.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .mov::<AsmRegister16, i32>(dst.into(), (*src).try_into().unwrap())
+                    .mov::<AsmRegister16, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                     .unwrap();
             }
         }
@@ -574,15 +590,21 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             if dst.is_gpr() {
                 if *src == 0 {
                     assembler
-                        .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                        .xor::<AsmRegister32, AsmRegister32>(
+                            dst.try_into().unwrap(),
+                            dst.try_into().unwrap(),
+                        )
                         .unwrap();
                 } else if *src < i32::MAX as u64 {
                     assembler
-                        .mov::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                        .mov::<AsmRegister32, i32>(
+                            dst.try_into().unwrap(),
+                            i32::try_from(*src).unwrap(),
+                        )
                         .unwrap();
                 } else {
                     assembler
-                        .mov::<AsmRegister64, u64>(dst.into(), *src)
+                        .mov::<AsmRegister64, u64>(dst.try_into().unwrap(), *src)
                         .unwrap();
                 }
             } else {
@@ -609,14 +631,30 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 width_in_bits: Width::_32,
             },
         ) => {
-            if *src == 0 {
-                assembler
-                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
-                    .unwrap();
+            if dst.is_gpr() {
+                if *src == 0 {
+                    assembler
+                        .xor::<AsmRegister32, AsmRegister32>(
+                            dst.try_into().unwrap(),
+                            dst.try_into().unwrap(),
+                        )
+                        .unwrap();
+                } else {
+                    assembler
+                        .mov::<AsmRegister32, u32>(dst.try_into().unwrap(), *src as u32)
+                        .unwrap();
+                }
             } else {
-                assembler
-                    .mov::<AsmRegister32, u32>(dst.into(), *src as u32)
-                    .unwrap();
+                if *src == 0 {
+                    assembler
+                        .pxor::<AsmRegisterXmm, AsmRegisterXmm>(
+                            dst.try_into().unwrap(),
+                            dst.try_into().unwrap(),
+                        )
+                        .unwrap();
+                } else {
+                    todo!()
+                }
             }
         }
 
@@ -634,11 +672,14 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             // todo: maybe zero extend src here?
             if *src == 0 {
                 assembler
-                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                    .xor::<AsmRegister32, AsmRegister32>(
+                        dst.try_into().unwrap(),
+                        dst.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                    .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                     .unwrap();
             }
         }
@@ -654,7 +695,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             // no need to write high bits
             assembler
-                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -670,7 +711,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             // don't need to write high bits
             assembler
-                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -686,7 +727,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             // don't need to write high bits
             assembler
-                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                 .unwrap();
         }
 
@@ -712,7 +753,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             assembler
                 .movdqu(
                     dst.try_into().unwrap(),
-                    xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    xmmword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                 )
                 .unwrap();
         }
@@ -737,7 +780,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             // todo: make this aligned!
             assembler
                 .movdqu(
-                    xmmword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    xmmword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     src.try_into().unwrap(),
                 )
                 .unwrap();
@@ -755,7 +800,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                .movd::<AsmRegister32, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
 

@@ -24,7 +24,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
-                .and::<AsmRegister8, i32>(right.into(), *left as i32)
+                .and::<AsmRegister8, i32>(right.try_into().unwrap(), *left as i32)
                 .unwrap();
         }
         (
@@ -38,7 +38,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
-                .and::<AsmRegister16, i32>(right.into(), *left as i32)
+                .and::<AsmRegister16, i32>(right.try_into().unwrap(), *left as i32)
                 .unwrap();
         }
         (
@@ -52,7 +52,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
-                .and::<AsmRegister32, u32>(right.into(), *left as u32)
+                .and::<AsmRegister32, u32>(right.try_into().unwrap(), *left as u32)
                 .unwrap();
         }
         (
@@ -66,7 +66,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
-                .and::<AsmRegister64, i32>(right.into(), *left as i32)
+                .and::<AsmRegister64, i32>(right.try_into().unwrap(), *left as i32)
                 .unwrap();
         }
         // AND IMM -> MEM
@@ -89,7 +89,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             }
             assembler
                 .and::<AsmMemoryOperand, i32>(
-                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    qword_ptr(
+                        memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap(),
+                    ),
                     *left as i32,
                 )
                 .unwrap();
@@ -114,7 +116,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             }
             assembler
                 .and::<AsmMemoryOperand, u32>(
-                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement).unwrap()),
                     *left as u32,
                 )
                 .unwrap();
@@ -130,7 +132,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .and::<AsmRegister64, AsmRegister64>(right.into(), left.into())
+                .and::<AsmRegister64, AsmRegister64>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -144,7 +149,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .and::<AsmRegister32, AsmRegister32>(right.into(), left.into())
+                .and::<AsmRegister32, AsmRegister32>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -158,7 +166,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .and::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                .and::<AsmRegister8, AsmRegister8>(
+                    right.try_into().unwrap(),
+                    left.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (

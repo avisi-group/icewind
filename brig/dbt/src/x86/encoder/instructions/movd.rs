@@ -28,11 +28,17 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
             if src.is_xmm() {
                 assembler
-                    .movd::<AsmRegister32, AsmRegisterXmm>(dst.into(), src.try_into().unwrap())
+                    .movd::<AsmRegister32, AsmRegisterXmm>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             } else {
                 assembler
-                    .movd::<AsmRegisterXmm, AsmRegister32>(dst.try_into().unwrap(), src.into())
+                    .movd::<AsmRegisterXmm, AsmRegister32>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
                     .unwrap();
             }
         }

@@ -42,27 +42,33 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => match (*src_width, *dst_width) {
             (Width::_8, Width::_32) => {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), u8::try_from(*src).unwrap().into())
+                    .mov::<AsmRegister32, i32>(
+                        dst.try_into().unwrap(),
+                        u8::try_from(*src).unwrap().into(),
+                    )
                     .unwrap();
             }
             (Width::_8, Width::_64) => {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), u8::try_from(*src).unwrap().into())
+                    .mov::<AsmRegister32, i32>(
+                        dst.try_into().unwrap(),
+                        u8::try_from(*src).unwrap().into(),
+                    )
                     .unwrap();
             }
             (Width::_16, Width::_64) => {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                    .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), *src as i32)
                     .unwrap();
             }
             (Width::_16, Width::_32) => {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                    .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), *src as i32)
                     .unwrap();
             }
             (Width::_32, Width::_64) => {
                 assembler
-                    .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                    .mov::<AsmRegister32, i32>(dst.try_into().unwrap(), *src as i32)
                     .unwrap();
             }
             (_, _) => todo!("{src} ({src_width}) -> {dst} zero extend mov not implemented"),
@@ -79,22 +85,40 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => match (*src_width, *dst_width) {
             (Width::_8, Width::_32) => assembler
-                .movzx::<AsmRegister32, AsmRegister8>(dst_r.into(), src_r.into())
+                .movzx::<AsmRegister32, AsmRegister8>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
             (Width::_8, Width::_64) => assembler
-                .movzx::<AsmRegister64, AsmRegister8>(dst_r.into(), src_r.into())
+                .movzx::<AsmRegister64, AsmRegister8>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
             (Width::_8, Width::_16) => assembler
-                .movzx::<AsmRegister16, AsmRegister8>(dst_r.into(), src_r.into())
+                .movzx::<AsmRegister16, AsmRegister8>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
             (Width::_16, Width::_32) => assembler
-                .movzx::<AsmRegister32, AsmRegister16>(dst_r.into(), src_r.into())
+                .movzx::<AsmRegister32, AsmRegister16>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
             (Width::_16, Width::_64) => assembler
-                .movzx::<AsmRegister64, AsmRegister16>(dst_r.into(), src_r.into())
+                .movzx::<AsmRegister64, AsmRegister16>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
             (Width::_32, Width::_64) => assembler
-                .mov::<AsmRegister32, AsmRegister32>(dst_r.into(), src_r.into())
+                .mov::<AsmRegister32, AsmRegister32>(
+                    dst_r.try_into().unwrap(),
+                    src_r.try_into().unwrap(),
+                )
                 .unwrap(),
 
             (_, _) => todo!("{src} -> {dst} zero extend mov not implemented"),

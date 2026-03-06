@@ -19,7 +19,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
+                .test::<AsmRegister64, AsmRegister64>(
+                    left.try_into().unwrap(),
+                    right.try_into().unwrap(),
+                )
                 .unwrap();
         }
 
@@ -35,7 +38,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .test::<AsmRegister8, AsmRegister8>(left.into(), right.into())
+                .test::<AsmRegister8, AsmRegister8>(
+                    left.try_into().unwrap(),
+                    right.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -49,7 +55,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .test::<AsmRegister32, AsmRegister32>(left.into(), right.into())
+                .test::<AsmRegister32, AsmRegister32>(
+                    left.try_into().unwrap(),
+                    right.try_into().unwrap(),
+                )
                 .unwrap();
         }
         _ => todo!("test {src} {dst}"),

@@ -23,7 +23,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .xor::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .xor::<AsmRegister64, AsmRegister64>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -54,7 +57,10 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .xor::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .xor::<AsmRegister32, AsmRegister32>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
                 .unwrap();
         }
         (
@@ -68,7 +74,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .xor::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
+                .xor::<AsmRegister8, AsmRegister8>(dst.try_into().unwrap(), src.try_into().unwrap())
                 .unwrap();
         }
         (
@@ -82,7 +88,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .xor::<AsmRegister64, i32>(dst.into(), (*src).try_into().unwrap())
+                .xor::<AsmRegister64, i32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                 .unwrap();
         }
         (
@@ -96,7 +102,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             },
         ) => {
             assembler
-                .xor::<AsmRegister32, u32>(dst.into(), (*src).try_into().unwrap())
+                .xor::<AsmRegister32, u32>(dst.try_into().unwrap(), (*src).try_into().unwrap())
                 .unwrap();
         }
         _ => todo!("xor {src} {dst}"),

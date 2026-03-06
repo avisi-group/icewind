@@ -12,15 +12,22 @@ pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
             width_in_bits: Width::_64,
         } => {
             assembler
-                .xor::<AsmRegister32, AsmRegister32>(target.into(), target.into())
+                .xor::<AsmRegister32, AsmRegister32>(
+                    target.try_into().unwrap(),
+                    target.try_into().unwrap(),
+                )
                 .unwrap();
-            assembler.setne::<AsmRegister8>(target.into()).unwrap();
+            assembler
+                .setne::<AsmRegister8>(target.try_into().unwrap())
+                .unwrap();
         }
         Operand {
             kind: R(PHYS(target)),
             width_in_bits: Width::_8,
         } => {
-            assembler.setne::<AsmRegister8>(target.into()).unwrap();
+            assembler
+                .setne::<AsmRegister8>(target.try_into().unwrap())
+                .unwrap();
         }
         _ => todo!("setne {dst}"),
     }
