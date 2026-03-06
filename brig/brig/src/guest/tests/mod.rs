@@ -7980,6 +7980,77 @@ fn fcvt() {
     assert_eq!(register_file.read::<f64>("_Z"), -3.141f64);
 }
 
+#[ktest]
+fn ucvtf() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 9e230061        ucvtf   s1, x3
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x9e230061,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("R3", 33141414u64);
+
+    translation.execute(&register_file);
+
+    let s1_offset = usize::try_from(model.reg_offset("_Z") + 1 * 256).unwrap();
+
+    assert_eq!(register_file.read_raw::<f32>(s1_offset), 33141414.0f32);
+}
+
+#[ktest]
+fn fdiv_s0_s0_s1() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e211800        fdiv    s0, s0, s1
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e211800,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
+#[ktest]
+fn fmul_s0_s0_s2() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e220800        fmul    s0, s0, s2
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e220800,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();

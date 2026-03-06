@@ -444,6 +444,11 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::cvtsi2ss(src, dst));
                             return dst;
                         }
+                        (Type::Unsigned(64), Type::Floating(32)) => {
+                            let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsi2ss(src, dst)); // changes based on argument size
+                            return dst;
+                        }
                         (Type::Floating(64), Type::Signed(32)) => {
                             let dst = Operand::vreg_general(Width::_32, self.next_vreg());
                             self.push_instruction(Instruction::cvtsds2i(src, dst));
@@ -1048,7 +1053,13 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             BinaryOperationKind::Sub(_, _) => {
                                 self.push_instruction(Instruction::subps(right, dst));
                             }
-                            _ => todo!(),
+                            BinaryOperationKind::Divide(_, _) => {
+                                self.push_instruction(Instruction::divps(right, dst));
+                            }
+                            BinaryOperationKind::Multiply(_, _) => {
+                                self.push_instruction(Instruction::mulps(right, dst));
+                            }
+                            op => todo!("{op:?}"),
                         }
                     } else {
                         panic!()

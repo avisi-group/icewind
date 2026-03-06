@@ -272,17 +272,17 @@ pub fn translate(
         let op1 = arguments[0].clone();
         let op2 = arguments[1].clone();
 
-        assert_eq!(op1.typ().width(), 64);
-        assert_eq!(op2.typ().width(), 64);
+        assert_eq!(op1.typ().width(), op2.typ().width());
+        let width = op1.typ().width();
 
-        let op1 = emitter.cast(op1, Type::Floating(64), CastOperationKind::Reinterpret);
-        let op2 = emitter.cast(op2, Type::Floating(64), CastOperationKind::Reinterpret);
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(width), CastOperationKind::Reinterpret);
 
         let res = emitter.binary_operation(BinaryOperationKind::Multiply(op1, op2));
 
         return Ok(Some(emitter.cast(
             res,
-            Type::Unsigned(64),
+            Type::Unsigned(width),
             CastOperationKind::Reinterpret,
         )));
     }

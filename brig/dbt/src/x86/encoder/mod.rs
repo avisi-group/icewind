@@ -93,12 +93,16 @@ pub enum Opcode {
     DIV(Operand),
     /// mulpd {0}, {1},
     MULPD(Operand, Operand),
+    /// mulps {0}, {1},
+    MULPS(Operand, Operand),
     /// addpd {0}, {1},
     ADDPD(Operand, Operand),
     /// subpd {0}, {1},
     SUBPD(Operand, Operand),
     /// divpd {0}, {1},
     DIVPD(Operand, Operand),
+    /// divps {0}, {1},
+    DIVPS(Operand, Operand),
     /// subps {0}, {1},
     SUBPS(Operand, Operand),
     /// cmppd {0}, {1}, {2}
@@ -724,6 +728,9 @@ impl Instruction {
     pub fn mulpd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::MULPD(src, dst))
     }
+    pub fn mulps(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::MULPS(src, dst))
+    }
 
     pub fn addpd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::ADDPD(src, dst))
@@ -735,6 +742,10 @@ impl Instruction {
 
     pub fn divpd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::DIVPD(src, dst))
+    }
+
+    pub fn divps(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::DIVPS(src, dst))
     }
 
     pub fn subps(src: Operand, dst: Operand) -> Self {
@@ -1310,6 +1321,22 @@ impl Instruction {
                     src.try_into().unwrap(),
                 )
                 .unwrap(),
+
+            MULPS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .mulps::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
             ADDPD(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1352,6 +1379,21 @@ impl Instruction {
                 },
             ) => assembler
                 .divpd::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+            DIVPS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .divps::<AsmRegisterXmm, AsmRegisterXmm>(
                     dst.try_into().unwrap(),
                     src.try_into().unwrap(),
                 )
@@ -1774,6 +1816,19 @@ impl Instruction {
                 .cvtsi2ss::<AsmRegisterXmm, AsmRegister32>(dst.try_into().unwrap(), src.into())
                 .unwrap(),
 
+            CVTSI2SS(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => assembler
+                .cvtsi2ss::<AsmRegisterXmm, AsmRegister64>(dst.try_into().unwrap(), src.into())
+                .unwrap(),
+
             CVTSD2SI(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1878,8 +1933,10 @@ impl Instruction {
             | Opcode::ADDPD(src, dst)
             | Opcode::SUBPD(src, dst)
             | Opcode::DIVPD(src, dst)
+            | Opcode::DIVPS(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::MULPD(src, dst)
+            | Opcode::MULPS(src, dst)
             | Opcode::PUNPCKL(src, dst)
             | Opcode::PUNPCKLWD(src, dst) => [
                 Some((OperandDirection::In, src)),
@@ -2020,9 +2077,11 @@ impl Instruction {
             | Opcode::AND(src, dst)
             | Opcode::IMUL(src, dst)
             | Opcode::MULPD(src, dst)
+            | Opcode::MULPS(src, dst)
             | Opcode::ADDPD(src, dst)
             | Opcode::SUBPD(src, dst)
             | Opcode::DIVPD(src, dst)
+            | Opcode::DIVPS(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::PUNPCKL(src, dst)
             | Opcode::PUNPCKLWD(src, dst) => {

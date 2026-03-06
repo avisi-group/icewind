@@ -1213,6 +1213,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     if value.typ() == target_type {
                         value
                     } else {
+                        // if cast_kind == CastOperationKind::Reinterpret {
+                        //     assert_eq!(value.typ().width(), target_type.width())
+                        // }
+
                         self.node(X86Node {
                             typ: target_type,
                             kind: NodeKind::Cast {
