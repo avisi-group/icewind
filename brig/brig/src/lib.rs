@@ -127,15 +127,18 @@ fn panic(info: &PanicInfo) -> ! {
 
     if let Some(device) = try_get_current_guest() {
         let guest_pc = device.core.register_file.read::<u64>("_PC");
-        log::error!(
-            "Guest PC = {guest_pc:#018x} ({:#010x}), EL = {}",
-            unsafe { *(guest_pc as *const u32) },
-            device.core.register_file.read::<u8>("PSTATE_EL")
-        );
 
         log::error!(
             "Last translated opcode = {:#010x}",
             models::LAST_TRANSLATED_OPCODE.load(Ordering::Relaxed)
+        );
+
+        log::error!("Guest PC = {guest_pc:#018x}");
+
+        log::error!(
+            "Guest PC deref = {:#010x}, EL = {}",
+            unsafe { *(guest_pc as *const u32) },
+            device.core.register_file.read::<u8>("PSTATE_EL")
         );
     };
 

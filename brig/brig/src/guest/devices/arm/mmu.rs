@@ -13,6 +13,14 @@ use {
 
 pub const AT_S1E1R: u64 = encode_sysreg_id(0b01, 0b000, 0b0111, 0b1000, 0b000);
 pub const DC_ZVA: u64 = encode_sysreg_id(0b01, 0b011, 0b0111, 0b0100, 0b001);
+pub const DBGBVR0_EL1: u64 = encode_sysreg_id(2, 0, 0, 0, 4);
+pub const DBGBVR1_EL1: u64 = encode_sysreg_id(2, 0, 0, 1, 4);
+pub const DBGBCR0_EL1: u64 = encode_sysreg_id(2, 0, 0, 0, 5);
+pub const DBGBCR1_EL1: u64 = encode_sysreg_id(2, 0, 0, 1, 5);
+pub const DBGWVR0_EL1: u64 = encode_sysreg_id(2, 0, 0, 0, 6);
+pub const DBGWVR1_EL1: u64 = encode_sysreg_id(2, 0, 0, 1, 6);
+pub const DBGWCR0_EL1: u64 = encode_sysreg_id(2, 0, 0, 0, 7);
+pub const DBGWCR1_EL1: u64 = encode_sysreg_id(2, 0, 0, 1, 7);
 
 pub fn at_s1e1r_handler(addr: u64) {
     let device = &get_current_guest().core;

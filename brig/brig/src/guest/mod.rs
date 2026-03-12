@@ -216,6 +216,13 @@ pub fn linux_platform() -> Guest {
     sysreg_helpers::register_fn(AT_S1E1R, at_s1e1r_handler);
     sysreg_helpers::register_fn(DC_ZVA, dc_zva_handler);
 
+    // DBG registers
+    for op2 in 4..=7 {
+        for crm in 0..=15 {
+            sysreg_helpers::register_fn(encode_sysreg_id(2, 0, 0, crm, op2), |_| {});
+        }
+    }
+
     // core
     let model = models::get("aarch64").unwrap();
     let initial_pc = 0x8000_0000;

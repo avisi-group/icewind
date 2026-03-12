@@ -8115,6 +8115,27 @@ fn fdiv_single() {
 }
 
 #[ktest]
+fn msr_dbgbcr0_el1() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  d51000a2        msr     dbgbcr0_el1, x2
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xd51000a2,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+}
+
+#[ktest]
 fn fsqrt() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
