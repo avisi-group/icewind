@@ -325,6 +325,23 @@ pub fn translate(
         )));
     }
 
+    if function == "FPSqrt" {
+        let op1 = arguments[0].clone();
+
+        let width = op1.typ().width();
+        assert!(matches!(width, 64 | 32));
+
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let res = emitter.unary_operation(crate::x86::emitter::UnaryOperationKind::SquareRoot(op1));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(width),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
     if function == "FPCompare" {
         // bv op1, bv op2, bool signal_nans, FPCRType fpcr
 

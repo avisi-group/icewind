@@ -112,6 +112,10 @@ pub enum Opcode {
     DIVPS(Operand, Operand),
     /// subps {0}, {1},
     SUBPS(Operand, Operand),
+    /// sqrtss {0}, {1},
+    SQRTSS(Operand, Operand),
+    /// sqrtsd {0}, {1},
+    SQRTSD(Operand, Operand),
     /// cmppd {0}, {1}, {2}
     CMPPD(Operand, Operand, Operand),
     /// cmpps {0}, {1}, {2}
@@ -782,6 +786,14 @@ impl Instruction {
     pub fn div(divisor: Operand) -> Self {
         Self(Opcode::DIV(divisor))
     }
+
+    pub fn sqrtss(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::SQRTSS(src, dst))
+    }
+    pub fn sqrtsd(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::SQRTSD(src, dst))
+    }
+
     pub fn cqo() -> Self {
         Self(Opcode::CQO)
     }
@@ -2040,6 +2052,23 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            SQRTSD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .sqrtsd::<AsmRegisterXmm, AsmRegisterXmm>(
+                        dst.try_into().unwrap(),
+                        src.try_into().unwrap(),
+                    )
+                    .unwrap();
+            }
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -2061,7 +2090,9 @@ impl Instruction {
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
             | Opcode::CVTSS2SI(src, dst)
-            | Opcode::CVTSD2SS(src, dst) => [
+            | Opcode::CVTSD2SS(src, dst)
+            | Opcode::SQRTSS(src, dst)
+            | Opcode::SQRTSD(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
                 None,
@@ -2212,7 +2243,9 @@ impl Instruction {
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
             | Opcode::CVTSS2SI(src, dst)
-            | Opcode::CVTSD2SS(src, dst) => {
+            | Opcode::CVTSD2SS(src, dst)
+            | Opcode::SQRTSS(src, dst)
+            | Opcode::SQRTSD(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::Out, dst)]
                     .into_iter()
                     .collect()

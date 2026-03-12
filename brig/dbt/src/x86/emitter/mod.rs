@@ -710,6 +710,11 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     kind: NodeKind::UnaryOperation(op),
                 }),
             },
+
+            SquareRoot(value) => self.node(X86Node {
+                typ: value.typ().clone(),
+                kind: NodeKind::UnaryOperation(op),
+            }),
             _ => {
                 todo!("{op:?}")
             }

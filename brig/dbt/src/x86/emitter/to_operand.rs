@@ -944,6 +944,18 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
                 quotient
             }
+            UnaryOperationKind::SquareRoot(value) => {
+                let op = self.to_operand(value);
+                let dest = Operand::vreg_xmm(op.width(), self.next_vreg());
+
+                self.push_instruction(match op.width() {
+                    Width::_32 => Instruction::sqrtss(op, dest),
+                    Width::_64 => Instruction::sqrtsd(op, dest),
+                    _ => todo!(),
+                });
+
+                dest
+            }
             kind => todo!("{kind:?}"),
         }
     }
