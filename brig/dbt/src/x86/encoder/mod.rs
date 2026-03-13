@@ -1329,7 +1329,7 @@ impl Instruction {
                 width_in_bits: Width::_8,
             }) => {
                 assembler
-                    .setne::<AsmRegister8>(dst.try_into().unwrap())
+                    .setb::<AsmRegister8>(dst.try_into().unwrap())
                     .unwrap();
             }
             SETNZ(Operand {

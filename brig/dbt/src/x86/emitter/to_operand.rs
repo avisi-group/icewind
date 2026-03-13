@@ -132,7 +132,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     .unwrap(),
                 );
 
-                if EMIT_TRACING {
+                if EMIT_TRACING && width < Width::_128 {
                     let mut arguments = Vec::new_in(self.ctx().allocator());
                     arguments.push(Operand::imm(Width::_64, *offset));
 

@@ -669,16 +669,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 },
             )),
             "min_int" => {
-                let true_value = args[0].clone();
-                let false_value = args[1].clone();
+                let left = args[0].clone();
+                let right = args[1].clone();
 
                 let condition = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareLessThan,
-                        lhs: true_value.clone(),
-                        rhs: false_value.clone(),
+                        lhs: left.clone(),
+                        rhs: right.clone(),
                     },
                 );
 
@@ -687,8 +687,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::Select {
                         condition,
-                        true_value,
-                        false_value,
+                        true_value: left,
+                        false_value: right,
                     },
                 ))
             }

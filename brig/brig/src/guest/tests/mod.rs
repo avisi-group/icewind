@@ -8156,6 +8156,135 @@ fn fsqrt() {
     let translation = Translation::new(ctx.compile(num_regs));
 }
 
+#[ktest]
+fn min() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let left = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(8));
+    let right = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(8));
+
+    let condition = emitter.binary_operation(BinaryOperationKind::CompareLessThan(
+        left.clone(),
+        right.clone(),
+    ));
+    let res = emitter.select(condition, left, right);
+
+    emitter.write_register(model.reg_offset("R2"), res);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("R0", 22);
+    register_file.write("R1", 13);
+
+    log::error!("{translation:?}");
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u8>("R2"), 13);
+}
+
+#[ktest]
+fn uminp() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 6e22ac20 	uminp	v0.16b, v1.16b, v2.16b
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_max_min_pair
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6e22ac20,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset;
+    let q1_offset = z_offset + 256;
+    let q2_offset = z_offset + 2 * 256;
+
+    register_file.write_raw::<u128>(
+        q1_offset,
+        u128::from_ne_bytes([22, 13, 2, 3, 4, 5, 6, 7, 8, 90, 10, 11, 22, 0, 1, 16]),
+    );
+    register_file.write_raw::<u128>(
+        q2_offset,
+        u128::from_ne_bytes([100, 1, 0, 3, 3, 10, 7, 7, 8, 91, 10, 1, 12, 13, 13, 15]),
+    );
+
+    translation.execute(&register_file);
+
+    log::error!("{translation:?}");
+
+    assert_eq!(
+        register_file.read_raw::<[u8; 16]>(q0_offset),
+        [13, 2, 4, 6, 8, 10, 0, 1, 1, 0, 3, 7, 8, 1, 12, 13]
+    );
+}
+
+#[ktest]
+fn strlen_asimd() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // adc10821 	ldp	q1, q2, [x1, #32]!
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0xadc10821,
+        0x0,
+    )
+    .unwrap();
+
+    // 6e22ac20 	uminp	v0.16b, v1.16b, v2.16b
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6e22ac20,
+        0x0,
+    )
+    .unwrap();
+
+    let data = Box::new(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\0BADBADBADBADBADBADBADBADBADBAD");
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("R1", data.as_ptr() as u64 - 32);
+
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+
+    let q0_offset = z_offset;
+    let q1_offset = z_offset + 256;
+    let q2_offset = z_offset + 2 * 256;
+
+    let q0 = register_file.read_raw::<u128>(q0_offset.try_into().unwrap());
+    let q1 = register_file.read_raw::<u128>(q1_offset.try_into().unwrap());
+    let q2 = register_file.read_raw::<u128>(q2_offset.try_into().unwrap());
+
+    assert_eq!(q1, u128::from_ne_bytes([b'a'; 16]));
+    assert_eq!(q2, u128::from_ne_bytes([b'a'; 16]));
+
+    assert_eq!(q0, u128::from_ne_bytes([b'a'; 16]));
+}
+
 // #[ktest]
 // fn tbl() {
 //     let (model, register_file, mut ctx) = setup();

@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, flush_tlb, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
-            trace_register_read, trace_register_write,
+            self, trace_instruction_end, trace_instruction_start, trace_memory_read,
+            trace_memory_write, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -70,6 +70,8 @@ pub static BUMP_ALLOCATOR: Lazy<BumpAllocator> =
 static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub static LAST_TRANSLATED_OPCODE: AtomicU32 = AtomicU32::new(0);
+
+pub static HIT_PROGRAM_START: AtomicBool = AtomicBool::new(false);
 
 pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -232,12 +234,6 @@ impl ModelDevice {
         let mut region_virt_base = 1u64;
         let mut region_phys_base = 1u64;
 
-        // only trace userspace
-        crate::guest::tracing::ENABLED.store(
-            true, //  self.register_file.read::<u8>("PSTATE_EL") == 0,
-            Ordering::Relaxed,
-        );
-
         // block translation/execution loop
         loop {
             {
@@ -262,6 +258,16 @@ impl ModelDevice {
             }
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
+
+            if block_start_virtual_pc == 0x400640 {
+                HIT_PROGRAM_START.store(true, Ordering::Relaxed);
+            }
+
+            tracing::ENABLED.store(
+                HIT_PROGRAM_START.load(Ordering::Relaxed)
+                    && self.register_file.read::<u8>("PSTATE_EL") == 0,
+                Ordering::Relaxed,
+            );
 
             if (block_start_virtual_pc & !0xFFF) != region_virt_base {
                 let block_start_physical_pc =

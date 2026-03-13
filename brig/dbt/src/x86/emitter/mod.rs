@@ -1832,7 +1832,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             .unwrap(),
         );
 
-        if EMIT_TRACING {
+        if EMIT_TRACING && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(Operand::imm(Width::_64, offset));
 
@@ -1879,7 +1879,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest).unwrap(),
         );
 
-        if EMIT_TRACING {
+        if EMIT_TRACING && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 
@@ -1975,7 +1975,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             panic!()
         }
 
-        if EMIT_TRACING {
+        if EMIT_TRACING && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 
