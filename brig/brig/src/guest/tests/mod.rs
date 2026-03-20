@@ -6673,7 +6673,117 @@ fn cmeq_v116b() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let _translation = ctx.compile(num_regs);
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset + (0 * 256);
+    let q1_offset = z_offset + (1 * 256);
+
+    register_file.write_raw::<u128>(q0_offset, 0x2100_96d8_14e4_9609_007a_d17c_5afb_3d00u128);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q1_offset),
+        0x00ff_0000_0000_0000_ff00_0000_0000_00ff
+    );
+}
+
+#[ktest]
+fn cmeq_v14s() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 4ea09801        cmeq    v1.4s, v0.4s, #0
+    // execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4ea09801,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset + (0 * 256);
+    let q1_offset = z_offset + (1 * 256);
+
+    register_file.write_raw::<u128>(q0_offset, 0x0000_0000_0000_0001_0000_0000_0000_0000u128);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q1_offset),
+        0xffff_ffff_0000_0000_ffff_ffff_ffff_ffff
+    );
+}
+
+#[ktest]
+fn u128_global_test_low() {
+    let (_, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _0 = emitter.constant(0, Type::Unsigned(128));
+    emitter.write_stack_variable(0, _0);
+
+    let read = emitter.read_stack_variable(0, Type::Unsigned(128));
+    let _ffff = emitter.constant(0xffff, Type::Unsigned(16));
+    let _16 = emitter.constant(16, Type::Signed(64));
+    let res = emitter.bit_insert(read, _ffff, _16.clone(), _16);
+    emitter.write_stack_variable(0, res);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    translation.execute(&register_file);
+
+    let greg_offset = register_file.global_register_offset();
+
+    assert_eq!(
+        register_file.read_raw::<u128>(greg_offset),
+        0x0000_0000_0000_0000_0000_0000_ffff_0000
+    );
+}
+
+#[ktest]
+fn u128_global_test_high() {
+    let (_, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let _0 = emitter.constant(0, Type::Unsigned(128));
+    emitter.write_stack_variable(0, _0);
+
+    let read = emitter.read_stack_variable(0, Type::Unsigned(128));
+    let _ffff = emitter.constant(0xffff, Type::Unsigned(16));
+    let _16 = emitter.constant(16, Type::Signed(64));
+    let _80 = emitter.constant(80, Type::Signed(64));
+    let res = emitter.bit_insert(read, _ffff, _80, _16);
+    emitter.write_stack_variable(0, res);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    translation.execute(&register_file);
+
+    let greg_offset = register_file.global_register_offset();
+
+    assert_eq!(
+        register_file.read_raw::<u128>(greg_offset),
+        0x0000_0000_ffff_0000_0000_0000_0000_0000
+    );
 }
 
 #[ktest]
@@ -7810,7 +7920,6 @@ fn gcc_segfault_str() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
-    log::error!("{translation:?}");
 
     let mut mem = Box::new(0u32);
 
@@ -8179,8 +8288,6 @@ fn min() {
     register_file.write("R0", 22);
     register_file.write("R1", 13);
 
-    log::error!("{translation:?}");
-
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u8>("R2"), 13);
@@ -8224,66 +8331,83 @@ fn uminp() {
 
     translation.execute(&register_file);
 
-    log::error!("{translation:?}");
-
     assert_eq!(
         register_file.read_raw::<[u8; 16]>(q0_offset),
         [13, 2, 4, 6, 8, 10, 0, 1, 1, 0, 3, 7, 8, 1, 12, 13]
     );
 }
 
-#[ktest]
-fn strlen_asimd() {
-    let (model, register_file, mut ctx) = setup();
-    let mut emitter = X86Emitter::new(&mut ctx);
+// #[ktest]
+// fn shrn() {
+//     todo!()
+// }
 
-    // adc10821 	ldp	q1, q2, [x1, #32]!
-    translate_instruction(
-        &*model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0xadc10821,
-        0x0,
-    )
-    .unwrap();
+// #[ktest]
+// fn strlen_asimd() {
+//     let (model, register_file, mut ctx) = setup();
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-    // 6e22ac20 	uminp	v0.16b, v1.16b, v2.16b
-    translate_instruction(
-        &*model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0x6e22ac20,
-        0x0,
-    )
-    .unwrap();
+//     // ORIGINAL:
 
-    let data = Box::new(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\0BADBADBADBADBADBADBADBADBADBAD");
+//     //   4179a0:	adc10821 	ldp	q1, q2, [x1, #32]!
+//     //   4179a4:	6e22ac20 	uminp	v0.16b, v1.16b, v2.16b
+//     //   4179a8:	6e20ac00 	uminp	v0.16b, v0.16b, v0.16b
+//     //   4179ac:	0e209800 	cmeq	v0.8b, v0.8b, #0
+//     //   4179b0:	9e660003 	fmov	x3, d0
+//     //   4179b4:	b4ffff63 	cbz	x3, 4179a0 <__strlen_asimd+0xa0>
+//     //   4179b8:	4e209820 	cmeq	v0.16b, v1.16b, #0
+//     //   4179bc:	cb000020 	sub	x0, x1, x0
+//     //   4179c0:	35000063 	cbnz	w3, 4179cc <__strlen_asimd+0xcc>
+//     //   4179c4:	4e209840 	cmeq	v0.16b, v2.16b, #0
+//     //   4179c8:	91004000 	add	x0, x0, #0x10
+//     //   4179cc:	0f0c8400 	shrn	v0.8b, v0.8h, #4
+//     //   4179d0:	9e660003 	fmov	x3, d0
+//     //   4179d4:	dac00063 	rbit	x3, x3
+//     //   4179d8:	dac01062 	clz	x2, x3
+//     //   4179dc:	8b420800 	add	x0, x0, x2, lsr #2
+//     //   4179e0:	d65f03c0 	ret
 
-    emitter.leave();
-    let num_regs = emitter.next_vreg();
-    let translation = Translation::new(ctx.compile(num_regs));
+//     // BRANCHLESS (using trace)
 
-    register_file.write("R1", data.as_ptr() as u64 - 32);
+//     for instr in [0x0] {
+//         translate_instruction(
+//             &*model,
+//             "__DecodeA64",
+//             &mut emitter,
+//             &register_file,
+//             instr,
+//             0x0,
+//         )
+//         .unwrap();
+//     }
 
-    translation.execute(&register_file);
+//     let data =
+// Box::new(b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\
+// 0BADBADBADBADBADBADBADBADBADBAD");
 
-    let z_offset = model.reg_offset("_Z");
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+//     let translation = Translation::new(ctx.compile(num_regs));
 
-    let q0_offset = z_offset;
-    let q1_offset = z_offset + 256;
-    let q2_offset = z_offset + 2 * 256;
+//     register_file.write("R1", data.as_ptr() as u64 - 32);
 
-    let q0 = register_file.read_raw::<u128>(q0_offset.try_into().unwrap());
-    let q1 = register_file.read_raw::<u128>(q1_offset.try_into().unwrap());
-    let q2 = register_file.read_raw::<u128>(q2_offset.try_into().unwrap());
+//     translation.execute(&register_file);
 
-    assert_eq!(q1, u128::from_ne_bytes([b'a'; 16]));
-    assert_eq!(q2, u128::from_ne_bytes([b'a'; 16]));
+//     let z_offset = model.reg_offset("_Z");
 
-    assert_eq!(q0, u128::from_ne_bytes([b'a'; 16]));
-}
+//     let q0_offset = z_offset;
+//     let q1_offset = z_offset + 256;
+//     let q2_offset = z_offset + 2 * 256;
+
+//     let q0 = register_file.read_raw::<u128>(q0_offset.try_into().unwrap());
+//     let q1 = register_file.read_raw::<u128>(q1_offset.try_into().unwrap());
+//     let q2 = register_file.read_raw::<u128>(q2_offset.try_into().unwrap());
+
+//     assert_eq!(q1, u128::from_ne_bytes([b'a'; 16]));
+//     assert_eq!(q2, u128::from_ne_bytes([b'a'; 16]));
+
+//     assert_eq!(q0, u128::from_ne_bytes([b'a'; 16]));
+// }
 
 // #[ktest]
 // fn tbl() {

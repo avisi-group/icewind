@@ -922,28 +922,28 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     //     )
                     // }
 
-                    log::trace!(
-                        "{} {} = {:?}",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                        value.kind(),
-                    );
+                    // log::trace!(
+                    //     "{} {} = {:?}",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    //     value.kind(),
+                    // );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    log::trace!(
-                        "{} {} = ()",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                    );
+                    // log::trace!(
+                    //     "{} {} = ()",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    // );
                 }
                 StatementResult::ControlFlow(block_result) => {
-                    log::trace!(
-                        "{} {} = {:?}",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                        block_result
-                    );
+                    // log::trace!(
+                    //     "{} {} = {:?}",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    //     block_result
+                    // );
                     return Ok(block_result);
                 }
             }
@@ -1041,6 +1041,10 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                             || (symbol.name().as_ref() == "address"
                                 && self.function.name().as_ref()
                                     == "execute_aarch64_instrs_memory_pair_general_post_idx")
+                        // hack to workaround cmeq re-using same test_passed variable for each loop
+                            || (symbol.name().as_ref() == "result"
+                                && self.function.name().as_ref()
+                                    == "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd")
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
@@ -1693,24 +1697,14 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 value.unwrap_or_else(|| panic!("local virtual variable never written to"))
             }
             Variable::Stack { id, typ } => {
-                let read = self.emitter.read_stack_variable(id, typ);
-
-                if matches!(typ, Type::Bits) {
+                let typ = if matches!(typ, Type::Bits) {
                     let width = *self.bits_stack_widths.get(&id).unwrap();
-
-                    if width > Type::Bits.width() {
-                        self.emitter.cast(
-                            read,
-                            Type::Unsigned(width),
-                            CastOperationKind::ZeroExtend,
-                        )
-                    } else {
-                        self.emitter
-                            .cast(read, Type::Unsigned(width), CastOperationKind::Truncate)
-                    }
+                    Type::Unsigned(width)
                 } else {
-                    read
-                }
+                    typ
+                };
+
+                self.emitter.read_stack_variable(id, typ)
             }
         }
     }
