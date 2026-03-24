@@ -6654,7 +6654,7 @@ fn _poly32mod2() {
 }
 
 #[ktest]
-fn cmeq_v116b() {
+fn cmeq_zero_v116b() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -6691,7 +6691,7 @@ fn cmeq_v116b() {
 }
 
 #[ktest]
-fn cmeq_v14s() {
+fn cmeq_zero_v14s() {
     let (model, register_file, mut ctx) = setup();
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -8334,6 +8334,199 @@ fn uminp() {
     assert_eq!(
         register_file.read_raw::<[u8; 16]>(q0_offset),
         [13, 2, 4, 6, 8, 10, 0, 1, 1, 0, 3, 7, 8, 1, 12, 13]
+    );
+}
+
+#[ktest]
+fn dup() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  4e010c20 	dup	v0.16b, w1
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4e010c20,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset;
+
+    register_file.write::<u32>("R1", 0x25);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read_raw::<[u8; 16]>(q0_offset), [0x25; 16]);
+}
+
+#[ktest]
+fn ld1() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 4c407041 	ld1	{v1.16b}, [x2]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4c407041,
+        0x0,
+    )
+    .unwrap();
+
+    let data = Box::new([1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q1_offset = z_offset + 256;
+
+    register_file.write("R2", data.as_ptr() as u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read_raw::<[u8; 16]>(q1_offset), *data);
+}
+
+#[ktest]
+fn cmeq_register_16b() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 6e208c23 	cmeq	v3.16b, v1.16b, v0.16b
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_bitwise_sisd
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6e208c23,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset + (0 * 256);
+    let q1_offset = z_offset + (1 * 256);
+    let q3_offset = z_offset + (3 * 256);
+
+    register_file.write_raw::<[u8; 16]>(q0_offset, [0x25; 16]);
+    register_file.write_raw::<[u8; 16]>(
+        q1_offset,
+        // 1 0 2 0 0 0 0 0 %x\lf 0 0 0 0 0
+        [
+            0x1, 0x0, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x25, 0x78, 0xa, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ],
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q3_offset),
+        0x0000_0000_0000_00ff_0000_0000_0000_0000
+    );
+}
+
+#[ktest]
+fn cmeq_register_4s() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  6ea08c23        cmeq    v3.4s, v1.4s, v0.4s
+    // execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_bitwise_sisd
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6ea08c23,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q0_offset = z_offset + (0 * 256);
+    let q1_offset = z_offset + (1 * 256);
+    let q3_offset = z_offset + (3 * 256);
+
+    register_file.write_raw::<u128>(q0_offset, 0x00000025_00000025_00000025_00000025u128);
+    register_file.write_raw::<u128>(q1_offset, 0x01000025_00000025_00000000_ffffffffu128);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q3_offset),
+        0x00000000_ffffffff_00000000_00000000
+    );
+}
+
+#[ktest]
+fn cmhs() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  6e213c63 	cmhs	v3.16b, v3.16b, v1.16b
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6e213c63,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset = model.reg_offset("_Z") as usize;
+
+    let q1_offset = z_offset + (1 * 256);
+    let q3_offset = z_offset + (3 * 256);
+
+    register_file.write_raw::<u128>(
+        q1_offset,
+        // 1 0 2 0 0 0 0 0 % x \lf 0 0 0 0 0
+        0x00000000000a78250000000000020001,
+    );
+    register_file.write_raw::<u128>(
+        q3_offset,
+        // result of cmeq?
+        0x0000_0000_0000_00ff_0000_0000_0000_0000,
+    );
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q3_offset),
+        0xffff_ffff_ff00_00ff_ffff_ffff_ff00_ff00
     );
 }
 

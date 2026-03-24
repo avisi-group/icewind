@@ -1043,8 +1043,14 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                                     == "execute_aarch64_instrs_memory_pair_general_post_idx")
                         // hack to workaround cmeq re-using same test_passed variable for each loop
                             || (symbol.name().as_ref() == "result"
-                                && self.function.name().as_ref()
-                                    == "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd")
+                                && (self.function.name().as_ref()
+                                    == "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd"
+                                    || self.function.name().as_ref()
+                                    == "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_bitwise_sisd")
+
+                                  || self.function.name().as_ref()
+                                    == "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_int_sisd"
+                                )
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there

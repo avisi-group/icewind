@@ -23,7 +23,7 @@ static LOGGER: &Logger = &Logger {
         ("brig::guest::models", LevelFilter::Info),
         ("dbt::x86::register_allocator", LevelFilter::Info),
         ("dbt::x86", LevelFilter::Info),
-        ("dbt::translate", LevelFilter::Info),
+        ("dbt::translate", LevelFilter::Debug),
         ("dbt::interpret", LevelFilter::Info),
         ("kernel::arch::x86::irq", LevelFilter::Trace),
         ("kernel::arch::x86::aarch64_mmu", LevelFilter::Trace),
