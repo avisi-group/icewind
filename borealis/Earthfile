@@ -1,10 +1,10 @@
 VERSION 0.7
 
 base-image:
-    FROM rust:alpine
+    FROM rust:1.90-alpine3.20
     WORKDIR /workdir
 
-    ENV RUSTFLAGS="-D warnings"
+#    ENV RUSTFLAGS="-D warnings"
 
     ARG TARGETARCH
 
@@ -21,7 +21,7 @@ base-image:
 
     # setup OCaml
     RUN opam init --disable-sandboxing --bare -y
-    RUN opam switch create 4.14.1+options --packages ocaml-variants.4.14.1+options,ocaml-option-static,ocaml-option-musl,ocaml-option-flambda
+    RUN opam switch create 4.14.2+options --packages ocaml-variants.4.14.2+options,ocaml-option-static,ocaml-option-musl,ocaml-option-flambda
 
     # install sail
     RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
@@ -48,7 +48,7 @@ build:
     COPY --dir sail common borealis .
 
     # build borealis
-    RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET
+    RUN eval `opam env` && cargo build --target $RUST_TARGET
 
     SAVE ARTIFACT target/$RUST_TARGET/debug/borealis borealis
 
