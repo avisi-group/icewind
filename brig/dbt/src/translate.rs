@@ -800,9 +800,12 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     variables,
                 } => {
                     self.emitter.set_current_block(x86_block);
-                    log::trace!(
-                        "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
+
+                    log::debug!(
+                        "translating static block rudder={rudder_block:?}, x86={x86_block:?}",
                     );
+                    log::trace!("block variables: {variables:?}");
+
                     let res = self.translate_block(rudder_block, false, variables)?;
                     log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     res
@@ -824,9 +827,10 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
 
                     self.emitter.set_current_block(x86_block);
 
-                    log::trace!(
-                        "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
+                    log::debug!(
+                        "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}",
                     );
+                    log::trace!("block variables: {variables:?}");
 
                     let res = self.translate_block(rudder_block, true, variables)?;
                     log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
@@ -1043,14 +1047,16 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                                     == "execute_aarch64_instrs_memory_pair_general_post_idx")
                         // hack to workaround cmeq re-using same test_passed variable for each loop
                             || (symbol.name().as_ref() == "result"
-                                && (self.function.name().as_ref()
-                                    == "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd"
-                                    || self.function.name().as_ref()
-                                    == "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_bitwise_sisd")
+                                && (
 
-                                  || self.function.name().as_ref()
-                                    == "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_int_sisd"
-                                )
+                                    [
+                                        "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_bulk_sisd",
+                                        "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_bitwise_sisd",
+                                        "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_int_sisd",
+                                        "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_lessthan_sisd",
+                                        ].contains(&self.function.name().as_ref())
+
+                                ))
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there

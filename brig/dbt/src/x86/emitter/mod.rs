@@ -106,13 +106,10 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
         let function_reg = Operand::vreg(Width::_64, self.next_vreg());
         self.push_instruction(Instruction::mov(function, function_reg).unwrap());
 
-        //self.to_operand_reg_promote(&function);
-
         let arg_count = arguments.len();
 
         arguments
             .into_iter()
-            // .map(|arg| self.to_operand(&arg))
             .collect::<Vec<_>>()
             .into_iter()
             .zip(ARG_REGS.iter())
@@ -333,12 +330,12 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             value: length_c, ..
         } = length.kind()
         else {
-            panic!()
+            panic!("{length:#?}")
         };
         let length_c = *length_c;
 
         if length_c > 64 {
-            panic!()
+            panic!("{length_c:?}")
         }
 
         // let low_start = if start >= 64 { 0 } else { start };

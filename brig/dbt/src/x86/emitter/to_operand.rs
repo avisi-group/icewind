@@ -21,7 +21,6 @@ use {
         cmp::{Ordering, min},
         panic,
     },
-    iced_x86::code_asm::es,
 };
 
 impl<'a, 'ctx> X86Emitter<'ctx> {
