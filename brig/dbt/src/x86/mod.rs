@@ -23,7 +23,7 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-pub const EMIT_TRACING: bool = true;
+pub const EMIT_TRACING: bool = false;
 
 // sysv64 ABI
 pub const ARG_REGS: &[PhysicalRegister] = &[

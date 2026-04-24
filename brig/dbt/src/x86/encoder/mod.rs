@@ -60,6 +60,8 @@ pub enum Opcode {
     CVTSS2SD(Operand, Operand),
     /// cvtsd2ss {0}, {1}
     CVTSD2SS(Operand, Operand),
+    /// cvttss2si {0}, {1}
+    CVTTSS2SI(Operand, Operand),
     /// lea {0}, {1}
     LEA(Operand, Operand),
     /// shl {0}, {1}
@@ -971,6 +973,11 @@ impl Instruction {
     pub fn cvtss2sd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::CVTSS2SD(src, dst))
     }
+
+    pub fn cvttss2si(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::CVTTSS2SI(src, dst))
+    }
+
     pub fn cvtss2si(src: Operand, dst: Operand) -> Self {
         Self(Opcode::CVTSS2SI(src, dst))
     }
@@ -1898,6 +1905,22 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            CVTSS2SI(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .cvtss2si::<AsmRegister64, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
             CVTSI2SD(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1962,6 +1985,22 @@ impl Instruction {
                 )
                 .unwrap(),
 
+            CVTSD2SI(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .cvtsd2si::<AsmRegister64, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+
             CVTSS2SD(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1978,7 +2017,7 @@ impl Instruction {
                 )
                 .unwrap(),
 
-            CVTSS2SI(
+            CVTTSS2SI(
                 Operand {
                     kind: R(PHYS(src)),
                     width_in_bits: Width::_32,
@@ -1988,7 +2027,7 @@ impl Instruction {
                     width_in_bits: Width::_32,
                 },
             ) => assembler
-                .cvtss2si::<AsmRegister32, AsmRegisterXmm>(
+                .cvttss2si::<AsmRegister32, AsmRegisterXmm>(
                     dst.try_into().unwrap(),
                     src.try_into().unwrap(),
                 )
@@ -2090,6 +2129,7 @@ impl Instruction {
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
             | Opcode::CVTSS2SI(src, dst)
+            | Opcode::CVTTSS2SI(src, dst)
             | Opcode::CVTSD2SS(src, dst)
             | Opcode::SQRTSS(src, dst)
             | Opcode::SQRTSD(src, dst) => [
@@ -2243,6 +2283,7 @@ impl Instruction {
             | Opcode::CVTSD2SI(src, dst)
             | Opcode::CVTSS2SD(src, dst)
             | Opcode::CVTSS2SI(src, dst)
+            | Opcode::CVTTSS2SI(src, dst)
             | Opcode::CVTSD2SS(src, dst)
             | Opcode::SQRTSS(src, dst)
             | Opcode::SQRTSD(src, dst) => {

@@ -8530,6 +8530,66 @@ fn fcvt() {
     // assert_eq!(register_file.read::<f64>("_Z"), -3.141f64);
 }
 
+#[ktest]
+fn fmadd() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1f410040        fmadd   d0, d2, d1, d0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1f410040,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let z_offset: usize = model.reg_offset("_Z").try_into().unwrap();
+
+    let q0_offset = z_offset + 0 * 256;
+    let q1_offset = z_offset + 1 * 256;
+    let q2_offset = z_offset + 2 * 256;
+
+    register_file.write_raw::<f64>(q0_offset, 1.33);
+    register_file.write_raw::<f64>(q1_offset, 0.5);
+    register_file.write_raw::<f64>(q2_offset, 100.0);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read_raw::<f64>(q0_offset),
+        (100.0 * 0.5) + 1.33
+    );
+}
+
+#[ktest]
+fn frintm() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+    // 1e654000        frintm  d0, d0
+    // execute_aarch64_instrs_float_arithmetic_round_frint
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e654000,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+    translation.execute(&register_file);
+}
+
 // #[ktest]
 // fn shrn() {
 //     todo!()

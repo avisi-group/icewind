@@ -440,32 +440,28 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     }
 
                     (Convert, _) => match (value.typ(), node.typ()) {
-                        (Type::Signed(64), Type::Floating(64)) => {
+                        (Type::Signed(32) | Type::Unsigned(32), Type::Floating(64)) => {
                             let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
                             self.push_instruction(Instruction::cvtsi2sd(src, dst));
                             return dst;
                         }
-                        (Type::Signed(32), Type::Floating(64)) => {
-                            let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
-                            self.push_instruction(Instruction::cvtsi2sd(src, dst));
-                            return dst;
-                        }
-                        (Type::Signed(32), Type::Floating(32)) => {
+                        (Type::Signed(32) | Type::Unsigned(32), Type::Floating(32)) => {
                             let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
                             self.push_instruction(Instruction::cvtsi2ss(src, dst));
                             return dst;
                         }
-                        (Type::Unsigned(32), Type::Floating(32)) => {
-                            let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
-                            self.push_instruction(Instruction::cvtsi2ss(src, dst));
-                            return dst;
-                        }
-                        (Type::Unsigned(64), Type::Floating(32)) => {
+
+                        (Type::Signed(64) | Type::Unsigned(64), Type::Floating(32)) => {
                             let dst = Operand::vreg_xmm(Width::_32, self.next_vreg());
                             self.push_instruction(Instruction::cvtsi2ss(src, dst)); // changes based on argument size
                             return dst;
                         }
-                        (Type::Floating(64), Type::Signed(32)) => {
+                        (Type::Signed(64) | Type::Unsigned(64), Type::Floating(64)) => {
+                            let dst = Operand::vreg_xmm(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsi2sd(src, dst));
+                            return dst;
+                        }
+                        (Type::Floating(64), Type::Signed(32) | Type::Unsigned(32)) => {
                             let dst = Operand::vreg_general(Width::_32, self.next_vreg());
                             self.push_instruction(Instruction::cvtsd2si(src, dst));
                             return dst;
@@ -475,9 +471,22 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                             self.push_instruction(Instruction::cvtss2sd(src, dst));
                             return dst;
                         }
-                        (Type::Floating(32), Type::Signed(32)) => {
+
+                        (Type::Floating(32), Type::Signed(32) | Type::Unsigned(32)) => {
                             let dst = Operand::vreg_general(Width::_32, self.next_vreg());
+                            self.push_instruction(Instruction::cvttss2si(src, dst));
+                            return dst;
+                        }
+
+                        (Type::Floating(32), Type::Signed(64) | Type::Unsigned(64)) => {
+                            let dst = Operand::vreg_general(Width::_64, self.next_vreg());
                             self.push_instruction(Instruction::cvtss2si(src, dst));
+                            return dst;
+                        }
+
+                        (Type::Floating(64), Type::Signed(64) | Type::Unsigned(64)) => {
+                            let dst = Operand::vreg_general(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::cvtsd2si(src, dst));
                             return dst;
                         }
 

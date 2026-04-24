@@ -164,6 +164,23 @@ pub fn translate(
         return translate(model, "AArch64_UndefinedFault", &[], emitter, register_file);
     }
 
+    if function == "FPRoundInt" {
+        let op = arguments[0].clone();
+        let fpcr = arguments[1].clone();
+        let rounding = arguments[2].clone();
+        let exact = arguments[3].clone();
+
+        let width = op.typ().width();
+
+        let op = emitter.cast(op, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        return Ok(Some(emitter.cast(
+            op,
+            Type::Unsigned(width),
+            CastOperationKind::Convert,
+        )));
+    }
+
     if function == "FPToFixed" {
         // op: bv,
         // fbits: int
@@ -300,6 +317,33 @@ pub fn translate(
 
         return Ok(Some(emitter.cast(
             res,
+            Type::Unsigned(width),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
+    if function == "FPMulAdd" {
+        let addend = arguments[0].clone();
+        let op1 = arguments[1].clone();
+        let op2 = arguments[2].clone();
+
+        assert_eq!(op1.typ().width(), op2.typ().width());
+        let width = op1.typ().width();
+
+        let addend = emitter.cast(
+            addend,
+            Type::Floating(width),
+            CastOperationKind::Reinterpret,
+        );
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+        let op2 = emitter.cast(op2, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let res = emitter.binary_operation(BinaryOperationKind::Multiply(op1, op2));
+
+        let res2 = emitter.binary_operation(BinaryOperationKind::Add(res, addend));
+
+        return Ok(Some(emitter.cast(
+            res2,
             Type::Unsigned(width),
             CastOperationKind::Reinterpret,
         )));
@@ -801,7 +845,7 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                 } => {
                     self.emitter.set_current_block(x86_block);
 
-                    log::debug!(
+                    log::trace!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}",
                     );
                     log::trace!("block variables: {variables:?}");
@@ -1055,7 +1099,6 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                                         "execute_aarch64_instrs_vector_arithmetic_binary_uniform_cmp_int_sisd",
                                         "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_lessthan_sisd",
                                         ].contains(&self.function.name().as_ref())
-
                                 ))
                 {
                     // if we're in a dynamic block and the local variable is not on the

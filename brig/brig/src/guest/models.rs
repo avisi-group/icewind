@@ -259,15 +259,15 @@ impl ModelDevice {
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
-            if block_start_virtual_pc == 0x400640 {
-                HIT_PROGRAM_START.store(true, Ordering::Relaxed);
-            }
+            // if block_start_virtual_pc == 0x400640 {
+            //     HIT_PROGRAM_START.store(true, Ordering::Relaxed);
+            // }
 
-            tracing::ENABLED.store(
-                HIT_PROGRAM_START.load(Ordering::Relaxed)
-                    && self.register_file.read::<u8>("PSTATE_EL") == 0,
-                Ordering::Relaxed,
-            );
+            // tracing::ENABLED.store(
+            //     HIT_PROGRAM_START.load(Ordering::Relaxed)
+            //         && self.register_file.read::<u8>("PSTATE_EL") == 0,
+            //     Ordering::Relaxed,
+            // );
 
             if (block_start_virtual_pc & !0xFFF) != region_virt_base {
                 let block_start_physical_pc =
@@ -658,10 +658,6 @@ pub extern "sysv64" fn svc_debug(value: u64) {
 
 pub extern "sysv64" fn prelude_debug(pc: u64, opcode: u64) {
     static ENABLED: AtomicBool = AtomicBool::new(false);
-
-    if pc == 0x400008d0 {
-        ENABLED.store(true, Ordering::Relaxed);
-    }
 
     if ENABLED.load(Ordering::Relaxed) {
         log::error!(

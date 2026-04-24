@@ -1097,10 +1097,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         value: exponent_value,
                         ..
                     },
-                ) => self.constant(
-                    base_value.pow(u32::try_from(*exponent_value).unwrap()),
-                    base.typ(),
-                ),
+                ) => {
+                    let res = base_value.pow(u32::try_from(*exponent_value).unwrap_or_else(|e| {
+                        panic!("powi: {base_value} ^^ {exponent_value}: {e:?}")
+                    }));
+
+                    self.constant(res, base.typ())
+                }
 
                 // 1^x = 1
                 (NodeKind::Constant { value: 1, .. }, ..) => base.clone(),
