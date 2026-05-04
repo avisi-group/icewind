@@ -259,7 +259,7 @@ impl ModelDevice {
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
-            // if block_start_virtual_pc == 0x400640 {
+            // if block_start_virtual_pc == 0x408200 {
             //     HIT_PROGRAM_START.store(true, Ordering::Relaxed);
             // }
 

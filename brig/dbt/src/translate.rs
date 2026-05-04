@@ -1100,6 +1100,15 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                                         "execute_aarch64_instrs_vector_arithmetic_unary_cmp_int_lessthan_sisd",
                                         ].contains(&self.function.name().as_ref())
                                 ))
+
+                        || (symbol.name().as_ref() == "maxmin"
+                                && (
+
+                                    [
+                                        "execute_aarch64_instrs_vector_reduce_int_max",
+
+                                        ].contains(&self.function.name().as_ref())
+                                ))
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there

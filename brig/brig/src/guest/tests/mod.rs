@@ -8590,6 +8590,28 @@ fn frintm() {
     translation.execute(&register_file);
 }
 
+#[ktest]
+fn uminv() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+    // uminv   b3, v2.16b
+    // execute_aarch64_instrs_vector_reduce_int_max
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6e31a843,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+    translation.execute(&register_file);
+}
+
 // #[ktest]
 // fn shrn() {
 //     todo!()
