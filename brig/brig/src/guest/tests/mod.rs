@@ -8509,6 +8509,8 @@ fn fcvt() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // 1e22c000        fcvt    d0, s0
+    // execute_aarch64_instrs_float_convert_fp
+    // FPConvert__1
     translate_instruction(
         &*model,
         "__DecodeA64",
@@ -8527,7 +8529,9 @@ fn fcvt() {
 
     translation.execute(&register_file);
 
-    // assert_eq!(register_file.read::<f64>("_Z"), -3.141f64);
+    let sum = register_file.read::<f64>("_Z") + 3.141f64;
+    assert!(sum < 0.001);
+    assert!(sum > -0.001);
 }
 
 #[ktest]

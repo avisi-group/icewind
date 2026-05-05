@@ -437,7 +437,11 @@ pub fn translate(
         };
         let target_width = u32::try_from(*target_width).unwrap();
 
-        let op_float = emitter.cast(op, Type::Floating(source_width), CastOperationKind::Convert);
+        let op_float = emitter.cast(
+            op,
+            Type::Floating(source_width),
+            CastOperationKind::Reinterpret,
+        );
 
         return Ok(Some(emitter.cast(
             op_float,
