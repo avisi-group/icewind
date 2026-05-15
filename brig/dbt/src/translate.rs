@@ -470,6 +470,40 @@ pub fn translate(
         )));
     }
 
+    if function == "FPAbs" {
+        let op1 = arguments[0].clone();
+
+        let width = op1.typ().width();
+        assert!(matches!(width, 64 | 32));
+
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let res = emitter.unary_operation(crate::x86::emitter::UnaryOperationKind::Absolute(op1));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(width),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
+    if function == "FPNeg" {
+        let op1 = arguments[0].clone();
+
+        let width = op1.typ().width();
+        assert!(matches!(width, 64 | 32));
+
+        let op1 = emitter.cast(op1, Type::Floating(width), CastOperationKind::Reinterpret);
+
+        let res = emitter.unary_operation(crate::x86::emitter::UnaryOperationKind::Negate(op1));
+
+        return Ok(Some(emitter.cast(
+            res,
+            Type::Unsigned(width),
+            CastOperationKind::Reinterpret,
+        )));
+    }
+
     let (is_sysreg, is_read) = match function {
         "AArch64_SysRegRead" => (true, true),
         "AArch64_SysRegWrite" => (true, false),

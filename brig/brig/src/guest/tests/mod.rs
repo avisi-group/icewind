@@ -8616,6 +8616,123 @@ fn uminv() {
     translation.execute(&register_file);
 }
 
+#[ktest]
+fn fmov_imm() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e2e1000 	fmov	s0, #1.000000000000000000e+00
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e2e1000,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let s0_offset = usize::try_from(model.reg_offset("_Z") + 0 * 256).unwrap();
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read_raw::<f32>(s0_offset), 1.0f32);
+}
+
+#[ktest]
+fn fmov_d1_x0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 9e670001 	fmov	d1, x0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x9e670001,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("R0", 0x3e80000000000000u64);
+
+    translation.execute(&register_file);
+
+    let d1_offset = usize::try_from(model.reg_offset("_Z") + 1 * 256).unwrap();
+    assert_eq!(
+        register_file.read_raw::<f64>(d1_offset),
+        1.1920928955078125e-7f64
+    );
+}
+
+#[ktest]
+fn fabs() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e60c002 	fabs	d2, d0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e60c002,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("_Z", 0x3e80000000000000u64);
+
+    translation.execute(&register_file);
+
+    let d2_offset = usize::try_from(model.reg_offset("_Z") + 2 * 256).unwrap();
+    assert_eq!(
+        register_file.read_raw::<u64>(d2_offset),
+        0x3e80000000000000u64
+    );
+}
+
+#[ktest]
+fn fabs_neg() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 1e60c002 	fabs	d2, d0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x1e60c002,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("_Z", -3.14f64);
+
+    translation.execute(&register_file);
+
+    let d2_offset = usize::try_from(model.reg_offset("_Z") + 2 * 256).unwrap();
+    assert_eq!(register_file.read_raw::<f64>(d2_offset), 3.14f64);
+}
+
 // #[ktest]
 // fn shrn() {
 //     todo!()

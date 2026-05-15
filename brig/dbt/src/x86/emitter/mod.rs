@@ -702,10 +702,33 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     }
                     _ => todo!("{:?} ({const_width})", value.typ()),
                 },
-                _ => self.node(X86Node {
-                    typ: value.typ().clone(),
-                    kind: NodeKind::UnaryOperation(op),
-                }),
+                _ => {
+                    if let Type::Floating(width) = value.typ() {
+                        let cast_value = self.cast(
+                            value.clone(),
+                            Type::Unsigned(width),
+                            CastOperationKind::Reinterpret,
+                        );
+
+                        let _0 = self.constant(0, Type::Unsigned(1));
+                        let _1 = self.constant(1, Type::Signed(64));
+                        let start = self.constant((width as u64) - 1, Type::Signed(64));
+
+                        let cleared_bit = self.bit_insert(cast_value, _0, start, _1);
+
+                        self.cast(
+                            cleared_bit,
+                            Type::Floating(width),
+                            CastOperationKind::Reinterpret,
+                        )
+                    } else {
+                        // self.node(X86Node {
+                        //     typ: value.typ().clone(),
+                        //     kind: NodeKind::UnaryOperation(op),
+                        // })
+                        todo!()
+                    }
+                }
             },
 
             SquareRoot(value) => self.node(X86Node {
