@@ -6,7 +6,7 @@ use {
 const DTB: &[u8] = include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
 const BOOTLOADER: &[u8] =
     include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/bootloader.bin");
-const IMAGE: &[u8] = include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/Image");
+const IMAGE: &[u8] = include_bytes!("../../brig-cli/guest_data/Image");
 
 mod logger;
 
