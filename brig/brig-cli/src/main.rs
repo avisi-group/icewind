@@ -102,6 +102,8 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
             cmd.arg("--release");
         }
 
+        cmd.arg("-Zjson-target-spec");
+
         cmd.arg("--message-format=json")
             .current_dir(path)
             .stdout(Stdio::piped());

@@ -130,7 +130,7 @@ impl VirtualMemoryArea {
     ) where
         OffsetPageTable<'static>: Mapper<S>,
     {
-        log::error!("");
+        //       log::error!("");
         unsafe {
             let _ = self
                 .opt

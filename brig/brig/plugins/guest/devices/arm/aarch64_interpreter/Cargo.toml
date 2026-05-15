@@ -14,4 +14,4 @@ u__FetchInstr = { path = "../../../../../../../aarch64/u__FetchInstr" }
 
 plugins_rt.workspace = true
 
-log = "0.4.22"
+log = "0.4.29"

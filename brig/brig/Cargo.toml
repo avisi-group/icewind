@@ -11,8 +11,8 @@ proc_macro_lib = { path = "./proc_macro_lib" }
 opt-level = 1
 
 [profile.release]
-debug = true
+debug = false
 incremental = true
 codegen-units = 256
-debug-assertions = true
-overflow-checks = true
+debug-assertions = false
+overflow-checks = false

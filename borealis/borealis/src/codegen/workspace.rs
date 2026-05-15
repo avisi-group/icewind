@@ -104,7 +104,7 @@ pub fn create_manifest(
     TomlManifest {
         cargo_features: None,
         package: Some(Box::new(TomlPackage {
-            edition: Some(InheritableField::Value("2021".to_owned())),
+            edition: Some(InheritableField::Value("2024".to_owned())),
             rust_version: None,
             name: PackageName::new(name.as_ref().to_owned()).unwrap(),
             version: Some(InheritableField::Value(Version {
@@ -184,7 +184,7 @@ pub fn create_manifest(
                 .chain([
                     (
                         PackageName::new("log".to_owned()).unwrap(),
-                        InheritableDependency::Value(TomlDependency::Simple("0.4.21".to_owned())),
+                        InheritableDependency::Value(TomlDependency::Simple("0.4.29".to_owned())),
                     ),
                     (
                         PackageName::new("num-rational".to_owned()).unwrap(),
