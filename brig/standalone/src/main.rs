@@ -71,7 +71,7 @@ fn main() {
     let mut interpreter = Aarch64Interpreter::new(
         // initial PC is 0x8000_0000
         0x8000_0000,
-        TracerKind::Log,
+        TracerKind::Noop,
     );
     interpreter.run();
 }

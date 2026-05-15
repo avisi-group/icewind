@@ -2,7 +2,7 @@
 [package]
 name = "standalone"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [profile.release]
 debug = true
@@ -14,8 +14,8 @@ overflow-checks = true
 
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
-rustix = { version = "0.38.34", features = ["mm"] }
-log = "0.4.22"
+rustix = { version = "1.1.4", features = ["mm"] }
+log = "0.4.29"
 
 # common = { path = "../../aarch64/common" }
 # u__DecodeA64 = { path = "../../aarch64/u__DecodeA64" }

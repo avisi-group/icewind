@@ -9,7 +9,7 @@ impl Log for PrintlnLogger {
 
     fn log(&self, record: &log::Record) {
         match record.level() {
-            log::Level::Trace => eprintln!("{}", record.args()),
+            log::Level::Trace => eprint!("{}", record.args()),
             _ => println!("{}", record.args()),
         }
     }
