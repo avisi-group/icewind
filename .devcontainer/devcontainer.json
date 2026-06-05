@@ -5,7 +5,7 @@
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 		"dockerfile": "Dockerfile"
 	},
-	"runArgs": ["--security-opt", "label=disable", "--device=/dev/net/tun", "--ulimit", "stack=1073741824"],
+	"runArgs": ["--ulimit", "stack=1073741824"],
 	"features": {
 		"ghcr.io/tailscale/codespace/tailscale": {}
 	},
@@ -19,8 +19,8 @@
 				"yzhang.markdown-all-in-one",
 				"ms-vscode.hexeditor",
 				"tamasfe.even-better-toml",
-				"serayuzgur.crates",
-				"vadimcn.vscode-lldb"
+				"vadimcn.vscode-lldb",
+				"fill-labs.dependi"
 			]
 		}
 	},
@@ -29,7 +29,7 @@
 	"mounts": [
 		// cargo target dir shared with non-container builds, and persisted across containers
 		"source=${localEnv:HOME}/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached",
-		// SSH directory shared for git auth
-		"source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+		// // SSH directory shared for git auth
+		// "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
 	]
 }

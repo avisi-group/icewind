@@ -1,8 +1,5 @@
 FROM rust:latest
 
-RUN curl -s https://syncthing.net/release-key.txt | apt-key add -
-RUN echo "deb https://apt.syncthing.net/ syncthing release" | tee /etc/apt/sources.list.d/syncthing.list
-
 RUN apt-get update
 RUN apt-get install -y build-essential device-tree-compiler opam mold fish neovim syncthing gcc-aarch64-linux-gnu gcc-arm-none-eabi z3 bison flex bc strace less qemu-system qemu-user screen
 
@@ -31,6 +28,8 @@ RUN cargo install dua-cli bottom
 
 RUN git config --global user.email "fm208@st-andrews.ac.uk"
 RUN git config --global user.name "Ferdia McKeogh"
+
+RUN ulimit -s 65536
 
 RUN chsh -s /usr/bin/fish
 ENV SHELL /usr/bin/fish
