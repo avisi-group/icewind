@@ -7,15 +7,13 @@ use {
         },
         vmx::{
             bitmap::{IoBitmap, MsrBitmap},
-            ept::{EPT, Ept, invalidation::invept_all_contexts},
+            ept::{EPT, invalidation::invept_all_contexts},
             vmcs::{Vmcs, VmcsError, VmxExitReason},
         },
     },
-    alloc::{alloc::alloc_zeroed, boxed::Box, sync::Arc},
+    alloc::{alloc::alloc_zeroed, boxed::Box},
     bitset_core::BitSet,
-    common::{GuestExecutionContext, device::MemoryMappedDevice, memory::AddressSpaceRegionKind},
     core::{alloc::Layout, arch::naked_asm},
-    iced_x86::{OpKind, Register},
     x86::{
         bits64::{
             segmentation::{rdfsbase, rdgsbase, wrgsbase},
@@ -24,15 +22,13 @@ use {
         controlregs::{cr0, cr3, cr4},
         cpuid::{CpuIdResult, cpuid},
         msr::{
-            IA32_APIC_BASE, IA32_EFER, IA32_VMX_BASIC, IA32_VMX_CR0_FIXED0, IA32_VMX_CR0_FIXED1,
+            IA32_EFER, IA32_VMX_BASIC, IA32_VMX_CR0_FIXED0, IA32_VMX_CR0_FIXED1,
             IA32_VMX_CR4_FIXED0, IA32_VMX_CR4_FIXED1, IA32_VMX_ENTRY_CTLS, IA32_VMX_EXIT_CTLS,
             IA32_VMX_PINBASED_CTLS, IA32_VMX_PROCBASED_CTLS, IA32_VMX_PROCBASED_CTLS2,
             IA32_VMX_TRUE_ENTRY_CTLS, IA32_VMX_TRUE_EXIT_CTLS, IA32_VMX_TRUE_PINBASED_CTLS,
             IA32_VMX_TRUE_PROCBASED_CTLS, rdmsr,
         },
-        vmx::vmcs::control::{
-            EntryControls, ExitControls, PinbasedControls, PrimaryControls, SecondaryControls,
-        },
+        vmx::vmcs::control::{EntryControls, ExitControls, PrimaryControls, SecondaryControls},
     },
     x86_64::{
         PhysAddr, VirtAddr,
@@ -44,6 +40,8 @@ use {
 mod bitmap;
 pub mod ept;
 mod vmcs;
+
+pub const EPT_ENABLED: bool = false;
 
 #[repr(C)]
 #[derive(Default, Clone, Copy)]

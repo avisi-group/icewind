@@ -38,19 +38,15 @@ use {
     kernel::{
         arch::x86::{
             memory::{
-                GUEST_PHYSICAL_START, STALE_CODE_PAGES, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START,
-                VirtAddrExt, VirtualMemoryArea,
+                STALE_CODE_PAGES, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtualMemoryArea,
             },
             safepoint::record_safepoint,
-            vmx::ept::{self, EPT},
+            vmx::{EPT_ENABLED, ept::EPT},
         },
         fs::Filesystem,
     },
     spin::{Lazy, Mutex},
-    x86_64::{
-        PhysAddr, VirtAddr,
-        structures::paging::{PageSize, Size4KiB},
-    },
+    x86_64::structures::paging::{PageSize, Size4KiB},
 };
 
 /// Size in bytes for the per-translation bump allocator
@@ -236,7 +232,7 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
-            {
+            if EPT_ENABLED {
                 let mut stale_code_pages = STALE_CODE_PAGES.lock();
 
                 if !stale_code_pages.is_empty() {
@@ -297,9 +293,11 @@ impl ModelDevice {
                         single_step_mode,
                     );
 
-                    EPT.lock().smc_protect(
-                        VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64() + region_phys_base,
-                    );
+                    if EPT_ENABLED {
+                        EPT.lock().smc_protect(
+                            VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64() + region_phys_base,
+                        );
+                    }
 
                     block
                 });

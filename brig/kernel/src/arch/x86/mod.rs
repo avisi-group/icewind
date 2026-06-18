@@ -1,8 +1,5 @@
 use {
-    crate::{
-        arch::x86::memory::PHYSICAL_MEMORY_OFFSET,
-        devices::{self, Bus, acpi, lapic},
-    },
+    crate::arch::x86::{memory::PHYSICAL_MEMORY_OFFSET, vmx::EPT_ENABLED},
     bootloader_api::BootInfo,
     core::fmt::Display,
     log::trace,
@@ -72,7 +69,13 @@ pub fn init(
     irq::init(page_fault_exception);
     dbg::init();
 
-    vmx::init(continuation, rsdp_addr.into_option().unwrap());
+    // ENABLE FOR EPT
+    if EPT_ENABLED {
+        vmx::init(continuation, rsdp_addr.into_option().unwrap());
+    } else {
+        // NO EPT
+        continuation(rsdp_addr.into_option().unwrap());
+    }
 
     panic!("shouldn't get here");
 }

@@ -3,20 +3,22 @@ use {
         devices::arm::mmu::{TranslationType, guest_translate},
         get_current_guest,
     },
-    alloc::sync::Arc,
+    alloc::{alloc::alloc_zeroed, sync::Arc},
     common::{
         GuestExecutionContext,
         device::MemoryMappedDevice,
         irq_handler,
         memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
     },
+    core::alloc::Layout,
     iced_x86::{Code, OpKind, Register},
     kernel::arch::x86::{
         MachineContext,
         memory::{
             GUEST_PHYSICAL_END, GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END,
-            VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtualMemoryArea,
+            VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtAddrExt as _, VirtualMemoryArea,
         },
+        vmx::EPT_ENABLED,
     },
     x86_64::{
         PhysAddr, VirtAddr,
@@ -61,8 +63,14 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
 }
 
 fn allocate_and_map_emulated_guest_physical_memory(guest_physical: u64) -> PhysAddr {
-    let backing_page =
-        (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64);
+    let backing_page = if EPT_ENABLED {
+        (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
+    } else {
+        VirtAddr::from_ptr(unsafe {
+            alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+        })
+        .to_phys()
+    };
 
     VirtualMemoryArea::current().map_page(
         Page::<Size4KiB>::from_start_address(
