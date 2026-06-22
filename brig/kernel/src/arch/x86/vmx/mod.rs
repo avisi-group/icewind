@@ -41,8 +41,6 @@ mod bitmap;
 pub mod ept;
 mod vmcs;
 
-pub const EPT_ENABLED: bool = false;
-
 #[repr(C)]
 #[derive(Default, Clone, Copy)]
 struct VmMachineContext {

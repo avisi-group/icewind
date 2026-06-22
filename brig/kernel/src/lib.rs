@@ -23,6 +23,16 @@ pub mod tasks;
 pub mod timer;
 pub mod util;
 
+#[derive(Debug)]
+pub enum StalePageMode {
+    EPT,
+    None,
+    SoftwareWalk,
+    SoftwareFullFlush,
+}
+
+pub const STALE_PAGE_MODE: StalePageMode = StalePageMode::SoftwareFullFlush;
+
 fn _serial_in() {
     let mut buf = [0u8; 64];
 

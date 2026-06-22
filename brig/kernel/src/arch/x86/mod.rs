@@ -1,5 +1,5 @@
 use {
-    crate::arch::x86::{memory::PHYSICAL_MEMORY_OFFSET, vmx::EPT_ENABLED},
+    crate::{STALE_PAGE_MODE, StalePageMode, arch::x86::memory::PHYSICAL_MEMORY_OFFSET},
     bootloader_api::BootInfo,
     core::fmt::Display,
     log::trace,
@@ -69,12 +69,12 @@ pub fn init(
     irq::init(page_fault_exception);
     dbg::init();
 
-    // ENABLE FOR EPT
-    if EPT_ENABLED {
-        vmx::init(continuation, rsdp_addr.into_option().unwrap());
-    } else {
-        // NO EPT
-        continuation(rsdp_addr.into_option().unwrap());
+    match STALE_PAGE_MODE {
+        // Enter VM for EPT
+        StalePageMode::EPT => vmx::init(continuation, rsdp_addr.into_option().unwrap()),
+        StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk | StalePageMode::None => {
+            continuation(rsdp_addr.into_option().unwrap())
+        }
     }
 
     panic!("shouldn't get here");

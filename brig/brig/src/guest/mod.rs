@@ -27,7 +27,9 @@ use {
     elfloader::{ElfLoader, ElfLoaderErr, ProgramHeader, RelocationEntry},
     embedded_time::duration::Nanoseconds,
     iced_x86::{Formatter, Instruction},
-    kernel::{arch::x86::memory::VirtualMemoryArea, fs::Filesystem},
+    kernel::{
+        STALE_PAGE_MODE, StalePageMode, arch::x86::memory::VirtualMemoryArea, fs::Filesystem,
+    },
     pl011::Pl011,
     spin::Mutex,
     x86_64::{VirtAddr, structures::paging::PageTableFlags},
@@ -398,11 +400,20 @@ pub struct Translation {
 
 impl Translation {
     pub fn new(code: Vec<u8>) -> Self {
+        // we update the flags, removing the "NOEXECUTE" flag, and optionally "WRITABLE"
+        // depending on the stale page detection mode
+        let new_flags = match STALE_PAGE_MODE {
+            StalePageMode::None | StalePageMode::EPT => {
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE
+            }
+            StalePageMode::SoftwareWalk | StalePageMode::SoftwareFullFlush => {
+                PageTableFlags::PRESENT
+            }
+        };
+
         let start = VirtAddr::from_ptr(code.as_ptr());
-        VirtualMemoryArea::current().update_flags_range(
-            start..start + code.len() as u64,
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE, // removing  "NOEXECUTE" flag
-        );
+        VirtualMemoryArea::current()
+            .update_flags_range(start..start + code.len() as u64, new_flags);
         Self { code }
     }
 

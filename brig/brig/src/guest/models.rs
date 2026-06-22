@@ -36,12 +36,13 @@ use {
         },
     },
     kernel::{
+        STALE_PAGE_MODE, StalePageMode,
         arch::x86::{
             memory::{
                 STALE_CODE_PAGES, VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtualMemoryArea,
             },
             safepoint::record_safepoint,
-            vmx::{EPT_ENABLED, ept::EPT},
+            vmx::ept::EPT,
         },
         fs::Filesystem,
     },
@@ -232,25 +233,41 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
-            if EPT_ENABLED {
-                let mut stale_code_pages = STALE_CODE_PAGES.lock();
+            match STALE_PAGE_MODE {
+                StalePageMode::EPT => {
+                    let mut stale_code_pages = STALE_CODE_PAGES.lock();
 
-                if !stale_code_pages.is_empty() {
-                    chain_cache.fill_keys(1);
-                }
+                    if !stale_code_pages.is_empty() {
+                        chain_cache.fill_keys(1);
+                    }
 
-                while let Some(stale_code_page) = stale_code_pages.pop() {
-                    // remove all translations for that page
-                    log::trace!("clearing {stale_code_page:x}");
+                    while let Some(stale_code_page) = stale_code_pages.pop() {
+                        // remove all translations for that page
+                        log::trace!("clearing {stale_code_page:x}");
 
-                    if let Some(page_block_cache) = block_cache.get_mut(&stale_code_page) {
-                        page_block_cache.clear();
-                    } else {
-                        panic!(
-                            "weird internal state where we are trying to clear a stale page that isn't in the cache"
-                        )
+                        if let Some(page_block_cache) = block_cache.get_mut(&stale_code_page) {
+                            page_block_cache.clear();
+                        } else {
+                            panic!(
+                                "weird internal state where we are trying to clear a stale page that isn't in the cache"
+                            )
+                        }
                     }
                 }
+
+                // we flushed the pages at the time of page fault, so do nothing here
+                StalePageMode::SoftwareFullFlush => {
+                    let mut stale_code_pages = STALE_CODE_PAGES.lock();
+                    if !stale_code_pages.is_empty() {
+                        block_cache.clear();
+                        stale_code_pages.clear();
+                        log::error!("cleared whole code cache")
+                    }
+                }
+                StalePageMode::SoftwareWalk => {}
+
+                // we're not doing anything
+                StalePageMode::None => {}
             }
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
@@ -284,8 +301,6 @@ impl ModelDevice {
                 .or_insert_with(|| {
                     BUMP_ALLOCATOR.clear();
 
-                    //   VirtualMemoryArea::current().smc_protect();
-
                     let block = self.translate_guest_block(
                         BumpAllocatorRef::new(&BUMP_ALLOCATOR),
                         chain_cache.table as u64,
@@ -293,11 +308,11 @@ impl ModelDevice {
                         single_step_mode,
                     );
 
-                    if EPT_ENABLED {
+                    if let StalePageMode::EPT = STALE_PAGE_MODE {
                         EPT.lock().smc_protect(
                             VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64() + region_phys_base,
                         );
-                    }
+                    };
 
                     block
                 });

@@ -12,13 +12,16 @@ use {
     },
     core::alloc::Layout,
     iced_x86::{Code, OpKind, Register},
-    kernel::arch::x86::{
-        MachineContext,
-        memory::{
-            GUEST_PHYSICAL_END, GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END,
-            VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtAddrExt as _, VirtualMemoryArea,
+    kernel::{
+        STALE_PAGE_MODE, StalePageMode,
+        arch::x86::{
+            MachineContext,
+            memory::{
+                GUEST_PHYSICAL_END, GUEST_PHYSICAL_START, HIGH_HALF_CANONICAL_END,
+                HIGH_HALF_CANONICAL_START, LOW_HALF_CANONICAL_END, STALE_CODE_PAGES,
+                VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START, VirtAddrExt as _, VirtualMemoryArea,
+            },
         },
-        vmx::EPT_ENABLED,
     },
     x86_64::{
         PhysAddr, VirtAddr,
@@ -41,19 +44,36 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
     let exec_ctx = GuestExecutionContext::current();
     let addrspace = unsafe { &*exec_ctx.current_address_space };
 
-    const LOW_HALF: u64 = LOW_HALF_CANONICAL_END.as_u64();
+    const LOW_HALF_END: u64 = LOW_HALF_CANONICAL_END.as_u64();
+    const HIGH_HALF_START: u64 = HIGH_HALF_CANONICAL_START.as_u64();
+    const HIGH_HALF_END: u64 = HIGH_HALF_CANONICAL_END.as_u64();
     const EMULATED_GUEST_PHYS_START: u64 = GUEST_PHYSICAL_START.as_u64();
     const EMULATED_GUEST_PHYS_END: u64 = GUEST_PHYSICAL_END.as_u64();
 
     match faulting_address.as_u64() {
-        ..LOW_HALF => handle_emulated_guest_virtual_memory_fault(
+        ..LOW_HALF_END => handle_emulated_guest_virtual_memory_fault(
             faulting_address,
             error_code,
             machine_context,
             addrspace,
         ),
+
         EMULATED_GUEST_PHYS_START..EMULATED_GUEST_PHYS_END => {
             handle_emulated_guest_physical_memory_fault(faulting_address, error_code, addrspace)
+        }
+
+        HIGH_HALF_START..=HIGH_HALF_END => {
+            if let StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk = STALE_PAGE_MODE
+                && error_code
+                    == PageFaultErrorCode::PROTECTION_VIOLATION
+                        | PageFaultErrorCode::CAUSED_BY_WRITE
+            {
+                handle_write_to_code_page(faulting_address)
+            } else {
+                panic!(
+                    "got a fault in the high half while either not in software page fault detection ({STALE_PAGE_MODE:?}), or a write fault, this probably shouldn't happen: {error_code:?} @ {faulting_address:?}"
+                );
+            }
         }
 
         _ => {
@@ -63,13 +83,19 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
 }
 
 fn allocate_and_map_emulated_guest_physical_memory(guest_physical: u64) -> PhysAddr {
-    let backing_page = if EPT_ENABLED {
-        (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
-    } else {
-        VirtAddr::from_ptr(unsafe {
-            alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
-        })
-        .to_phys()
+    let backing_page = match STALE_PAGE_MODE {
+        StalePageMode::EPT => {
+            // back with EPT page (to be allocated by EPT fault handler)
+            (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
+        }
+        StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk | StalePageMode::None => {
+            // allocate now with brig's allocator
+            VirtAddr::from_ptr(unsafe {
+                alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+            })
+            // get the backing physical page
+            .to_phys()
+        }
     };
 
     VirtualMemoryArea::current().map_page(
@@ -82,6 +108,15 @@ fn allocate_and_map_emulated_guest_physical_memory(guest_physical: u64) -> PhysA
     );
 
     backing_page
+}
+
+fn handle_write_to_code_page(faulting_address: VirtAddr) {
+    if let StalePageMode::SoftwareFullFlush = STALE_PAGE_MODE {
+        log::error!("full flush signalled");
+        STALE_CODE_PAGES.lock().push(u64::MAX);
+    } else {
+        STALE_CODE_PAGES.lock().push(faulting_address.as_u64());
+    }
 }
 
 fn handle_emulated_guest_io_access(
