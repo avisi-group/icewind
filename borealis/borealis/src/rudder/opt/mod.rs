@@ -45,21 +45,25 @@ static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 
 pub fn optimise(ctx: &mut Context) {
-    let passes: &[FunctionPass; _] = &[
-        //INLINER,
-        // JUMP_THREADING,
-        // BRANCH_SIMPLIFICATION,
-        // RETURN_PROPAGATION,
-        // TAIL_CALL,
-        // DEAD_SYMBOL_ELIMINATION,
-        // DEAD_WRITE_ELIMINATION,
-        // DEAD_STMT_ELIMINATION,
-        // VARIABLE_ELIMINATION,
-        // CONSTANT_PROPAGATION,
-        // CONSTANT_FOLDING,
-        // VECTOR_FOLDING,
-        // PHI_ANALYSIS,
+    let eliminations = &[
+        DEAD_SYMBOL_ELIMINATION,
+        DEAD_WRITE_ELIMINATION,
+        DEAD_STMT_ELIMINATION,
+        VARIABLE_ELIMINATION,
     ];
+
+    let control_flow = &[
+        INLINER,
+        JUMP_THREADING,
+        BRANCH_SIMPLIFICATION,
+        RETURN_PROPAGATION,
+        TAIL_CALL,
+        PHI_ANALYSIS,
+    ];
+
+    let constant_eval = &[CONSTANT_PROPAGATION, CONSTANT_FOLDING, VECTOR_FOLDING];
+
+    let passes = control_flow;
 
     ctx.get_functions().par_iter().for_each(|(name, function)| {
         let mut changed = true;
