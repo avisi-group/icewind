@@ -44,55 +44,22 @@ static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 
-pub fn optimise(ctx: &mut Context, level: OptLevel) {
-    let passes: Vec<FunctionPass> = match level {
-        OptLevel::Level0 => vec![],
-        OptLevel::Level1 => vec![
-            INLINER,
-            JUMP_THREADING,
-            BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
-            TAIL_CALL,
-            DEAD_SYMBOL_ELIMINATION,
-            DEAD_WRITE_ELIMINATION,
-            DEAD_STMT_ELIMINATION,
-            VARIABLE_ELIMINATION,
-            CONSTANT_PROPAGATION,
-            CONSTANT_FOLDING,
-            VECTOR_FOLDING,
-            PHI_ANALYSIS,
-        ],
-        OptLevel::Level2 => vec![
-            INLINER,
-            JUMP_THREADING,
-            BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
-            TAIL_CALL,
-            DEAD_SYMBOL_ELIMINATION,
-            DEAD_WRITE_ELIMINATION,
-            DEAD_STMT_ELIMINATION,
-            VARIABLE_ELIMINATION,
-            CONSTANT_PROPAGATION,
-            CONSTANT_FOLDING,
-            VECTOR_FOLDING,
-            PHI_ANALYSIS,
-        ],
-        OptLevel::Level3 => vec![
-            INLINER,
-            JUMP_THREADING,
-            BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
-            TAIL_CALL,
-            DEAD_SYMBOL_ELIMINATION,
-            DEAD_WRITE_ELIMINATION,
-            DEAD_STMT_ELIMINATION,
-            VARIABLE_ELIMINATION,
-            CONSTANT_PROPAGATION,
-            CONSTANT_FOLDING,
-            VECTOR_FOLDING,
-            PHI_ANALYSIS,
-        ],
-    };
+pub fn optimise(ctx: &mut Context) {
+    let passes: &[FunctionPass; _] = &[
+        //INLINER,
+        // JUMP_THREADING,
+        // BRANCH_SIMPLIFICATION,
+        // RETURN_PROPAGATION,
+        // TAIL_CALL,
+        // DEAD_SYMBOL_ELIMINATION,
+        // DEAD_WRITE_ELIMINATION,
+        // DEAD_STMT_ELIMINATION,
+        // VARIABLE_ELIMINATION,
+        // CONSTANT_PROPAGATION,
+        // CONSTANT_FOLDING,
+        // VECTOR_FOLDING,
+        // PHI_ANALYSIS,
+    ];
 
     ctx.get_functions().par_iter().for_each(|(name, function)| {
         let mut changed = true;
@@ -101,7 +68,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
 
         while changed {
             changed = false;
-            for pass in &passes {
+            for pass in passes {
                 trace!("running pass {}", pass.0);
 
                 function.update_names();

@@ -620,8 +620,8 @@ impl Context {
         }
     }
 
-    pub fn optimise(&mut self, level: opt::OptLevel) {
-        opt::optimise(self, level);
+    pub fn optimise(&mut self) {
+        opt::optimise(self);
     }
 
     pub fn validate(&mut self) -> Vec<validator::ValidationMessage> {

@@ -6,13 +6,10 @@
 		"dockerfile": "Dockerfile"
 	},
 	"runArgs": ["--ulimit", "stack=1073741824"],
-	"features": {
-		"ghcr.io/tailscale/codespace/tailscale": {}
-	},
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"rust-lang.rust-analyzer",
+				//"rust-lang.rust-analyzer",
 				"redhat.vscode-xml",
 				"ocamllabs.ocaml-platform",
 				"webfreak.debug",
@@ -28,7 +25,7 @@
 	// disabled due to permission error, need to add `:z` somewhere, maybe not with --security-opt label=disable as above
 	"mounts": [
 		// cargo target dir shared with non-container builds, and persisted across containers
-		"source=${localEnv:HOME}/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached"
 		// // SSH directory shared for git auth
 		// "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
 	]

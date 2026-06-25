@@ -103,7 +103,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::ReadVariable { symbol } => {
             let var = codegen_ident(symbol.name());
 
-            quote! {fn_state.#var }
+            quote! {fn_state.#var.clone() }
         }
         StatementKind::WriteVariable { symbol, value } => {
             let var = codegen_ident(symbol.name());
@@ -668,18 +668,18 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     };
 
     let msg = format!(" {} {stmt}", stmt.class());
-    if stmt.has_value() {
+  //  if stmt.has_value() {
         let typ = codegen_type(stmt.typ());
         quote! {
             #[doc = #msg]
             let #stmt_name: #typ = #value;
         }
-    } else {
-        quote! {
-            #[doc = #msg]
-            #value;
-        }
-    }
+   // } else {
+    //     quote! {
+    //         #[doc = #msg]
+    //         #value;
+    //     }
+    // }
 }
 
 fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> TokenStream {

@@ -139,7 +139,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Optimising rudder");
-    rudder.optimise(rudder::opt::OptLevel::Level3);
+    rudder.optimise();
 
     if let Some(path) = &dump_ir {
         writeln!(

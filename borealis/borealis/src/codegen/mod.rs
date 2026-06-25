@@ -114,6 +114,60 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
     }
 }
 
+pub fn codegen_default_value(typ: Arc<Type>) -> TokenStream {
+ match &*typ {
+        Type::Primitive(typ) => {
+            if typ.type_class() == PrimitiveTypeClass::UnsignedInteger && typ.width() == 1 {
+                return quote!(false);
+            }
+
+            let width = promote_width(typ.width());
+
+            match typ.type_class() {
+                PrimitiveTypeClass::Void => todo!(),
+                PrimitiveTypeClass::Unit => quote!(()),
+                PrimitiveTypeClass::UnsignedInteger |  PrimitiveTypeClass::SignedInteger => {
+                    quote!(0)
+                }
+                PrimitiveTypeClass::FloatingPoint => {
+                    quote!(0.0)
+                }
+            }
+
+
+        }
+        Type::Product(t) => {
+            quote! { Default::default() }
+        }
+        Type::Sum(t) => {
+            quote! { Default::default() }
+        }
+        Type::Vector {
+            element_count,
+            element_type,
+        } => {
+            if *element_count == 0 {
+                quote!(alloc::vec::Vec::new())
+            } else {
+                let element_value = codegen_default_value(element_type.clone());
+                let count = quote!(#element_count);
+                quote!([#element_value; #count])
+            }
+        }
+        Type::Bits => {
+            quote!(Bits::default())
+        }
+        Type::Rational => {
+           quote!(num_rational::Ratio::<i128>::ZERO)
+
+        }
+        Type::ArbitraryLengthInteger => quote!(0),
+        Type::String => quote!("default string"),
+        // maybe this should be `core::Any`?
+        Type::Any => quote!(todo!()),
+    }
+}
+
 pub fn codegen_ident(input: InternedString) -> Ident {
     static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
 
@@ -123,6 +177,8 @@ pub fn codegen_ident(input: InternedString) -> Ident {
         return Ident::new("model_main", Span::call_site());
     } else if s == "break" {
         return Ident::new("_break", Span::call_site());
+    } else if s == "const" {
+        return Ident::new("_cnst", Span::call_site());
     }
 
     let mut buf = String::with_capacity(s.len());
@@ -427,15 +483,27 @@ fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream
             })
             .collect::<TokenStream>();
 
+            let var_inits = function
+            .local_variables()
+            .iter()
+            .map(|symbol| {
+                let name = codegen_ident(symbol.name());
+                let value = codegen_default_value(symbol.typ());
+
+                quote! {
+                    #name: #value,
+                }
+            })
+            .collect::<TokenStream>();
+
         quote! {
-            #[derive(Default)]
             struct FunctionState {
                 #fields
             }
 
             let fn_state = FunctionState {
                 #parameter_copies
-                ..Default::default()
+                #var_inits
             };
         }
     };
@@ -443,7 +511,8 @@ fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream
 }
 
 pub fn tokens_to_string(tokens: &TokenStream) -> String {
-    let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
+    let syntax_tree = syn::parse_file(&tokens.to_string())
+        .unwrap_or_else(|e| panic!("failed to parse: {e:?}\n{tokens}"));
     let formatted = prettyplease::unparse(&syntax_tree);
     // fix comments
     formatted.replace("///", "//")
