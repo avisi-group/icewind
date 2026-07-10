@@ -1,7 +1,7 @@
 use {
     crate::arch::x86::{
         memory::{PhysAddrExt, VirtAddrExt},
-        vmx::ept::invalidation::invept_all_contexts,
+        vmx::ept::invalidation::{invept_all_contexts, invvpid_individual_address},
     },
     alloc::alloc::alloc_zeroed,
     bitfields::bitfield,
@@ -151,14 +151,17 @@ impl Ept {
         pdp_entry.set_size(true);
     }
 
-    pub fn invalidate(&self) {
+    pub fn invalidate(&self, linear_address: u64) {
         // let masked_addr = self.phys_addr().as_u64() & !0xFFF;
         // let memory_type = 0; // writeback (0 = uncacheable)
         // This value is 1 less than the EPT page-walk length
         // let page_walk_length = 3 << 3;
         // let eptp = masked_addr | memory_type | page_walk_length;
         // invept_single_context(eptp);
-        invept_all_contexts();
+
+        // invept_all_contexts();
+
+        invvpid_individual_address(linear_address);
     }
 
     pub fn phys_addr(&self) -> PhysAddr {
@@ -182,6 +185,7 @@ impl Ept {
 
         unsafe {
             core::arch::asm!("vmfunc", in("rax") 0, in("rcx") 0);
+            // core::arch::asm!("vmcall");
         };
     }
 

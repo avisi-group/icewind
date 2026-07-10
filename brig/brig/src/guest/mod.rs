@@ -400,20 +400,14 @@ pub struct Translation {
 
 impl Translation {
     pub fn new(code: Vec<u8>) -> Self {
-        // we update the flags, removing the "NOEXECUTE" flag, and optionally "WRITABLE"
-        // depending on the stale page detection mode
-        let new_flags = match STALE_PAGE_MODE {
-            StalePageMode::None | StalePageMode::EPT => {
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE
-            }
-            StalePageMode::SoftwareWalk | StalePageMode::SoftwareFullFlush => {
-                PageTableFlags::PRESENT
-            }
-        };
+        // we update the flags, removing the "NOEXECUTE" flag because heap pages arent
+        // executable by default
 
         let start = VirtAddr::from_ptr(code.as_ptr());
-        VirtualMemoryArea::current()
-            .update_flags_range(start..start + code.len() as u64, new_flags);
+        VirtualMemoryArea::current().update_flags_range(
+            start..start + code.len() as u64,
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+        );
         Self { code }
     }
 
@@ -429,17 +423,19 @@ impl Translation {
     }
 }
 
-/// Disabled until we can validate that `code` is always page-aligned: after the
-/// variable deep clone fix we got isntruction fetch host page faults when
-/// executing cached translations, likely because another translation drop
-/// overlapped?
+// Disabled until we can validate that `code` is always page-aligned: after the
+// variable deep clone fix we got isntruction fetch host page faults when
+// executing cached translations, likely because another translation drop
+// overlapped?
 // impl Drop for Translation {
 //     fn drop(&mut self) {
+//         log::error!("starting drop page");
 //         let start = VirtAddr::from_ptr(self.code.as_ptr());
 //         VirtualMemoryArea::current().update_flags_range(
 //             start..start + self.code.len() as u64,
 //             PageTableFlags::PRESENT | PageTableFlags::WRITABLE |
 // PageTableFlags::NO_EXECUTE,         );
+//         log::error!("dropped page");
 //     }
 // }
 

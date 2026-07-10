@@ -155,7 +155,7 @@ impl VirtualMemoryArea {
         self.invalidate();
     }
 
-    pub fn release_smc_protection(&mut self, address: VirtAddr) -> bool {
+    pub fn release_smc_protection(&mut self, address: VirtAddr) {
         let l3_table =
             walk_table_smc_reset(self.opt.level_4_table_mut(), address, PageTableLevel::Four);
         let l2_table = walk_table_smc_reset(l3_table, address, PageTableLevel::Three);
@@ -164,8 +164,6 @@ impl VirtualMemoryArea {
         let l1_entry = &mut l1_table[address.p1_index()];
 
         l1_entry.set_flags(l1_entry.flags().union(PageTableFlags::WRITABLE));
-
-        false
     }
 
     pub fn invalidate(&self) {

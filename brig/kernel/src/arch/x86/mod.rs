@@ -72,9 +72,9 @@ pub fn init(
     match STALE_PAGE_MODE {
         // Enter VM for EPT
         StalePageMode::EPT => vmx::init(continuation, rsdp_addr.into_option().unwrap()),
-        StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk | StalePageMode::None => {
-            continuation(rsdp_addr.into_option().unwrap())
-        }
+        StalePageMode::SoftwareFullFlush
+        | StalePageMode::SoftwareTargetedFlush
+        | StalePageMode::None => continuation(rsdp_addr.into_option().unwrap()),
     }
 
     panic!("shouldn't get here");

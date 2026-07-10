@@ -27,11 +27,11 @@ pub mod util;
 pub enum StalePageMode {
     EPT,
     None,
-    SoftwareWalk,
+    SoftwareTargetedFlush,
     SoftwareFullFlush,
 }
 
-pub const STALE_PAGE_MODE: StalePageMode = StalePageMode::SoftwareFullFlush;
+pub const STALE_PAGE_MODE: StalePageMode = StalePageMode::EPT;
 
 fn _serial_in() {
     let mut buf = [0u8; 64];

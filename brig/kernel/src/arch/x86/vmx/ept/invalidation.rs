@@ -54,6 +54,19 @@ fn invept(invept_type: InveptType, eptp: u64) {
     };
 }
 
+pub fn invvpid_individual_address(linear_address: u64) {
+    let descriptor: [u64; 2] = [0, linear_address];
+
+    unsafe {
+        core::arch::asm!(
+        "invvpid {0}, [{1}]",
+        in(reg) 0 as u64,// vpid_type (individual address)
+        in(reg) &descriptor,
+        options(nostack)
+        );
+    };
+}
+
 /// Invalidates entries in the TLB and other processor structures that cache
 /// translations derived from EPT.
 ///

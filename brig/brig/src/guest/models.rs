@@ -204,7 +204,7 @@ impl ModelDevice {
     fn block_exec(&self, single_step_mode: bool) {
         log::trace!("start block exec");
         // guest physical PC to translated block cache
-        // (2-stage, first stage is the page, second stage is the offset within a paage)
+        // (2-stage, first stage is the page, second stage is the offset within a page)
         let mut block_cache = Box::new(HashMap::<u64, HashMap<u64, TranslatedBlock>>::default());
 
         // guest virtual address PC to host virtual ptr to executable code
@@ -234,7 +234,7 @@ impl ModelDevice {
         // block translation/execution loop
         loop {
             match STALE_PAGE_MODE {
-                StalePageMode::EPT => {
+                StalePageMode::EPT | StalePageMode::SoftwareTargetedFlush => {
                     let mut stale_code_pages = STALE_CODE_PAGES.lock();
 
                     if !stale_code_pages.is_empty() {
@@ -248,23 +248,25 @@ impl ModelDevice {
                         if let Some(page_block_cache) = block_cache.get_mut(&stale_code_page) {
                             page_block_cache.clear();
                         } else {
-                            panic!(
-                                "weird internal state where we are trying to clear a stale page that isn't in the cache"
-                            )
+                            // fine, could be a linux lazy data page
+                            // panic!(
+                            //     "weird internal state where we are trying to
+                            // clear a stale page that isn't in the cache:
+                            // {stale_code_page:x}"
+                            // )
                         }
                     }
                 }
 
-                // we flushed the pages at the time of page fault, so do nothing here
                 StalePageMode::SoftwareFullFlush => {
                     let mut stale_code_pages = STALE_CODE_PAGES.lock();
+
                     if !stale_code_pages.is_empty() {
-                        block_cache.clear();
                         stale_code_pages.clear();
-                        log::error!("cleared whole code cache")
+                        chain_cache.fill_keys(1);
+                        block_cache.clear();
                     }
                 }
-                StalePageMode::SoftwareWalk => {}
 
                 // we're not doing anything
                 StalePageMode::None => {}
@@ -308,11 +310,15 @@ impl ModelDevice {
                         single_step_mode,
                     );
 
-                    if let StalePageMode::EPT = STALE_PAGE_MODE {
-                        EPT.lock().smc_protect(
+                    match STALE_PAGE_MODE {
+                        StalePageMode::EPT => EPT.lock().smc_protect(
                             VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START.as_u64() + region_phys_base,
-                        );
-                    };
+                        ),
+                        StalePageMode::SoftwareTargetedFlush | StalePageMode::SoftwareFullFlush => {
+                            VirtualMemoryArea::current().smc_protect()
+                        }
+                        StalePageMode::None => {}
+                    }
 
                     block
                 });

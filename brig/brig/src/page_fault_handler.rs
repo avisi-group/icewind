@@ -45,8 +45,6 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
     let addrspace = unsafe { &*exec_ctx.current_address_space };
 
     const LOW_HALF_END: u64 = LOW_HALF_CANONICAL_END.as_u64();
-    const HIGH_HALF_START: u64 = HIGH_HALF_CANONICAL_START.as_u64();
-    const HIGH_HALF_END: u64 = HIGH_HALF_CANONICAL_END.as_u64();
     const EMULATED_GUEST_PHYS_START: u64 = GUEST_PHYSICAL_START.as_u64();
     const EMULATED_GUEST_PHYS_END: u64 = GUEST_PHYSICAL_END.as_u64();
 
@@ -62,20 +60,6 @@ pub fn page_fault_exception(machine_context: *mut MachineContext) {
             handle_emulated_guest_physical_memory_fault(faulting_address, error_code, addrspace)
         }
 
-        HIGH_HALF_START..=HIGH_HALF_END => {
-            if let StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk = STALE_PAGE_MODE
-                && error_code
-                    == PageFaultErrorCode::PROTECTION_VIOLATION
-                        | PageFaultErrorCode::CAUSED_BY_WRITE
-            {
-                handle_write_to_code_page(faulting_address)
-            } else {
-                panic!(
-                    "got a fault in the high half while either not in software page fault detection ({STALE_PAGE_MODE:?}), or a write fault, this probably shouldn't happen: {error_code:?} @ {faulting_address:?}"
-                );
-            }
-        }
-
         _ => {
             panic!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
         }
@@ -88,7 +72,9 @@ fn allocate_and_map_emulated_guest_physical_memory(guest_physical: u64) -> PhysA
             // back with EPT page (to be allocated by EPT fault handler)
             (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
         }
-        StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareWalk | StalePageMode::None => {
+        StalePageMode::SoftwareFullFlush
+        | StalePageMode::SoftwareTargetedFlush
+        | StalePageMode::None => {
             // allocate now with brig's allocator
             VirtAddr::from_ptr(unsafe {
                 alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
@@ -108,15 +94,6 @@ fn allocate_and_map_emulated_guest_physical_memory(guest_physical: u64) -> PhysA
     );
 
     backing_page
-}
-
-fn handle_write_to_code_page(faulting_address: VirtAddr) {
-    if let StalePageMode::SoftwareFullFlush = STALE_PAGE_MODE {
-        log::error!("full flush signalled");
-        STALE_CODE_PAGES.lock().push(u64::MAX);
-    } else {
-        STALE_CODE_PAGES.lock().push(faulting_address.as_u64());
-    }
 }
 
 fn handle_emulated_guest_io_access(
@@ -291,16 +268,17 @@ fn handle_emulated_guest_virtual_memory_fault(
     log::debug!("guest backing frame: {guest_backing_frame:x?}");
 
     // have we already allocated this gues physical address?
-    let backing_page = match guest_backing_frame {
+    let (backing_page, present) = match guest_backing_frame {
         None => {
             // No existing backing page, so lookup what to do.
             if let Some(rgn) = addrspace.find_region(guest_physical) {
                 // Physical address lies within a valid guest region, determine
                 //region             type...
                 match rgn.kind() {
-                    AddressSpaceRegionKind::Ram => {
-                        allocate_and_map_emulated_guest_physical_memory(guest_physical)
-                    }
+                    AddressSpaceRegionKind::Ram => (
+                        allocate_and_map_emulated_guest_physical_memory(guest_physical),
+                        false,
+                    ),
                     AddressSpaceRegionKind::IO(device) => {
                         handle_emulated_guest_io_access(
                             guest_physical,
@@ -323,7 +301,7 @@ fn handle_emulated_guest_virtual_memory_fault(
         }
         Some(phys_addr) => {
             // Backing page already exists at this host physical address
-            phys_addr
+            (phys_addr, true)
         }
     };
 
@@ -337,6 +315,17 @@ fn handle_emulated_guest_virtual_memory_fault(
     //     (VIRT_GUEST_EMULATED_GUEST_PHYSICAL_START +
     // guest_physical).align_down(0x1000u64);
     // ---------------------------------------------------------------------------------------- //
+    if is_write
+        && present
+        && matches!(
+            STALE_PAGE_MODE,
+            StalePageMode::SoftwareFullFlush | StalePageMode::SoftwareTargetedFlush
+        )
+    {
+        VirtualMemoryArea::current().release_smc_protection(faulting_address);
+        STALE_CODE_PAGES.lock().push(backing_page.as_u64());
+    }
+
     let flags = if is_write {
         PageTableFlags::PRESENT | PageTableFlags::WRITABLE
     } else {

@@ -132,13 +132,17 @@ pub fn init(continuation: extern "C" fn(u64), continuation_arg: u64) {
             panic!("vmx launch or resume failed: {vm_error}");
         }
 
-        let result = match vmcs.read_vm_exit_reason().unwrap() {
+        let reason = vmcs.read_vm_exit_reason().unwrap();
+        //  log::error!("{reason:?}");
+
+        let result = match reason {
             VmxExitReason::EptViolation => handle_ept_violation(&mut vmcs),
             VmxExitReason::EptMisconfiguration => handle_ept_misconfiguration(&mut vmcs),
             VmxExitReason::CpuId => handle_cpuid(),
             VmxExitReason::VmCall => {
-                log::trace!("vmcall invept");
-                invept_all_contexts();
+                //log::trace!("vmcall invept");
+                // invept_all_contexts();
+                todo!("ept.invalidate");
                 ExitHandleResult::ContinueAdvance
             }
             _ => {
@@ -222,7 +226,7 @@ fn handle_ept_violation(vmcs: &mut Vmcs) -> ExitHandleResult {
     // qual={qual}, rsp={:x}",     vmcs.read_guest_rsp().unwrap()
     // );
 
-    ept.invalidate();
+    ept.invalidate(guest_phys_addr);
 
     ExitHandleResult::ContinueRetry
 }
