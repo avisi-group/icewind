@@ -14,7 +14,7 @@ use {
     },
     alloc::{rc::Rc, vec::Vec},
     common::{
-        GuestExecutionContext,
+        GuestExecutionContext, TRACING_MODE, TracingMode,
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,

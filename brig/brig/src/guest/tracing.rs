@@ -121,3 +121,10 @@ pub extern "sysv64" fn trace_memory_write(address: u64, value: u64, width: u8) {
         write!(transport, "M[{address:x}:{width}] <= {value:#x}, ").unwrap();
     }
 }
+
+pub extern "sysv64" fn trace_pc(pc: u64) {
+    let Device::Transport(transport) = &mut *CURRENT_TRACE_PACKET.lock() else {
+        panic!()
+    };
+    transport.write(&pc.to_ne_bytes());
+}

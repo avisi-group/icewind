@@ -21,6 +21,20 @@ pub mod ringbuffer;
 pub mod rudder;
 pub mod width_helpers;
 
+pub enum TracingMode {
+    // No tracing
+    None,
+
+    // Calls to functions inserted a beginning of blocks writing current PC to shared memory
+    // ringbuffer
+    Software,
+
+    // PTWRITE instruction used
+    PtWrite,
+}
+
+pub const TRACING_MODE: TracingMode = TracingMode::PtWrite;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TestConfig {
     // Do not run tests

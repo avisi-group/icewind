@@ -13,6 +13,7 @@ pub mod movzx;
 pub mod not;
 pub mod or;
 pub mod pshuflw;
+pub mod ptwrite;
 pub mod setne;
 pub mod shl;
 pub mod shr;

@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, flush_tlb, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            self, trace_instruction_end, trace_instruction_start, trace_memory_read,
-            trace_memory_write, trace_register_read, trace_register_write,
+            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
+            trace_pc, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -13,7 +13,7 @@ use {
         string::String, sync::Arc, vec::Vec,
     },
     common::{
-        GuestExecutionContext,
+        GuestExecutionContext, TRACING_MODE, TracingMode,
         device::Device,
         hashmap::HashMap,
         intern::InternedString,
@@ -32,7 +32,8 @@ use {
         translate::translate_instruction,
         x86::{
             Callbacks, X86TranslationContext,
-            emitter::{BinaryOperationKind, X86Emitter},
+            emitter::{BinaryOperationKind, X86Emitter, X86NodeRef},
+            encoder::{Instruction, Operand, width::Width},
         },
     },
     kernel::{
@@ -452,6 +453,28 @@ impl ModelDevice {
 
         // block prologue
         emitter.prologue();
+
+        // only trace userspace?
+        match TRACING_MODE {
+            TracingMode::None => (),
+            TracingMode::Software => {
+                // call to write pc to hyperport
+                let mut arguments = Vec::new_in(emitter.ctx().allocator());
+                arguments.push(emitter.constant(block_start_pc, Type::Unsigned(64)));
+                let trace_pc_fnptr = emitter.function_ptr(trace_pc as *const () as u64);
+
+                emitter.call(trace_pc_fnptr, arguments);
+            }
+            TracingMode::PtWrite => {
+                // insert ptwrite
+                // todo PC
+                let pc = Operand::vreg_general(Width::_64, emitter.next_vreg());
+                emitter.push_instruction(
+                    Instruction::mov(Operand::imm(Width::_64, block_start_pc), pc).unwrap(),
+                );
+                emitter.push_instruction(Instruction::ptwrite(pc));
+            }
+        }
 
         // reset BranchTaken
         let _false = emitter.constant(0 as u64, Type::Unsigned(1));

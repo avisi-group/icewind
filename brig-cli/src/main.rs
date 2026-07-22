@@ -1,10 +1,11 @@
 use {
+    crate::ptwrite::HardwareTracer,
     bootloader::BootConfig,
     bootloader_boot_config::LevelFilter,
     cargo_metadata::{Artifact, Message, TargetKind, diagnostic::DiagnosticLevel},
     clap::{Parser, Subcommand},
     common::{
-        TestConfig,
+        TRACING_MODE, TestConfig, TracingMode,
         ringbuffer::{Consumer, MaybeSplitBuffer, RingBuffer},
     },
     elf::{ElfBytes, endian::AnyEndian, section::SectionHeader},
@@ -25,6 +26,8 @@ use {
     tar::Header,
     walkdir::WalkDir,
 };
+
+mod ptwrite;
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -71,6 +74,7 @@ enum Command {
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
+    pretty_env_logger::init();
 
     let cli = Cli::parse();
 
@@ -426,28 +430,48 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     let ready_clone = ready.clone();
     let terminate_clone = terminate.clone();
 
-    let handle = thread::spawn(move || {
-        hyperport_reader(
-            mem_path,
-            "/tmp/hyperport.trace",
-            ready_clone,
-            terminate_clone,
-        )
-    });
+    match TRACING_MODE {
+        TracingMode::None => (),
+        TracingMode::Software => {
+            let handle = thread::spawn(move || {
+                hyperport_reader(
+                    mem_path,
+                    "/tmp/hyperport.trace",
+                    ready_clone,
+                    terminate_clone,
+                )
+            });
 
-    while ready.load(Ordering::Relaxed) {
-        println!("waiting for hyperport...");
+            while ready.load(Ordering::Relaxed) {
+                println!("waiting for hyperport...");
+            }
+
+            let mut child = cmd.spawn().unwrap();
+
+            while !terminate.load(Ordering::Relaxed) {
+                sleep(Duration::from_millis(100));
+            }
+
+            child.kill().unwrap();
+
+            handle.join().unwrap();
+        }
+        TracingMode::PtWrite => {
+            let tracer = HardwareTracer::init("/tmp/ptwrite.trace");
+
+            let mut child = cmd.spawn().unwrap();
+
+            tracer.start_recording();
+
+            while !terminate.load(Ordering::Relaxed) {
+                sleep(Duration::from_millis(100));
+            }
+
+            child.kill().unwrap();
+
+            tracer.exit();
+        }
     }
-
-    let mut child = cmd.spawn().unwrap();
-
-    while !terminate.load(Ordering::Relaxed) {
-        sleep(Duration::from_millis(100));
-    }
-
-    child.kill().unwrap();
-
-    handle.join().unwrap();
 }
 
 fn get_kernel_from_artifacts(artifacts: &[Artifact]) -> PathBuf {

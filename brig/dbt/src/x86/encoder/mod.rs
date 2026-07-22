@@ -6,7 +6,7 @@ use {
             encoder::{
                 instructions::{
                     adc, add, and, cmovne, cmp, jne, lea, mov, movd, movq, movsx, movzx, not, or,
-                    setne, shl, shr, sub, test, xor,
+                    ptwrite, setne, shl, shr, sub, test, xor,
                 },
                 registers::{
                     PhysicalRegister, Register, RegisterClass, RegisterConversionError,
@@ -206,6 +206,9 @@ pub enum Opcode {
 
     /// label
     LABEL,
+
+    /// ptwrite {0}
+    PTWRITE(Operand),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
@@ -998,6 +1001,10 @@ impl Instruction {
         })
     }
 
+    pub fn ptwrite(src: Operand) -> Self {
+        Self(Opcode::PTWRITE(src))
+    }
+
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
     alu_op!(or, OR);
@@ -1037,6 +1044,7 @@ impl Instruction {
             XOR(src, dst) => xor::encode(assembler, src, dst),
             NOT(dst) => not::encode(assembler, dst),
             CMOVNE(src, dst) => cmovne::encode(assembler, src, dst),
+            PTWRITE(src) => ptwrite::encode(assembler, src),
 
             // control flow
             JNE(tgt) => jne::encode(assembler, label_map, tgt),
@@ -2265,6 +2273,7 @@ impl Instruction {
                 None,
             ]
             .into_iter(),
+            Opcode::PTWRITE(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
         }
     }
 
@@ -2483,6 +2492,7 @@ impl Instruction {
             ]
             .into_iter()
             .collect(),
+            Opcode::PTWRITE(src) => [(OperandDirection::In, src)].into_iter().collect(),
         }
     }
 
