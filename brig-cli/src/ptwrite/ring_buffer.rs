@@ -3,7 +3,7 @@ use {
     memmap2::MmapRaw,
     perf_event_open_sys::bindings::perf_event_mmap_page,
     std::{
-        ptr,
+        cmp, ptr,
         sync::atomic::{Ordering, fence},
     },
 };
@@ -44,7 +44,7 @@ impl RingBufferAux {
         if len < BUFFER_SIZE / 2 {
             READY.store(true, Ordering::Relaxed);
         }
-        if len > ((BUFFER_SIZE * 100) / 90) {
+        if len > ((BUFFER_SIZE * 90) / 100) {
             panic!(
                 "Ring buffer exceeded >90% capacity: head: {head:x}, tail: {tail:x}, len: {len:x}, capacity: {BUFFER_SIZE:x}",
             );
@@ -54,8 +54,9 @@ impl RingBufferAux {
         let wrapped_head = head % BUFFER_SIZE;
         let wrapped_tail = tail % BUFFER_SIZE;
 
-        let (main, secondary) = if wrapped_head > wrapped_tail {
-            (
+        let (main, secondary) = match wrapped_head.cmp(&wrapped_tail) {
+            // head is before tail, so single contiguous slice from tail to head
+            cmp::Ordering::Greater => (
                 unsafe {
                     std::slice::from_raw_parts(
                         self.aux_area.as_ptr().add(wrapped_tail),
@@ -63,16 +64,22 @@ impl RingBufferAux {
                     )
                 },
                 None,
-            )
-        } else {
-            let a = unsafe {
-                std::slice::from_raw_parts(
-                    self.aux_area.as_ptr().add(wrapped_tail),
-                    BUFFER_SIZE - wrapped_tail,
-                )
-            };
-            let b = unsafe { std::slice::from_raw_parts(self.aux_area.as_ptr(), wrapped_head) };
-            (a, Some(b))
+            ),
+            // tail is before head, so two slices, tail to end, and start to head
+            cmp::Ordering::Less => {
+                let a = unsafe {
+                    std::slice::from_raw_parts(
+                        self.aux_area.as_ptr().add(wrapped_tail),
+                        BUFFER_SIZE - wrapped_tail,
+                    )
+                };
+                let b = unsafe { std::slice::from_raw_parts(self.aux_area.as_ptr(), wrapped_head) };
+                (a, Some(b))
+            }
+            // empty, return early
+            cmp::Ordering::Equal => {
+                return false;
+            }
         };
 
         let consumed = callback(main, secondary);
