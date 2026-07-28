@@ -467,7 +467,6 @@ impl ModelDevice {
             }
             TracingMode::PtWrite => {
                 // insert ptwrite
-                // todo PC
                 let pc = Operand::vreg_general(Width::_64, emitter.next_vreg());
                 emitter.push_instruction(
                     Instruction::mov(Operand::imm(Width::_64, block_start_pc), pc).unwrap(),

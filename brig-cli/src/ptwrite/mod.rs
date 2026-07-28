@@ -22,8 +22,8 @@ pub struct HardwareTracer {
 }
 
 impl HardwareTracer {
-    pub fn init<P: AsRef<Path> + Send + 'static>(path: P) -> Self {
-        let (reader, perf_file_descriptor) = Reader::init(path);
+    pub fn init<P: AsRef<Path> + Send + 'static>(path: P, target_pid: i32) -> Self {
+        let (reader, perf_file_descriptor) = Reader::init(path, target_pid);
 
         HardwareTracer {
             perf_file_descriptor,
@@ -32,10 +32,17 @@ impl HardwareTracer {
     }
 
     pub fn start_recording(&self) {
-        READY.store(false, Ordering::Relaxed);
-        while !READY.load(Ordering::Relaxed) {
-            unsafe { std::arch::asm!("nop") };
-            // println!("waiting");
+        // READY.store(false, Ordering::Relaxed);
+        // while !READY.load(Ordering::Relaxed) {
+        //     unsafe { std::arch::asm!("nop") };
+        //     // println!("waiting");
+        // }
+
+        if unsafe {
+            perf_event_open_sys::ioctls::RESET(self.perf_file_descriptor.load(Ordering::Relaxed), 0)
+        } < 0
+        {
+            panic!("failed to start recording");
         }
 
         if unsafe {

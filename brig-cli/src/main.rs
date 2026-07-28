@@ -13,7 +13,7 @@ use {
     ovmf_prebuilt::{Arch, FileType, Source},
     std::{
         fs::{self, File},
-        io::{BufReader, BufWriter, Write},
+        io::{BufReader, BufWriter, Read, Write},
         path::{Path, PathBuf},
         process::{self, Stdio},
         sync::{
@@ -457,9 +457,11 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
             handle.join().unwrap();
         }
         TracingMode::PtWrite => {
-            let tracer = HardwareTracer::init("/tmp/ptwrite.trace");
-
             let mut child = cmd.spawn().unwrap();
+
+            let id = find_vm_tid_from_qemu_pid(child.id());
+
+            let tracer = HardwareTracer::init("/tmp/ptwrite.trace", id.try_into().unwrap());
 
             tracer.start_recording();
 
@@ -584,4 +586,24 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
     }
 
     dest.flush().unwrap();
+}
+
+fn find_vm_tid_from_qemu_pid(qemu_pid: u32) -> i32 {
+    loop {
+        if let Some(tid) = std::fs::read_dir(format!("/proc/{qemu_pid}/task"))
+            .unwrap()
+            .map(|entry| {
+                entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .parse::<i32>()
+                    .unwrap()
+            })
+            .skip(3) // magic!
+            .next()
+        {
+            return tid;
+        }
+    }
 }

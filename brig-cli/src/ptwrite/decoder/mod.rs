@@ -94,6 +94,14 @@ impl<'data> Decoder<'data> {
                         self.step(8);
                         return Ok(Some(payload));
                     }
+                    0x43 => {
+                        // pt_ext_pip
+                        self.step(7);
+                    }
+                    0xc8 => {
+                        // pt_ext_vmcs
+                        self.step(6);
+                    }
                     _ => return Err(Error::UnknownExtOpcode { ext }),
                 }
             }
@@ -119,7 +127,8 @@ impl<'data> Iterator for Decoder<'data> {
             match self.next_packet() {
                 Ok(None) => (),
                 Ok(Some(payload)) => break Some(payload),
-                Err(_) => break None,
+                Err(Error::EndOfData) => break None,
+                Err(e) => panic!("{e:#x?}"),
             }
         }
     }
@@ -169,6 +178,8 @@ enum Opcode {
 // };
 
 const OPCODE_PAD: u8 = 0x00;
+const OPCODE_MODE: u8 = 0x99;
+const OPCODE_TIPPGD: u8 = 0x01;
 const OPCODE_EXT: u8 = 0x02;
 const OPCODE_EXT_PSB: u8 = 0x82;
 const OPCODE_EXT_PSBEND: u8 = 0x23;

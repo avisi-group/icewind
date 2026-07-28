@@ -36,12 +36,15 @@ pub struct Reader {
 }
 
 impl Reader {
-    pub fn init<P: AsRef<Path> + Send + 'static>(path: P) -> (Self, Arc<AtomicI32>) {
+    pub fn init<P: AsRef<Path> + Send + 'static>(
+        path: P,
+        target_pid: i32,
+    ) -> (Self, Arc<AtomicI32>) {
         let perf_file_descriptor = Arc::new(AtomicI32::new(-1));
         let fd = perf_file_descriptor.clone();
         (
             Self {
-                handle: ThreadHandle::spawn(move |ctx| read_pt_data(ctx, fd, path)),
+                handle: ThreadHandle::spawn(move |ctx| read_pt_data(ctx, target_pid, fd, path)),
             },
             perf_file_descriptor,
         )
@@ -52,17 +55,34 @@ impl Reader {
     }
 }
 
-fn read_pt_data<P: AsRef<Path>>(ctx: Context, perf_file_descriptor: Arc<AtomicI32>, path: P) {
+fn read_pt_data<P: AsRef<Path>>(
+    ctx: Context,
+    target_pid: i32,
+    perf_file_descriptor: Arc<AtomicI32>,
+    path: P,
+) {
     let mut pea = perf_event_attr::default();
 
     // perf event type
     pea.type_ = get_intel_pt_perf_type();
 
-    // Event should start disabled, and not operate in kernel-mode.
+    // Event should start disabled
+    // 2026-07-22 fmckeogh: why?
     pea.set_disabled(1);
-    pea.set_exclude_kernel(1);
+
+    // we now *are* in a vm and recording kernel so turn off exclusions?
+    pea.set_exclude_kernel(0);
     pea.set_exclude_hv(1);
-    pea.set_precise_ip(2);
+    pea.set_exclude_guest(0);
+    pea.set_exclude_host(1);
+    pea.set_exclude_user(1);
+
+    pea.set_inherit(0);
+
+    pea.set_sample_id_all(0);
+
+    // still needed?
+    pea.set_precise_ip(0);
 
     // 0 pt
     // 1 cyc
@@ -89,7 +109,7 @@ fn read_pt_data<P: AsRef<Path>>(ctx: Context, perf_file_descriptor: Arc<AtomicI3
     // 31 event
 
     // 55 notnt
-    pea.config = 0b0001_0000_0000_0001;
+    pea.config = (1 << 0) | (1 << 12);
 
     pea.size = std::mem::size_of::<perf_event_attr>() as u32;
 
@@ -97,10 +117,10 @@ fn read_pt_data<P: AsRef<Path>>(ctx: Context, perf_file_descriptor: Arc<AtomicI3
         let result = unsafe {
             perf_event_open(
                 (&mut pea) as *mut _,
-                i32::try_from(process::id()).unwrap(),
+                target_pid,
                 -1,
                 -1,
-                0,
+                perf_event_open_sys::bindings::PERF_FLAG_FD_CLOEXEC.into(),
             )
         };
         if result < 0 {
