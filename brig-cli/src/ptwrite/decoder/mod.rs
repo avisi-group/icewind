@@ -127,6 +127,10 @@ impl<'data> Iterator for Decoder<'data> {
             match self.next_packet() {
                 Ok(None) => (),
                 Ok(Some(payload)) => break Some(payload),
+                Err(Error::MissingData) => {
+                    log::error!("missing!");
+                    break None;
+                }
                 Err(Error::EndOfData) => break None,
                 Err(e) => panic!("{e:#x?}"),
             }

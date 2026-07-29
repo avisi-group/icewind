@@ -33,7 +33,7 @@ pub enum TracingMode {
     PtWrite,
 }
 
-pub const TRACING_MODE: TracingMode = TracingMode::None;
+pub const TRACING_MODE: TracingMode = TracingMode::PtWrite;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TestConfig {

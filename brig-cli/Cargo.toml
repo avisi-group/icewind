@@ -4,6 +4,14 @@ version = "0.1.0"
 edition = "2024"
 default-run = "brig-cli"
 
+[profile.release]
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = "fat"
+incremental = false
+codegen-units = 1
+
 [dependencies]
 common = { path = "../common" }
 

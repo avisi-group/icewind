@@ -1,5 +1,5 @@
 use {
-    crate::ptwrite::reader::{READY, Reader},
+    crate::ptwrite::reader::Reader,
     std::{
         path::{Path, PathBuf},
         sync::{

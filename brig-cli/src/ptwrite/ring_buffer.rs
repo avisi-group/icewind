@@ -1,5 +1,5 @@
 use {
-    crate::ptwrite::reader::{BUFFER_SIZE, READY},
+    crate::ptwrite::reader::BUFFER_SIZE,
     memmap2::MmapRaw,
     perf_event_open_sys::bindings::perf_event_mmap_page,
     std::{
@@ -39,14 +39,16 @@ impl RingBufferAux {
         // - page points to a valid instance of perf_event_mmap_page.
         let head = unsafe { read_head(page) };
 
+        assert!(head >= tail);
+
         let len = head - tail;
 
-        if len < BUFFER_SIZE / 2 {
-            READY.store(true, Ordering::Relaxed);
-        }
-        if len > ((BUFFER_SIZE * 90) / 100) {
+        // if len < BUFFER_SIZE / 2 {
+        //     READY.store(true, Ordering::Relaxed);
+        // }
+        if len > ((BUFFER_SIZE * 4) / 5) {
             panic!(
-                "Ring buffer exceeded >90% capacity: head: {head:x}, tail: {tail:x}, len: {len:x}, capacity: {BUFFER_SIZE:x}",
+                "Ring buffer exceeded >80% capacity: head: {head:x}, tail: {tail:x}, len: {len:x}, capacity: {BUFFER_SIZE:x}",
             );
         }
 

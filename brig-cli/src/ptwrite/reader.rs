@@ -29,7 +29,7 @@ const INTEL_PT_TYPE_PATH: &str = "/sys/bus/event_source/devices/intel_pt/type";
 pub const BUFFER_SIZE: usize = 2 * 1024 * 1024 * 1024;
 const NR_DATA_PAGES: usize = 256;
 
-pub static READY: AtomicBool = AtomicBool::new(false);
+//pub static READY: AtomicBool = AtomicBool::new(false);
 
 pub struct Reader {
     handle: ThreadHandle,
@@ -167,6 +167,7 @@ fn read_pt_data<P: AsRef<Path>>(
 
             let consumed = decoder.offset();
             total += consumed;
+
             consumed
         });
 
@@ -177,6 +178,7 @@ fn read_pt_data<P: AsRef<Path>>(
             if terminating {
                 log::trace!("read terminating");
                 dbg!(total);
+
                 return;
             }
 
