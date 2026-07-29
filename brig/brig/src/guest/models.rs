@@ -4,8 +4,8 @@ use {
         devices::arm::mmu::{TranslationType, flush_tlb, guest_translate, take_arm_exception},
         get_current_guest,
         tracing::{
-            trace_instruction_end, trace_instruction_start, trace_memory_read, trace_memory_write,
-            trace_pc, trace_register_read, trace_register_write,
+            self, trace_instruction_end, trace_instruction_start, trace_memory_read,
+            trace_memory_write, trace_pc, trace_register_read, trace_register_write,
         },
     },
     alloc::{
@@ -22,7 +22,6 @@ use {
     core::{
         alloc::Layout,
         fmt::{self, Debug},
-        panic,
         sync::atomic::{AtomicBool, AtomicU32, Ordering},
     },
     dbt::{
@@ -31,8 +30,8 @@ use {
         register_file::{RegisterFile, WellKnownRegister},
         translate::translate_instruction,
         x86::{
-            Callbacks, X86TranslationContext,
-            emitter::{BinaryOperationKind, X86Emitter, X86NodeRef},
+            Callbacks, EMIT_INSTRUCTION_TRACING_CALLBACKS, X86TranslationContext,
+            emitter::{BinaryOperationKind, X86Emitter},
             encoder::{Instruction, Operand, width::Width},
         },
     },
@@ -275,15 +274,18 @@ impl ModelDevice {
 
             let block_start_virtual_pc = self.well_known_registers.pc().read();
 
-            // if block_start_virtual_pc == 0x408200 {
-            //     HIT_PROGRAM_START.store(true, Ordering::Relaxed);
-            // }
+            if EMIT_INSTRUCTION_TRACING_CALLBACKS {
+                if block_start_virtual_pc == 0x40056c {
+                    HIT_PROGRAM_START.store(true, Ordering::Relaxed);
+                }
 
-            // tracing::ENABLED.store(
-            //     HIT_PROGRAM_START.load(Ordering::Relaxed)
-            //         && self.register_file.read::<u8>("PSTATE_EL") == 0,
-            //     Ordering::Relaxed,
-            // );
+                tracing::ENABLED.store(
+                    HIT_PROGRAM_START.load(Ordering::Relaxed)
+                        && (self.register_file.read::<u8>("PSTATE_EL") == 0),
+                    // || GuestExecutionContext::current().instruction_count > 2497750000),
+                    Ordering::Relaxed,
+                );
+            }
 
             if (block_start_virtual_pc & !0xFFF) != region_virt_base {
                 let block_start_physical_pc =
@@ -382,7 +384,7 @@ impl ModelDevice {
             // {     panic!("{execution_time} {translation_time}");
             // }
 
-            // if EMIT_TRACING {
+            // if EMIT_INSTRUCTION_TRACING_CALLBACKS {
             //     INSTRUCTION_COUNT
             //         .fetch_add(translated_block.opcodes.len() as u64, Ordering::Relaxed);
             // }

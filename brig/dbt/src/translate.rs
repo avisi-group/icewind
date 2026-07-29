@@ -4,7 +4,7 @@ use {
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
         x86::{
-            EMIT_TRACING, X86Block,
+            EMIT_INSTRUCTION_TRACING_CALLBACKS, X86Block,
             emitter::{BinaryOperationKind, CastOperationKind, NodeKind, X86Emitter, X86NodeRef},
             encoder::{Instruction, Operand, registers::SegmentRegister},
         },
@@ -84,7 +84,7 @@ pub fn translate_instruction(
 ) -> Result<Option<X86NodeRef>, Error> {
     register_file.write("SEE", -1i64);
 
-    if EMIT_TRACING {
+    if EMIT_INSTRUCTION_TRACING_CALLBACKS {
         emitter.emit_trace_instruction_start(opcode, pc);
     }
 
@@ -139,7 +139,7 @@ pub fn translate_instruction(
         i32::try_from(offset_of!(GuestExecutionContext, instruction_count)).unwrap(),
     )));
 
-    if EMIT_TRACING {
+    if EMIT_INSTRUCTION_TRACING_CALLBACKS {
         emitter.emit_trace_instruction_end();
     }
 

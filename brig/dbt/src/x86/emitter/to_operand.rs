@@ -2,10 +2,10 @@ use {
     crate::{
         emitter::{Emitter, Type},
         x86::{
-            EMIT_TRACING,
+            EMIT_INSTRUCTION_TRACING_CALLBACKS,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
-                TernaryOperationKind, UnaryOperationKind, X86Emitter, X86Node, X86NodeRef,
+                TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
                 X86NodeRefPtrHash,
             },
             encoder::{
@@ -131,7 +131,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
                     .unwrap(),
                 );
 
-                if EMIT_TRACING && width < Width::_128 {
+                if EMIT_INSTRUCTION_TRACING_CALLBACKS && width < Width::_128 {
                     let mut arguments = Vec::new_in(self.ctx().allocator());
                     arguments.push(Operand::imm(Width::_64, *offset));
 

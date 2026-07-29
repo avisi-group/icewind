@@ -4,7 +4,8 @@ use {
         emitter::{Emitter, Type},
         trampoline::ExecutionResult,
         x86::{
-            ARG_REGS, CALLER_SAVED, EMIT_TRACING, X86Block, X86TranslationContext,
+            ARG_REGS, CALLER_SAVED, EMIT_INSTRUCTION_TRACING_CALLBACKS, X86Block,
+            X86TranslationContext,
             encoder::{
                 Instruction, MemoryScale, Opcode, Operand, OperandKind,
                 registers::{PhysicalRegister, Register, SegmentRegister},
@@ -14,7 +15,7 @@ use {
     },
     alloc::{rc::Rc, vec::Vec},
     common::{
-        GuestExecutionContext, TRACING_MODE, TracingMode,
+        GuestExecutionContext,
         arena::Ref,
         bits::{bit_extract, bit_insert, mask},
         hashmap::HashMap,
@@ -1909,7 +1910,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             .unwrap(),
         );
 
-        if EMIT_TRACING && width < Width::_128 {
+        if EMIT_INSTRUCTION_TRACING_CALLBACKS && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(Operand::imm(Width::_64, offset));
 
@@ -1956,7 +1957,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest).unwrap(),
         );
 
-        if EMIT_TRACING && width < Width::_128 {
+        if EMIT_INSTRUCTION_TRACING_CALLBACKS && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 
@@ -2052,7 +2053,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             panic!()
         }
 
-        if EMIT_TRACING && width < Width::_128 {
+        if EMIT_INSTRUCTION_TRACING_CALLBACKS && width < Width::_128 {
             let mut arguments = Vec::new_in(self.ctx().allocator());
             arguments.push(address);
 

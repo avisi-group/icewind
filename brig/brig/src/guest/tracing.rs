@@ -26,33 +26,6 @@ pub extern "sysv64" fn trace_instruction_start(opcode: u32, pc: u64) {
         let count = GuestExecutionContext::current().instruction_count;
 
         write!(transport, "{{ <{count}> [{pc:x}] ({opcode:x}) ").unwrap();
-
-        let pc = get_current_guest().core.well_known_registers.pc().read();
-
-        // strlen_asimd
-        if pc >= 0x417900 && pc < 0x417a3c {
-            let z_offset = get_current_guest().core.model.reg_offset("_Z") as usize;
-
-            let q0_offset = z_offset + 0 * 256;
-            let q1_offset = z_offset + 1 * 256;
-            let q2_offset = z_offset + 2 * 256;
-
-            let q0 = get_current_guest()
-                .core
-                .register_file
-                .read_raw::<u128>(q0_offset);
-            let q1 = get_current_guest()
-                .core
-                .register_file
-                .read_raw::<u128>(q1_offset);
-            let q2 = get_current_guest()
-                .core
-                .register_file
-                .read_raw::<u128>(q2_offset);
-
-            write!(transport, "v0: {q0:032x}, v1: {q1:032x}, v2: {q2:032x} ",).unwrap();
-        }
-        //  writeln!(transport, "{pc:016x}").unwrap();
     }
 }
 
