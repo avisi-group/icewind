@@ -685,6 +685,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     }
                     _ => todo!(),
                 },
+                NodeKind::Real {
+                    numerator,
+                    denominator,
+                } => {
+                    let neg = self.unary_operation(UnaryOperationKind::Negate(numerator.clone()));
+                    self.create_real(neg, denominator.clone())
+                }
                 _ => self.node(X86Node {
                     typ: value.typ().clone(),
                     kind: NodeKind::UnaryOperation(op),
@@ -813,6 +820,35 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                             kind: NodeKind::BinaryOperation(op),
                         })
                     }
+                }
+                (
+                    NodeKind::Real {
+                        numerator: left_num,
+                        denominator: left_den,
+                    },
+                    NodeKind::Real {
+                        numerator: right_num,
+                        denominator: right_den,
+                    },
+                ) => {
+                    let left = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_num.clone(),
+                        right_den.clone(),
+                    ));
+
+                    let right = self.binary_operation(BinaryOperationKind::Multiply(
+                        right_num.clone(),
+                        left_den.clone(),
+                    ));
+
+                    let num = self.binary_operation(BinaryOperationKind::Add(left, right));
+
+                    let den = self.binary_operation(BinaryOperationKind::Multiply(
+                        left_den.clone(),
+                        right_den.clone(),
+                    ));
+
+                    self.create_real(num, den)
                 }
                 _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
@@ -1121,15 +1157,33 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         ..
                     },
                 ) => {
-                    let res = base_value.pow(u32::try_from(*exponent_value).unwrap_or_else(|e| {
-                        panic!("powi: {base_value} ^^ {exponent_value}: {e:?}")
-                    }));
+                    let base_signed = i64::from_ne_bytes((*base_value).to_ne_bytes());
+                    let exp_signed = i64::from_ne_bytes((*exponent_value).to_ne_bytes());
 
-                    self.constant(res, base.typ())
+                    let res =
+                        base_signed.pow(u32::try_from(exp_signed.abs()).unwrap_or_else(|e| {
+                            panic!("powi: {base_value} ^^ {exponent_value}: {e:?}")
+                        }));
+
+                    if res == 0 {
+                        self.constant(0, base.typ())
+                    } else if exp_signed.is_negative() {
+                        self.constant((1 / res) as u64, base.typ())
+                    } else {
+                        self.constant(res as u64, base.typ())
+                    }
                 }
 
                 // 1^x = 1
                 (NodeKind::Constant { value: 1, .. }, ..) => base.clone(),
+
+                // x^0 = 1
+                (.., NodeKind::Constant { value: 0, .. }) => self.constant(1, base.typ()),
+
+                (NodeKind::Constant { value: 2, .. }, ..) => {
+                    let _1 = self.constant(1, base.typ());
+                    self.shift(_1, exponent.clone(), ShiftOperationKind::LogicalShiftLeft)
+                }
 
                 (
                     NodeKind::Real {

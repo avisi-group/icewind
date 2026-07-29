@@ -8733,6 +8733,33 @@ fn fabs_neg() {
     assert_eq!(register_file.read_raw::<f64>(d2_offset), 3.14f64);
 }
 
+#[ktest]
+fn fcmgt() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // fcmgt   d0, d0, #0.0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x5ee0c800,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    register_file.write("_Z", 3.14f64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("_Z"), 0xFFFF_FFFF_FFFF_FFFF);
+}
+
 // #[ktest]
 // fn shrn() {
 //     todo!()

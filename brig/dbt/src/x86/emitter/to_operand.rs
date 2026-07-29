@@ -1260,13 +1260,15 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             }
 
             BinaryOperationKind::PowI(base, exponent) => {
-                let zero = self.constant(0, Type::Int);
-                let exp_gt_zero = self.binary_operation(
-                    BinaryOperationKind::CompareGreaterThanOrEqual(exponent.clone(), zero),
-                );
-                self.assert(exp_gt_zero, 0);
+                // let zero = self.constant(0, Type::Int);
+                // let exp_gt_zero = self.binary_operation(
+                //     BinaryOperationKind::CompareGreaterThanOrEqual(exponent.clone(), zero),
+                // );
+                // self.assert(exp_gt_zero, 0);
 
-                todo!("{base:?} ^ {exponent:?}");
+                let base = self.to_operand(base);
+                let exp = self.to_operand(exponent);
+                todo!("{base:?} ^ {exp:?}");
             }
 
             op => todo!("{op:#?}"),
