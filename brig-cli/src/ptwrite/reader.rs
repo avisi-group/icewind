@@ -166,6 +166,15 @@ fn read_pt_data<P: AsRef<Path>>(
             }
 
             let consumed = decoder.offset();
+
+            // // writes raw pt data to file
+            // f.write_all(main).unwrap();
+            // if let Some(sec) = secondary {
+            //     f.write_all(sec).unwrap();
+            // }
+
+            // let consumed = main.len() + secondary.map(|s| s.len()).unwrap_or(0);
+
             total += consumed;
 
             consumed
