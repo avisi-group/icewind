@@ -1773,7 +1773,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     width: pattern_width,
                 },
                 NodeKind::Constant { value: count, .. },
-            ) => {
+            ) if u64::from(*pattern_width) * count <= 64 => {
                 let mut dest = *pattern;
 
                 for _ in 1..*count {

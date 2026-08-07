@@ -1008,20 +1008,20 @@ impl<'m, 'r, 'e, 'c> FunctionTranslator<'m, 'r, 'e, 'c> {
                     //     )
                     // }
 
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     value.kind(),
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        value.kind(),
+                    );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    // log::trace!(
-                    //     "{} {} = ()",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    // );
+                    log::trace!(
+                        "{} {} = ()",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                    );
                 }
                 StatementResult::ControlFlow(block_result) => {
                     // log::trace!(

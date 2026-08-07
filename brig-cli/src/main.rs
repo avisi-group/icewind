@@ -431,16 +431,7 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     let terminate_clone = terminate.clone();
 
     match TRACING_MODE {
-        TracingMode::None => {
-            let mut child = cmd.spawn().unwrap();
-
-            while !terminate.load(Ordering::Relaxed) {
-                sleep(Duration::from_millis(100));
-            }
-
-            child.kill().unwrap();
-        }
-        TracingMode::Software => {
+        TracingMode::None | TracingMode::Software => {
             let handle = thread::spawn(move || {
                 hyperport_reader(
                     mem_path,

@@ -8760,6 +8760,215 @@ fn fcmgt() {
     assert_eq!(register_file.read::<u64>("_Z"), 0xFFFF_FFFF_FFFF_FFFF);
 }
 
+#[ktest]
+fn movi_2() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 0f000761   movi  v1.2s, #0x1b
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0f000761,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+    let q1_offset = z_offset + (1 * 256);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q1_offset.try_into().unwrap()),
+        0x0000001b0000001b,
+    );
+}
+
+#[ktest]
+fn movi_3() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 4f000760   movi  v0.4s, #0x1b
+    // decode_movi_advsimd_aarch64_instrs_vector_logical
+
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x4f000760,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    translation.execute(&register_file);
+
+    let z_offset = model.reg_offset("_Z");
+    let q0_offset = z_offset + (0 * 256);
+
+    assert_eq!(
+        register_file.read_raw::<u128>(q0_offset.try_into().unwrap()),
+        0x0000001b0000001b_0000001b0000001b,
+    );
+}
+
+#[ktest]
+fn str_q0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 3d800000        str     q0, [x0]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x3d800000,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    let mem = alloc::boxed::Box::new(0xdead_c0de_a3a4_a5be_dead_c0de_a3a4_a5beu128);
+
+    register_file.write::<u64>("R0", &*mem as *const _ as u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u128>("_Z"), *mem);
+}
+
+#[ktest]
+fn umov_w24_v0b0() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // umov    w24, v0.b[0]
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e013c18,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+    translation.execute(&register_file);
+}
+
+#[ktest]
+fn addv_b0_v08b() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  addv    b0, v0.8b
+    // execute_aarch64_instrs_vector_reduce_add_simd(0, 64, 8, 0 , 5)
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0e31b800,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    log::error!("{translation:?}");
+
+    register_file.write("_Z", 0xA0B0_C0D0_E0F0_1007u64);
+
+    translation.execute(&register_file);
+
+    assert_eq!(
+        register_file.read::<u8>("_Z"),
+        0xA0u8
+            .wrapping_add(0xB0)
+            .wrapping_add(0xC0)
+            .wrapping_add(0xD0)
+            .wrapping_add(0xE0)
+            .wrapping_add(0xF0)
+            .wrapping_add(0x10)
+            .wrapping_add(0x07)
+    );
+}
+
+#[ktest]
+fn reduce() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let op = emitter.constant(5, Type::Unsigned(32));
+    let src = emitter.read_register(5280, Type::Unsigned(16));
+    let count = emitter.constant(8, Type::Signed(64));
+
+    let arguments = &[op, src, count];
+
+    translate(&model, "Reduce", arguments, &mut emitter, &register_file).unwrap();
+
+    //     (873ms) DEBUG [dbt::translate] translating "Reduce": [
+    //     X86NodeRef(
+    //         X86Node {
+    //             typ: Signed(
+    //                 32,
+    //             ),
+    //             kind: Constant {
+    //                 value: 5,
+    //                 width: 32,
+    //             },
+    //         },
+    //     ),
+    //     X86NodeRef(
+    //         X86Node {
+    //             typ: Unsigned(
+    //                 64,
+    //             ),
+    //             kind: GuestRegister {
+    //                 offset: 5280,
+    //             },
+    //         },
+    //     ),
+    //     X86NodeRef(
+    //         X86Node {
+    //             typ: Signed(
+    //                 64,
+    //             ),
+    //             kind: Constant {
+    //                 value: 8,
+    //                 width: 64,
+    //             },
+    //         },
+    //     ),
+    // ]
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = Translation::new(ctx.compile(num_regs));
+
+    log::error!("{translation:?}");
+}
 // #[ktest]
 // fn shrn() {
 //     todo!()

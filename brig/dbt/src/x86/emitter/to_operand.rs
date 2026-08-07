@@ -728,7 +728,7 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
             NodeKind::BitReplicate { pattern, count } => {
                 let pattern_width = pattern.typ().width();
 
-                let pattern = self.to_operand(pattern);
+                let pattern = self.to_operand_reg_promote(pattern);
                 let count = self.to_operand(count);
 
                 let OperandKind::Immediate(count) = *count.kind() else {
@@ -761,6 +761,18 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
 
                             // punpcklwd xmm0, xmm0
                             self.push_instruction(Instruction::punpcklwd(pattern_xmm, pattern_xmm));
+
+                            pattern_xmm
+                        }
+                        (Width::_128, Width::_64, 2) => {
+                            let mut pattern_xmm = Operand::vreg_xmm(Width::_64, self.next_vreg());
+                            self.push_instruction(Instruction::movq(pattern, pattern_xmm).unwrap());
+                            pattern_xmm.set_width(Width::_128);
+
+                            self.push_instruction(Instruction::punpcklqdq(
+                                pattern_xmm,
+                                pattern_xmm,
+                            ));
 
                             pattern_xmm
                         }

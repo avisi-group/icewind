@@ -138,6 +138,8 @@ pub enum Opcode {
     PUNPCKL(Operand, Operand),
     /// punpcklwd {0}, {1}
     PUNPCKLWD(Operand, Operand),
+    /// punpcklqdq {0}, {1}
+    PUNPCKLQDQ(Operand, Operand),
     /// pshuflw {0}, {1}, {2}
     PSHUFLW(Operand, Operand, Operand),
     /// jmp {0}
@@ -708,6 +710,12 @@ impl Instruction {
     }
 
     pub fn movq(src: Operand, dst: Operand) -> Result<Self, Error> {
+        if let OperandKind::Immediate(_) = src.kind()
+            && dst.register_class() == Some(RegisterClass::Xmm)
+        {
+            return Err(Error::MovImmediateXmm { src, dst });
+        }
+
         if src.register_class() == dst.register_class() {
             return Err(Error::MovqSameClass(src.register_class()));
         }
@@ -847,6 +855,10 @@ impl Instruction {
 
     pub fn punpcklwd(src: Operand, dst: Operand) -> Self {
         Self(Opcode::PUNPCKLWD(src, dst))
+    }
+
+    pub fn punpcklqdq(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::PUNPCKLQDQ(src, dst))
     }
 
     pub fn pinsr(index: Operand, src: Operand, dst: Operand) -> Self {
@@ -1780,7 +1792,22 @@ impl Instruction {
                     width_in_bits: Width::_128,
                 },
             ) => assembler
-                .punpcklwd::<AsmRegisterXmm, AsmRegisterXmm>(
+                .punpcklqdq::<AsmRegisterXmm, AsmRegisterXmm>(
+                    dst.try_into().unwrap(),
+                    src.try_into().unwrap(),
+                )
+                .unwrap(),
+            PUNPCKLQDQ(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_128,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_128,
+                },
+            ) => assembler
+                .punpcklqdq::<AsmRegisterXmm, AsmRegisterXmm>(
                     dst.try_into().unwrap(),
                     src.try_into().unwrap(),
                 )
@@ -2164,7 +2191,8 @@ impl Instruction {
             | Opcode::MULPD(src, dst)
             | Opcode::MULPS(src, dst)
             | Opcode::PUNPCKL(src, dst)
-            | Opcode::PUNPCKLWD(src, dst) => [
+            | Opcode::PUNPCKLWD(src, dst)
+            | Opcode::PUNPCKLQDQ(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
@@ -2318,7 +2346,8 @@ impl Instruction {
             | Opcode::DIVPS(src, dst)
             | Opcode::SUBPS(src, dst)
             | Opcode::PUNPCKL(src, dst)
-            | Opcode::PUNPCKLWD(src, dst) => {
+            | Opcode::PUNPCKLWD(src, dst)
+            | Opcode::PUNPCKLQDQ(src, dst) => {
                 [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
                     .into_iter()
                     .collect()
