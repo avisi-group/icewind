@@ -846,10 +846,11 @@ impl<'a, 'ctx> X86Emitter<'ctx> {
     fn unary_operation_to_operand(&mut self, kind: &UnaryOperationKind) -> Operand {
         match &kind {
             UnaryOperationKind::Complement(value) => {
-                let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
-                let dst = Operand::vreg(width, self.next_vreg());
                 let value = self.to_operand(value);
+                let dst = Operand::vreg(value.width(), self.next_vreg());
+
                 self.push_instruction(Instruction::mov(value, dst).unwrap());
+
                 self.push_instruction(Instruction::not(dst));
                 dst
             }

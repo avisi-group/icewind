@@ -8896,8 +8896,6 @@ fn addv_b0_v08b() {
     let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    log::error!("{translation:?}");
-
     register_file.write("_Z", 0xA0B0_C0D0_E0F0_1007u64);
 
     translation.execute(&register_file);
@@ -8965,9 +8963,32 @@ fn reduce() {
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
+    let _translation = Translation::new(ctx.compile(num_regs));
+}
+
+#[ktest]
+fn mvni() {
+    let (model, register_file, mut ctx) = setup();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // mvni    v1.4s, #0x0
+    translate_instruction(
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x6f000401,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
     let translation = Translation::new(ctx.compile(num_regs));
 
-    log::error!("{translation:?}");
+    register_file.write("_Z", 0xA0B0_C0D0_E0F0_1007u64);
+
+    translation.execute(&register_file);
 }
 // #[ktest]
 // fn shrn() {
