@@ -237,7 +237,14 @@
             pkgs.gdb
             pkgs.gcc-arm-embedded
           ] ++ lib.optionals (system == "x86_64-linux") [
-            pkgs.pkgsCross.aarch64-multiplatform.stdenv.cc
+            # The Dockerfile's gcc-aarch64-linux-gnu, with only its binaries linked
+            # in. As a package, its setup hook would set CC to the aarch64 gcc and
+            # break host C builds (e.g. ring via cc-rs).
+            (pkgs.symlinkJoin {
+              name = "aarch64-unknown-linux-gnu-tools";
+              paths = let cc = pkgs.pkgsCross.aarch64-multiplatform.stdenv.cc; in [ cc cc.bintools ];
+              postBuild = "rm -rf $out/nix-support";
+            })
           ];
 
           # The wrapper falls back to an opam path unless SAIL_DIR is set.
