@@ -1,3 +1,0 @@
-gic_read_ram
-PhysMemRead
-initialize_registers

@@ -193,16 +193,14 @@
           sailrs data/arm-v9.4-a.json $out
         '';
 
-        # Stage 2: JIB archive -> brig guest model. borealis reads denylist.txt
-        # from its working directory (borealis/src/lib.rs). $out is the file
-        # itself, so `nix build .#aarch64-model -o brig-cli/guest_data/aarch64.postcard`
+        # Stage 2: JIB archive -> brig guest model. $out is the file itself, so
+        # `nix build .#aarch64-model -o brig-cli/guest_data/aarch64.postcard`
         # links it straight into brig-cli's guest data.
         aarch64-model = pkgs.runCommand "aarch64.postcard" {
           nativeBuildInputs = [ borealis ];
           # Worker threads overflow Rust's 2 MiB default while building rudder.
           RUST_MIN_STACK = toString (32 * 1024 * 1024);
         } ''
-          cp ${./borealis/denylist.txt} denylist.txt
           borealis ${arm-v9_4-a-jib} $out
         '';
       in

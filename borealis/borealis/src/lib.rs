@@ -1,13 +1,6 @@
 //! Sail frontend for GenSim
 
-use {
-    common::{hashmap::HashSet, intern::InternedString},
-    once_cell::sync::Lazy,
-    std::{
-        fs::File,
-        io::{BufRead, BufReader},
-    },
-};
+use common::intern::InternedString;
 
 pub mod boom;
 pub mod jib;
@@ -27,13 +20,8 @@ pub const DELETED_CALLS: &[&str] = &[
     "execute_aarch64_instrs_integer_crc",
 ];
 
-pub fn fn_is_allowlisted(name: InternedString) -> bool {
-    static FN_DENYLIST: Lazy<HashSet<InternedString>> = Lazy::new(|| {
-        BufReader::new(File::open("denylist.txt").unwrap())
-            .lines()
-            .map(|s| InternedString::from(s.unwrap()))
-            .collect()
-    });
+const FN_DENYLIST: &[&str] = &["gic_read_ram", "PhysMemRead", "initialize_registers"];
 
-    !FN_DENYLIST.contains(&name)
+pub fn fn_is_allowlisted(name: InternedString) -> bool {
+    !FN_DENYLIST.contains(&name.as_ref())
 }
