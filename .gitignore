@@ -18,3 +18,9 @@
 /brig-cli/guest_data/rootfs.ext2
 /brig-cli/guest_data/Image
 /brig-cli/guest_data/vmlinux
+
+.direnv
+result
+_sbuild
+
+z3_problems
