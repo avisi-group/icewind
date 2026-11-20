@@ -29,4 +29,4 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build
-        run: nix build .#devShells.x86_64-linux.default
+        run: nix build .
