@@ -1,11 +1,12 @@
-# borg
+# icewind
 
-## Borealis
-
-> ISA simulation and development.
+> Fast ISA simulation from Sail models
 
 [![CI](https://github.com/avisi-group/borealis/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/borealis/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-borealis-blue)](https://avisi.org.uk/borealis/borealis/)
+
+`icewind` is a toolchain consisting of the `borealis` offline compiler (for preparing ISA models from Sail specifications), and the `brig` runtime (unikernel that hosts the dynamic binary translator and JIT).
+
+## Borealis
 
 ### Build Requirements
 
@@ -17,7 +18,15 @@
 * [Dune](https://dune.build)
 * [`sail` opam package](https://opam.ocaml.org/packages/sail/)
 
-### Usage
+_or_
+
+* Docker
+
+_or_
+
+* Nix
+
+### Usage
 
 ```bash
 $ cd borealis && cargo r --bin borealis -- ../arm-v9.4-a_d43f3f4c.rkyv ../aarch64
